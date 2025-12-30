@@ -77,6 +77,8 @@ type
     pmRepos: TPopupMenu;
     pmSetPublic: TMenuItem;
     pmSetPrivate: TMenuItem;
+    pmSep1: TMenuItem;
+    pmEditGitignore: TMenuItem;
     procedure FormCreate( Sender: TObject );
     procedure FormDestroy( Sender: TObject );
     procedure FormShow( Sender: TObject );
@@ -96,6 +98,8 @@ type
     procedure mnuFilterClick( Sender: TObject );
     procedure pmSetPublicClick( Sender: TObject );
     procedure pmSetPrivateClick( Sender: TObject );
+    procedure pmReposPopup( Sender: TObject );
+    procedure pmEditGitignoreClick( Sender: TObject );
   private
     const
       WM_LOAD_REPOS = WM_USER + 100;
@@ -409,15 +413,15 @@ begin
         iValA, iValB: Integer;
       begin
         // Handle numeric columns separately
-        if FSortColumn in [ 3, 4 ] then
+        if FSortColumn in [ 4, 5 ] then
         begin
           case FSortColumn of
-            3:
+            4:
             begin
               iValA := FRepoManager.Repos[ A ].TrackedFileCount;
               iValB := FRepoManager.Repos[ B ].TrackedFileCount;
             end;
-            4:
+            5:
             begin
               iValA := FRepoManager.Repos[ A ].ModifiedFileCount;
               iValB := FRepoManager.Repos[ B ].ModifiedFileCount;
@@ -450,7 +454,12 @@ begin
               sValA := FRepoManager.Repos[ A ].Branch;
               sValB := FRepoManager.Repos[ B ].Branch;
             end;
-            5:
+            3:
+            begin
+              sValA := RemoteProviderToString( FRepoManager.Repos[ A ].Provider );
+              sValB := RemoteProviderToString( FRepoManager.Repos[ B ].Provider );
+            end;
+            6:
             begin
               sValA := FRepoManager.Repos[ A ].StatusText;
               sValB := FRepoManager.Repos[ B ].StatusText;
@@ -565,6 +574,7 @@ begin
         Item.Caption    := FRepoManager.Repos[ iRepoIndex ].Name;
         Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].Path );
         Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].Branch );
+        Item.SubItems.Add( RemoteProviderToString( FRepoManager.Repos[ iRepoIndex ].Provider ) );
         Item.SubItems.Add( IntToStr( FRepoManager.Repos[ iRepoIndex ].TrackedFileCount ) );
         Item.SubItems.Add( IntToStr( FRepoManager.Repos[ iRepoIndex ].ModifiedFileCount ) );
         Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].StatusText );
@@ -598,9 +608,10 @@ begin
         Item.Caption       := FRepoManager.Repos[ iIndex ].Name;
         Item.SubItems[ 0 ] := FRepoManager.Repos[ iIndex ].Path;
         Item.SubItems[ 1 ] := FRepoManager.Repos[ iIndex ].Branch;
-        Item.SubItems[ 2 ] := IntToStr( FRepoManager.Repos[ iIndex ].TrackedFileCount );
-        Item.SubItems[ 3 ] := IntToStr( FRepoManager.Repos[ iIndex ].ModifiedFileCount );
-        Item.SubItems[ 4 ] := FRepoManager.Repos[ iIndex ].StatusText;
+        Item.SubItems[ 2 ] := RemoteProviderToString( FRepoManager.Repos[ iIndex ].Provider );
+        Item.SubItems[ 3 ] := IntToStr( FRepoManager.Repos[ iIndex ].TrackedFileCount );
+        Item.SubItems[ 4 ] := IntToStr( FRepoManager.Repos[ iIndex ].ModifiedFileCount );
+        Item.SubItems[ 5 ] := FRepoManager.Repos[ iIndex ].StatusText;
       finally
         FUpdatingList := False;
       end;
@@ -1250,6 +1261,68 @@ begin
   finally
     Screen.Cursor := crDefault;
   end;
+
+end;
+
+/// <summary>
+///   Handles the popup menu opening to enable/disable items.
+/// </summary>
+procedure TMainForm.pmReposPopup( Sender: TObject );
+begin
+
+  // Enable .gitignore edit only when a single repository is selected
+  pmEditGitignore.Enabled := ( lvRepos.Selected <> nil );
+
+end;
+
+/// <summary>
+///   Handles the Edit .gitignore menu click.
+/// </summary>
+procedure TMainForm.pmEditGitignoreClick( Sender: TObject );
+var
+  iIndex: Integer;
+  sGitignorePath: string;
+  FileStream: TFileStream;
+begin
+
+  if lvRepos.Selected = nil then
+  begin
+    MessageDlg( 'Please select a repository.', mtInformation, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  iIndex         := Integer( lvRepos.Selected.Data );
+  sGitignorePath := IncludeTrailingPathDelimiter( FRepoManager.Repos[ iIndex ].Path ) + '.gitignore';
+
+  // Check if .gitignore exists, offer to create if not
+  if ( not FileExists( sGitignorePath ) ) then
+  begin
+    if MessageDlg( Format( 'No .gitignore file exists in "%s".%s%sCreate one now?',
+                           [ FRepoManager.Repos[ iIndex ].Name, sLineBreak, sLineBreak ] ),
+                   mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
+      Exit;
+
+    // Create empty .gitignore file
+    try
+      FileStream := TFileStream.Create( sGitignorePath, fmCreate );
+      try
+        // File created empty
+      finally
+        FileStream.Free;
+      end;
+
+      Log( 'Created .gitignore in ' + FRepoManager.Repos[ iIndex ].Name );
+    except
+      on E: Exception do
+      begin
+        MessageDlg( 'Failed to create .gitignore: ' + E.Message, mtError, [ mbOK ], 0 );
+        Exit;
+      end;
+    end;
+  end;
+
+  // Open in default editor
+  ShellExecute( Handle, 'open', PChar( sGitignorePath ), nil, nil, SW_SHOWNORMAL );
 
 end;
 

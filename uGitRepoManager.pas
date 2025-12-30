@@ -65,6 +65,7 @@ type
     Selected: Boolean;
     TrackedFileCount: Integer;
     ModifiedFileCount: Integer;
+    Provider: TRemoteProvider;
   end;
 
   TRepoInfoArray = TArray<TRepoInfo>;
@@ -311,6 +312,11 @@ type
 /// </summary>
 function RepoStatusToString( const Status: TRepoStatus ): string;
 
+/// <summary>
+///   Converts a remote provider to a human-readable string.
+/// </summary>
+function RemoteProviderToString( const Provider: TRemoteProvider ): string;
+
 implementation
 
 function RepoStatusToString( const Status: TRepoStatus ): string;
@@ -323,6 +329,19 @@ begin
     rsError:        Result := 'Error';
   else
     Result := 'Unknown';
+  end;
+
+end;
+
+function RemoteProviderToString( const Provider: TRemoteProvider ): string;
+begin
+
+  case Provider of
+    rpCodeberg: Result := 'Codeberg';
+    rpGitHub:   Result := 'GitHub';
+    rpOther:    Result := 'Other';
+  else
+    Result := 'None';
   end;
 
 end;
@@ -697,6 +716,7 @@ begin
       FRepos[ i ].Selected          := False;
       FRepos[ i ].TrackedFileCount  := 0;
       FRepos[ i ].ModifiedFileCount := 0;
+      FRepos[ i ].Provider          := rpNone;
     end;
 
     Result := True;
@@ -773,6 +793,7 @@ begin
   FRepos[ iLen ].Selected          := False;
   FRepos[ iLen ].TrackedFileCount  := 0;
   FRepos[ iLen ].ModifiedFileCount := 0;
+  FRepos[ iLen ].Provider          := rpNone;
 
   RefreshStatus( iLen );
   SaveConfig;
@@ -794,6 +815,8 @@ begin
 end;
 
 procedure TGitRepoManager.RefreshStatus( const iIndex: Integer );
+var
+  sOriginURL: string;
 begin
 
   if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
@@ -804,6 +827,9 @@ begin
   FRepos[ iIndex ].StatusText        := RepoStatusToString( FRepos[ iIndex ].Status );
   FRepos[ iIndex ].TrackedFileCount  := GetTrackedFileCount( FRepos[ iIndex ].Path );
   FRepos[ iIndex ].ModifiedFileCount := GetModifiedFileCount( FRepos[ iIndex ].Path );
+
+  sOriginURL                         := GetRemoteOriginURL( FRepos[ iIndex ].Path );
+  FRepos[ iIndex ].Provider          := DetectRemoteProvider( sOriginURL );
 
 end;
 

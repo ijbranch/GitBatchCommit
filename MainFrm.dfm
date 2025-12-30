@@ -126,6 +126,11 @@ object MainForm: TMainForm
         end
         item
           Alignment = taCenter
+          Caption = 'Remote'
+          Width = 70
+        end
+        item
+          Alignment = taCenter
           Caption = 'Tracked Files'
           Width = 80
         end
@@ -257,6 +262,7 @@ object MainForm: TMainForm
   object pmRepos: TPopupMenu
     Left = 450
     Top = 200
+    OnPopup = pmReposPopup
     object pmSetPublic: TMenuItem
       Caption = 'Set &Public'
       OnClick = pmSetPublicClick
@@ -264,6 +270,13 @@ object MainForm: TMainForm
     object pmSetPrivate: TMenuItem
       Caption = 'Set Pri&vate'
       OnClick = pmSetPrivateClick
+    end
+    object pmSep1: TMenuItem
+      Caption = '-'
+    end
+    object pmEditGitignore: TMenuItem
+      Caption = 'Edit .&gitignore...'
+      OnClick = pmEditGitignoreClick
     end
   end
 end
