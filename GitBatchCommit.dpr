@@ -21,6 +21,9 @@ uses
   Vcl.Forms,
   MainFrm in 'MainFrm.pas' {MainForm},
   uGitRepoManager in 'uGitRepoManager.pas',
+  uCodebergDialog in 'uCodebergDialog.pas' {CodebergDialog},
+  uCodebergSettings in 'uCodebergSettings.pas' {CodebergSettingsDialog},
+  uGitHubSettings in 'uGitHubSettings.pas' {GitHubSettingsDialog},
   Vcl.Themes,
   Vcl.Styles;
 

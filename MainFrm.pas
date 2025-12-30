@@ -7,13 +7,14 @@
   Licence: Provided as-is for personal and commercial use
 
   Author:  GITLAK Software
-  Version: 1.3.0
+  Version: 1.5.0
 
   Part of GitBatchCommit Application
 
   Description:
     Main form providing the user interface for managing multiple Git
-    repositories and performing batch commit and push operations.
+    repositories and performing batch commit and push operations,
+    including Codeberg repository creation.
 *)
 
 unit MainFrm;
@@ -22,11 +23,12 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, Winapi.ShellAPI, Winapi.CommCtrl,
-  System.SysUtils, System.Variants, System.Classes, System.UITypes, System.Generics.Collections,
+  System.SysUtils, System.StrUtils, System.Variants, System.Classes, System.UITypes, System.Generics.Collections,
   System.Generics.Defaults,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.FileCtrl,
+  Vcl.Menus,
 
-  uGitRepoManager;
+  uGitRepoManager, uCodebergDialog, uCodebergSettings, uGitHubSettings;
 
 type
   /// <summary>
@@ -41,37 +43,75 @@ type
     pnlBottom: TPanel;
     pnlClient: TPanel;
     lvRepos: TListView;
-    btnAddRepo: TButton;
-    btnRemoveRepo: TButton;
-    btnRefresh: TButton;
+    btnSelectModified: TButton;
+    btnSelectAll: TButton;
+    btnSelectNone: TButton;
     lblCommitMessage: TLabel;
     edtCommitMessage: TEdit;
     btnCommitPush: TButton;
     mmoLog: TMemo;
     splitter: TSplitter;
-    btnSelectModified: TButton;
-    btnSelectAll: TButton;
-    btnSelectNone: TButton;
-    pnlButtons: TPanel;
+    MainMenu: TMainMenu;
+    mnuFile: TMenuItem;
+    mnuAddRepository: TMenuItem;
+    mnuRemoveSelected: TMenuItem;
+    mnuFileSep1: TMenuItem;
+    mnuRefreshStatus: TMenuItem;
+    mnuFileSep2: TMenuItem;
+    mnuExit: TMenuItem;
+    mnuCodeberg: TMenuItem;
+    mnuInitPushCodeberg: TMenuItem;
+    mnuCodebergSep1: TMenuItem;
+    mnuCodebergSettings: TMenuItem;
+    mnuGitHub: TMenuItem;
+    mnuInitPushGitHub: TMenuItem;
+    mnuGitHubSep1: TMenuItem;
+    mnuGitHubSettings: TMenuItem;
+    mnuView: TMenuItem;
+    mnuFilter: TMenuItem;
+    mnuFilterAll: TMenuItem;
+    mnuFilterClean: TMenuItem;
+    mnuFilterModified: TMenuItem;
+    mnuFilterPullRequired: TMenuItem;
+    mnuFilterError: TMenuItem;
+    pmRepos: TPopupMenu;
+    pmSetPublic: TMenuItem;
+    pmSetPrivate: TMenuItem;
     procedure FormCreate( Sender: TObject );
     procedure FormDestroy( Sender: TObject );
-    procedure btnAddRepoClick( Sender: TObject );
-    procedure btnRemoveRepoClick( Sender: TObject );
-    procedure btnRefreshClick( Sender: TObject );
+    procedure FormShow( Sender: TObject );
     procedure btnCommitPushClick( Sender: TObject );
     procedure btnSelectModifiedClick( Sender: TObject );
     procedure btnSelectAllClick( Sender: TObject );
     procedure btnSelectNoneClick( Sender: TObject );
     procedure lvReposItemChecked( Sender: TObject; Item: TListItem );
+    procedure mnuAddRepositoryClick( Sender: TObject );
+    procedure mnuRemoveSelectedClick( Sender: TObject );
+    procedure mnuRefreshStatusClick( Sender: TObject );
+    procedure mnuExitClick( Sender: TObject );
+    procedure mnuInitPushCodebergClick( Sender: TObject );
+    procedure mnuCodebergSettingsClick( Sender: TObject );
+    procedure mnuInitPushGitHubClick( Sender: TObject );
+    procedure mnuGitHubSettingsClick( Sender: TObject );
+    procedure mnuFilterClick( Sender: TObject );
+    procedure pmSetPublicClick( Sender: TObject );
+    procedure pmSetPrivateClick( Sender: TObject );
   private
-    FRepoManager: TGitRepoManager;
-    FUpdatingList: Boolean;
-    FSortColumn: Integer;
-    FSortAscending: Boolean;
-    FFilteredIndices: TList<Integer>;
-    FStatusFilter: Integer;
-    FcboFilter: TComboBox;
-    FlblFilter: TLabel;
+    const
+      WM_LOAD_REPOS = WM_USER + 100;
+    var
+      FRepoManager: TGitRepoManager;
+      FUpdatingList: Boolean;
+      FSortColumn: Integer;
+      FSortAscending: Boolean;
+      FFilteredIndices: TList<Integer>;
+      FStatusFilter: Integer;
+      FInitialLoadDone: Boolean;
+
+    /// <summary>
+    ///   Handles custom message to load repositories after form is visible.
+    /// </summary>
+    procedure WMLoadRepos( var Msg: TMessage ); message WM_USER + 100;
 
     /// <summary>
     ///   Populates the list view with all repositories from the manager.
@@ -106,24 +146,19 @@ type
     procedure lvReposColumnClick( Sender: TObject; Column: TListColumn );
 
     /// <summary>
-    ///   Handles filter combo box change.
-    /// </summary>
-    procedure cboFilterChange( Sender: TObject );
-
-    /// <summary>
     ///   Applies current filter and sort to the list.
     /// </summary>
     procedure ApplyFilterAndSort;
 
     /// <summary>
-    ///   Creates runtime UI controls for filtering.
-    /// </summary>
-    procedure CreateFilterControls;
-
-    /// <summary>
     ///   Sets the sort indicator arrow on column header.
     /// </summary>
     procedure SetColumnSortArrow( const iColumn: Integer; const bAscending: Boolean );
+
+    /// <summary>
+    ///   Updates the filter menu checkmarks.
+    /// </summary>
+    procedure UpdateFilterMenuChecks;
   public
   end;
 
@@ -135,7 +170,7 @@ implementation
 {$R *.dfm}
 
 /// <summary>
-///   Initialises the form, loads configuration, and refreshes repository status.
+///   Initialises the form and prepares for loading.
 /// </summary>
 procedure TMainForm.FormCreate( Sender: TObject );
 begin
@@ -144,11 +179,9 @@ begin
   FSortColumn      := -1;
   FSortAscending   := True;
   FStatusFilter    := 0;
+  FInitialLoadDone := False;
   FFilteredIndices := TList<Integer>.Create;
   FRepoManager     := TGitRepoManager.Create;
-
-  // Create filter controls
-  CreateFilterControls;
 
   // Enable drag-and-drop support
   DragAcceptFiles( Handle, True );
@@ -156,21 +189,76 @@ begin
   // Wire up column click event
   lvRepos.OnColumnClick := lvReposColumnClick;
 
-  if ( not FRepoManager.LoadConfig ) then
-    mmoLog.Lines.Add( 'Warning: Failed to load configuration file' );
+  // Set initial filter menu state
+  UpdateFilterMenuChecks;
 
-  mmoLog.Lines.Add( 'Config file: ' + FRepoManager.ConfigPath );
-  mmoLog.Lines.Add( Format( 'Loaded %d repositories', [ Length( FRepoManager.Repos ) ] ) );
-  mmoLog.Lines.Add( 'Refreshing status...' );
-  ScrollLogToEnd;
-  Application.ProcessMessages;
+end;
 
-  FRepoManager.RefreshAllStatus;
-  PopulateListView;
+/// <summary>
+///   Posts a message to trigger loading after form is fully visible.
+/// </summary>
+procedure TMainForm.FormShow( Sender: TObject );
+begin
 
-  mmoLog.Lines.Add( 'Ready. Drag and drop repository folders to add them.' );
-  mmoLog.Lines.Add( 'Click column headers to sort. Use filter dropdown to filter by status.' );
-  ScrollLogToEnd;
+  if FInitialLoadDone then
+    Exit;
+
+  FInitialLoadDone := True;
+
+  // Post message to load after form is fully painted
+  PostMessage( Handle, WM_LOAD_REPOS, 0, 0 );
+
+end;
+
+/// <summary>
+///   Loads configuration and refreshes repository status.
+/// </summary>
+procedure TMainForm.WMLoadRepos( var Msg: TMessage );
+var
+  iCount: Integer;
+begin
+
+  Screen.Cursor := crHourGlass;
+
+  try
+    mmoLog.Lines.Add( 'Loading configuration...' );
+    ScrollLogToEnd;
+    Update;
+
+    if ( not FRepoManager.LoadConfig ) then
+      mmoLog.Lines.Add( 'Warning: Failed to load configuration file' );
+
+    iCount := Length( FRepoManager.Repos );
+    mmoLog.Lines.Add( Format( 'Found %d repositories', [ iCount ] ) );
+    ScrollLogToEnd;
+
+    // Show list immediately with unknown status
+    PopulateListView;
+    Update;
+
+    // Refresh each repository individually so user sees activity
+    if iCount > 0 then
+    begin
+      for var i := 0 to iCount - 1 do
+      begin
+        mmoLog.Lines.Add( Format( 'Checking %s... (%d of %d)',
+          [ FRepoManager.Repos[ i ].Name, i + 1, iCount ] ) );
+        ScrollLogToEnd;
+        Update;
+
+        FRepoManager.RefreshStatus( i );
+        UpdateListItem( i );
+        Update;
+      end;
+    end;
+
+    mmoLog.Lines.Add( '' );
+    mmoLog.Lines.Add( 'Ready. Drag and drop repository folders to add them.' );
+    mmoLog.Lines.Add( 'Click column headers to sort. Use View > Filter to filter by status.' );
+    ScrollLogToEnd;
+  finally
+    Screen.Cursor := crDefault;
+  end;
 
 end;
 
@@ -188,42 +276,37 @@ begin
 end;
 
 /// <summary>
-///   Creates runtime UI controls for filtering.
+///   Updates the filter menu checkmarks.
 /// </summary>
-procedure TMainForm.CreateFilterControls;
+procedure TMainForm.UpdateFilterMenuChecks;
 begin
 
-  FlblFilter         := TLabel.Create( Self );
-  FlblFilter.Parent  := pnlTop;
-  FlblFilter.Left    := pnlTop.Width - 220;
-  FlblFilter.Top     := 12;
-  FlblFilter.Caption := 'Filter:';
-  FlblFilter.Anchors := [ akTop, akRight ];
-
-  FcboFilter             := TComboBox.Create( Self );
-  FcboFilter.Parent      := pnlTop;
-  FcboFilter.Style       := csDropDownList;
-  FcboFilter.Left        := pnlTop.Width - 180;
-  FcboFilter.Top         := 8;
-  FcboFilter.Width       := 170;
-  FcboFilter.Anchors     := [ akTop, akRight ];
-  FcboFilter.Items.Add( 'All' );
-  FcboFilter.Items.Add( 'Clean' );
-  FcboFilter.Items.Add( 'Modified' );
-  FcboFilter.Items.Add( 'Pull Required' );
-  FcboFilter.Items.Add( 'Error' );
-  FcboFilter.ItemIndex   := 0;
-  FcboFilter.OnChange    := cboFilterChange;
+  mnuFilterAll.Checked          := ( FStatusFilter = 0 );
+  mnuFilterClean.Checked        := ( FStatusFilter = 1 );
+  mnuFilterModified.Checked     := ( FStatusFilter = 2 );
+  mnuFilterPullRequired.Checked := ( FStatusFilter = 3 );
+  mnuFilterError.Checked        := ( FStatusFilter = 4 );
 
 end;
 
 /// <summary>
-///   Handles filter combo box change.
+///   Handles filter menu item click.
 /// </summary>
-procedure TMainForm.cboFilterChange( Sender: TObject );
+procedure TMainForm.mnuFilterClick( Sender: TObject );
 begin
 
-  FStatusFilter := FcboFilter.ItemIndex;
+  if Sender = mnuFilterAll then
+    FStatusFilter := 0
+  else if Sender = mnuFilterClean then
+    FStatusFilter := 1
+  else if Sender = mnuFilterModified then
+    FStatusFilter := 2
+  else if Sender = mnuFilterPullRequired then
+    FStatusFilter := 3
+  else if Sender = mnuFilterError then
+    FStatusFilter := 4;
+
+  UpdateFilterMenuChecks;
   PopulateListView;
 
 end;
@@ -323,37 +406,65 @@ begin
       function( const A, B: Integer ): Integer
       var
         sValA, sValB: string;
+        iValA, iValB: Integer;
       begin
-        case FSortColumn of
-          0:
-          begin
-            sValA := FRepoManager.Repos[ A ].Name;
-            sValB := FRepoManager.Repos[ B ].Name;
+        // Handle numeric columns separately
+        if FSortColumn in [ 3, 4 ] then
+        begin
+          case FSortColumn of
+            3:
+            begin
+              iValA := FRepoManager.Repos[ A ].TrackedFileCount;
+              iValB := FRepoManager.Repos[ B ].TrackedFileCount;
+            end;
+            4:
+            begin
+              iValA := FRepoManager.Repos[ A ].ModifiedFileCount;
+              iValB := FRepoManager.Repos[ B ].ModifiedFileCount;
+            end;
+          else
+            iValA := 0;
+            iValB := 0;
           end;
-          1:
-          begin
-            sValA := FRepoManager.Repos[ A ].Path;
-            sValB := FRepoManager.Repos[ B ].Path;
-          end;
-          2:
-          begin
-            sValA := FRepoManager.Repos[ A ].Branch;
-            sValB := FRepoManager.Repos[ B ].Branch;
-          end;
-          3:
-          begin
-            sValA := FRepoManager.Repos[ A ].StatusText;
-            sValB := FRepoManager.Repos[ B ].StatusText;
-          end;
+
+          Result := iValA - iValB;
+
+          if ( not FSortAscending ) then
+            Result := -Result;
+        end
         else
-          sValA := '';
-          sValB := '';
+        begin
+          case FSortColumn of
+            0:
+            begin
+              sValA := FRepoManager.Repos[ A ].Name;
+              sValB := FRepoManager.Repos[ B ].Name;
+            end;
+            1:
+            begin
+              sValA := FRepoManager.Repos[ A ].Path;
+              sValB := FRepoManager.Repos[ B ].Path;
+            end;
+            2:
+            begin
+              sValA := FRepoManager.Repos[ A ].Branch;
+              sValB := FRepoManager.Repos[ B ].Branch;
+            end;
+            5:
+            begin
+              sValA := FRepoManager.Repos[ A ].StatusText;
+              sValB := FRepoManager.Repos[ B ].StatusText;
+            end;
+          else
+            sValA := '';
+            sValB := '';
+          end;
+
+          Result := CompareText( sValA, sValB );
+
+          if ( not FSortAscending ) then
+            Result := -Result;
         end;
-
-        Result := CompareText( sValA, sValB );
-
-        if ( not FSortAscending ) then
-          Result := -Result;
       end
     ) );
   end;
@@ -454,6 +565,8 @@ begin
         Item.Caption    := FRepoManager.Repos[ iRepoIndex ].Name;
         Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].Path );
         Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].Branch );
+        Item.SubItems.Add( IntToStr( FRepoManager.Repos[ iRepoIndex ].TrackedFileCount ) );
+        Item.SubItems.Add( IntToStr( FRepoManager.Repos[ iRepoIndex ].ModifiedFileCount ) );
         Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].StatusText );
         Item.Checked    := FRepoManager.Repos[ iRepoIndex ].Selected;
         Item.Data       := Pointer( iRepoIndex );
@@ -485,7 +598,9 @@ begin
         Item.Caption       := FRepoManager.Repos[ iIndex ].Name;
         Item.SubItems[ 0 ] := FRepoManager.Repos[ iIndex ].Path;
         Item.SubItems[ 1 ] := FRepoManager.Repos[ iIndex ].Branch;
-        Item.SubItems[ 2 ] := FRepoManager.Repos[ iIndex ].StatusText;
+        Item.SubItems[ 2 ] := IntToStr( FRepoManager.Repos[ iIndex ].TrackedFileCount );
+        Item.SubItems[ 3 ] := IntToStr( FRepoManager.Repos[ iIndex ].ModifiedFileCount );
+        Item.SubItems[ 4 ] := FRepoManager.Repos[ iIndex ].StatusText;
       finally
         FUpdatingList := False;
       end;
@@ -509,9 +624,9 @@ begin
 end;
 
 /// <summary>
-///   Handles the Add Repository button click.
+///   Handles the File > Add Repository menu click.
 /// </summary>
-procedure TMainForm.btnAddRepoClick( Sender: TObject );
+procedure TMainForm.mnuAddRepositoryClick( Sender: TObject );
 var
   sFolder: string;
 begin
@@ -532,9 +647,9 @@ begin
 end;
 
 /// <summary>
-///   Handles the Remove Selected button click.
+///   Handles the File > Remove Selected menu click.
 /// </summary>
-procedure TMainForm.btnRemoveRepoClick( Sender: TObject );
+procedure TMainForm.mnuRemoveSelectedClick( Sender: TObject );
 begin
 
   if lvRepos.Selected = nil then
@@ -556,9 +671,9 @@ begin
 end;
 
 /// <summary>
-///   Handles the Refresh Status button click.
+///   Handles the File > Refresh Status menu click.
 /// </summary>
-procedure TMainForm.btnRefreshClick( Sender: TObject );
+procedure TMainForm.mnuRefreshStatusClick( Sender: TObject );
 begin
 
   Screen.Cursor := crHourGlass;
@@ -571,6 +686,16 @@ begin
   finally
     Screen.Cursor := crDefault;
   end;
+
+end;
+
+/// <summary>
+///   Handles the File > Exit menu click.
+/// </summary>
+procedure TMainForm.mnuExitClick( Sender: TObject );
+begin
+
+  Close;
 
 end;
 
@@ -711,6 +836,420 @@ begin
 
   if ( iIndex >= 0 ) and ( iIndex <= High( FRepoManager.Repos ) ) then
     FRepoManager.Repos[ iIndex ].Selected := Item.Checked;
+
+end;
+
+/// <summary>
+///   Handles the Codeberg > Settings menu click.
+/// </summary>
+procedure TMainForm.mnuCodebergSettingsClick( Sender: TObject );
+var
+  sUsername, sToken: string;
+begin
+
+  sUsername := FRepoManager.CodebergUsername;
+  sToken    := FRepoManager.CodebergToken;
+
+  if TCodebergSettingsDialog.Execute( sUsername, sToken ) then
+  begin
+    FRepoManager.CodebergUsername := sUsername;
+    FRepoManager.CodebergToken    := sToken;
+    FRepoManager.SaveConfig;
+    Log( 'Codeberg credentials updated.' );
+  end;
+
+end;
+
+/// <summary>
+///   Handles the Codeberg > Initialize and Push menu click.
+/// </summary>
+procedure TMainForm.mnuInitPushCodebergClick( Sender: TObject );
+var
+  sFolder: string;
+  sRepoName: string;
+  sDescription: string;
+  bPrivate: Boolean;
+  sRemoteURL: string;
+  sError: string;
+  sLog: string;
+begin
+
+  // Check credentials first
+  if ( not FRepoManager.HasCodebergCredentials ) then
+  begin
+    MessageDlg( 'Please configure Codeberg credentials first.', mtWarning, [ mbOK ], 0 );
+    mnuCodebergSettingsClick( nil );
+
+    if ( not FRepoManager.HasCodebergCredentials ) then
+      Exit;
+  end;
+
+  // Select folder
+  if ( not SelectDirectory( 'Select Folder to Initialize as Git Repository', '', sFolder ) ) then
+    Exit;
+
+  // Check if already a Git repository
+  if System.SysUtils.DirectoryExists( sFolder + '\.git' ) then
+  begin
+    MessageDlg( 'The selected folder is already a Git repository.' + sLineBreak +
+                'Use File > Add Repository instead.', mtWarning, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  // Get repository details
+  sRepoName    := ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) );
+  sDescription := '';
+  bPrivate     := False;
+
+  if ( not TCodebergDialog.Execute( sRepoName, sDescription, bPrivate ) ) then
+    Exit;
+
+  // Confirm operation
+  if MessageDlg( Format( 'This will:%s%s' +
+                         '1. Initialize Git repository in: %s%s' +
+                         '2. Create %s repository "%s" on Codeberg%s' +
+                         '3. Commit all files and push%s%s' +
+                         'Continue?',
+                         [ sLineBreak, sLineBreak,
+                           sFolder, sLineBreak,
+                           IfThen( bPrivate, 'private', 'public' ), sRepoName, sLineBreak,
+                           sLineBreak, sLineBreak ] ),
+                 mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
+    Exit;
+
+  Screen.Cursor := crHourGlass;
+
+  try
+    // Step 1: Initialize local repository
+    Log( '=== Initializing Local Repository ===' );
+
+    if ( not FRepoManager.InitializeRepository( sFolder, sLog ) ) then
+    begin
+      Log( 'Error: ' + sLog );
+      MessageDlg( 'Failed to initialize repository: ' + sLog, mtError, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    Log( sLog );
+
+    // Step 2: Create Codeberg repository
+    Log( '=== Creating Codeberg Repository ===' );
+
+    if ( not FRepoManager.CreateCodebergRepository( sRepoName, sDescription, bPrivate, sRemoteURL, sError ) ) then
+    begin
+      Log( 'Error: ' + sError );
+      MessageDlg( 'Failed to create Codeberg repository: ' + sError, mtError, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    Log( 'Created repository: ' + sRemoteURL );
+
+    // Step 3: Add remote origin
+    Log( '=== Adding Remote Origin ===' );
+
+    if ( not FRepoManager.AddRemoteOrigin( sFolder, sRemoteURL, sLog ) ) then
+    begin
+      Log( 'Error: ' + sLog );
+      MessageDlg( 'Failed to add remote origin: ' + sLog, mtError, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    Log( sLog );
+
+    // Step 4: Initial commit and push
+    Log( '=== Initial Commit and Push ===' );
+
+    if ( not FRepoManager.InitialCommitAndPush( sFolder, 'Initial commit', sLog ) ) then
+    begin
+      Log( 'Error: ' + sLog );
+      MessageDlg( 'Failed to commit and push: ' + sLog, mtError, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    Log( sLog );
+
+    // Add to repository list
+    FRepoManager.AddRepository( sFolder );
+    PopulateListView;
+
+    Log( '=== Complete ===' );
+    Log( 'Repository URL: https://codeberg.org/' + FRepoManager.CodebergUsername + '/' + sRepoName );
+
+    MessageDlg( 'Repository created and pushed successfully!' + sLineBreak + sLineBreak +
+                'URL: https://codeberg.org/' + FRepoManager.CodebergUsername + '/' + sRepoName,
+                mtInformation, [ mbOK ], 0 );
+  finally
+    Screen.Cursor := crDefault;
+  end;
+
+end;
+
+/// <summary>
+///   Handles the GitHub > Settings menu click.
+/// </summary>
+procedure TMainForm.mnuGitHubSettingsClick( Sender: TObject );
+var
+  sUsername, sToken: string;
+begin
+
+  sUsername := FRepoManager.GitHubUsername;
+  sToken    := FRepoManager.GitHubToken;
+
+  if TGitHubSettingsDialog.Execute( sUsername, sToken ) then
+  begin
+    FRepoManager.GitHubUsername := sUsername;
+    FRepoManager.GitHubToken    := sToken;
+    FRepoManager.SaveConfig;
+    Log( 'GitHub credentials updated.' );
+  end;
+
+end;
+
+/// <summary>
+///   Handles the GitHub > Initialize and Push menu click.
+/// </summary>
+procedure TMainForm.mnuInitPushGitHubClick( Sender: TObject );
+var
+  sFolder: string;
+  sRepoName: string;
+  sDescription: string;
+  bPrivate: Boolean;
+  sRemoteURL: string;
+  sError: string;
+  sLog: string;
+begin
+
+  // Check credentials first
+  if ( not FRepoManager.HasGitHubCredentials ) then
+  begin
+    MessageDlg( 'Please configure GitHub credentials first.', mtWarning, [ mbOK ], 0 );
+    mnuGitHubSettingsClick( nil );
+
+    if ( not FRepoManager.HasGitHubCredentials ) then
+      Exit;
+  end;
+
+  // Select folder
+  if ( not SelectDirectory( 'Select Folder to Initialize as Git Repository', '', sFolder ) ) then
+    Exit;
+
+  // Check if already a Git repository
+  if System.SysUtils.DirectoryExists( sFolder + '\.git' ) then
+  begin
+    MessageDlg( 'The selected folder is already a Git repository.' + sLineBreak +
+                'Use File > Add Repository instead.', mtWarning, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  // Get repository details (reuse Codeberg dialog as it has same fields)
+  sRepoName    := ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) );
+  sDescription := '';
+  bPrivate     := False;
+
+  if ( not TCodebergDialog.Execute( sRepoName, sDescription, bPrivate ) ) then
+    Exit;
+
+  // Confirm operation
+  if MessageDlg( Format( 'This will:%s%s' +
+                         '1. Initialize Git repository in: %s%s' +
+                         '2. Create %s repository "%s" on GitHub%s' +
+                         '3. Commit all files and push%s%s' +
+                         'Continue?',
+                         [ sLineBreak, sLineBreak,
+                           sFolder, sLineBreak,
+                           IfThen( bPrivate, 'private', 'public' ), sRepoName, sLineBreak,
+                           sLineBreak, sLineBreak ] ),
+                 mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
+    Exit;
+
+  Screen.Cursor := crHourGlass;
+
+  try
+    // Step 1: Initialize local repository
+    Log( '=== Initializing Local Repository ===' );
+
+    if ( not FRepoManager.InitializeRepository( sFolder, sLog ) ) then
+    begin
+      Log( 'Error: ' + sLog );
+      MessageDlg( 'Failed to initialize repository: ' + sLog, mtError, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    Log( sLog );
+
+    // Step 2: Create GitHub repository
+    Log( '=== Creating GitHub Repository ===' );
+
+    if ( not FRepoManager.CreateGitHubRepository( sRepoName, sDescription, bPrivate, sRemoteURL, sError ) ) then
+    begin
+      Log( 'Error: ' + sError );
+      MessageDlg( 'Failed to create GitHub repository: ' + sError, mtError, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    Log( 'Created repository: ' + sRemoteURL );
+
+    // Step 3: Add remote origin
+    Log( '=== Adding Remote Origin ===' );
+
+    if ( not FRepoManager.AddRemoteOrigin( sFolder, sRemoteURL, sLog ) ) then
+    begin
+      Log( 'Error: ' + sLog );
+      MessageDlg( 'Failed to add remote origin: ' + sLog, mtError, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    Log( sLog );
+
+    // Step 4: Initial commit and push
+    Log( '=== Initial Commit and Push ===' );
+
+    if ( not FRepoManager.InitialCommitAndPush( sFolder, 'Initial commit', sLog ) ) then
+    begin
+      Log( 'Error: ' + sLog );
+      MessageDlg( 'Failed to commit and push: ' + sLog, mtError, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    Log( sLog );
+
+    // Add to repository list
+    FRepoManager.AddRepository( sFolder );
+    PopulateListView;
+
+    Log( '=== Complete ===' );
+    Log( 'Repository URL: https://github.com/' + FRepoManager.GitHubUsername + '/' + sRepoName );
+
+    MessageDlg( 'Repository created and pushed successfully!' + sLineBreak + sLineBreak +
+                'URL: https://github.com/' + FRepoManager.GitHubUsername + '/' + sRepoName,
+                mtInformation, [ mbOK ], 0 );
+  finally
+    Screen.Cursor := crDefault;
+  end;
+
+end;
+
+/// <summary>
+///   Handles the Set Public context menu click.
+/// </summary>
+procedure TMainForm.pmSetPublicClick( Sender: TObject );
+var
+  iIndex: Integer;
+  sError: string;
+  Provider: TRemoteProvider;
+  sProviderName: string;
+begin
+
+  if lvRepos.Selected = nil then
+  begin
+    MessageDlg( 'Please select a repository.', mtInformation, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  iIndex   := Integer( lvRepos.Selected.Data );
+  Provider := FRepoManager.GetRepoProvider( iIndex );
+
+  case Provider of
+    rpCodeberg: sProviderName := 'Codeberg';
+    rpGitHub:   sProviderName := 'GitHub';
+    rpOther:
+    begin
+      MessageDlg( 'Visibility change only supported for GitHub and Codeberg repositories.',
+                  mtWarning, [ mbOK ], 0 );
+      Exit;
+    end;
+    rpNone:
+    begin
+      MessageDlg( 'This repository has no remote origin configured.', mtWarning, [ mbOK ], 0 );
+      Exit;
+    end;
+  end;
+
+  if MessageDlg( Format( 'Make repository "%s" PUBLIC on %s?%s%s' +
+                         'This will make the repository visible to everyone.',
+                         [ FRepoManager.Repos[ iIndex ].Name, sProviderName, sLineBreak, sLineBreak ] ),
+                 mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
+    Exit;
+
+  Screen.Cursor := crHourGlass;
+
+  try
+    if FRepoManager.SetRepositoryVisibility( iIndex, False, sError ) then
+    begin
+      Log( Format( 'Repository "%s" set to PUBLIC on %s',
+           [ FRepoManager.Repos[ iIndex ].Name, sProviderName ] ) );
+      MessageDlg( 'Repository visibility changed to PUBLIC.', mtInformation, [ mbOK ], 0 );
+    end
+    else
+    begin
+      Log( 'Error: ' + sError );
+      MessageDlg( 'Failed to change visibility: ' + sError, mtError, [ mbOK ], 0 );
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+
+end;
+
+/// <summary>
+///   Handles the Set Private context menu click.
+/// </summary>
+procedure TMainForm.pmSetPrivateClick( Sender: TObject );
+var
+  iIndex: Integer;
+  sError: string;
+  Provider: TRemoteProvider;
+  sProviderName: string;
+begin
+
+  if lvRepos.Selected = nil then
+  begin
+    MessageDlg( 'Please select a repository.', mtInformation, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  iIndex   := Integer( lvRepos.Selected.Data );
+  Provider := FRepoManager.GetRepoProvider( iIndex );
+
+  case Provider of
+    rpCodeberg: sProviderName := 'Codeberg';
+    rpGitHub:   sProviderName := 'GitHub';
+    rpOther:
+    begin
+      MessageDlg( 'Visibility change only supported for GitHub and Codeberg repositories.',
+                  mtWarning, [ mbOK ], 0 );
+      Exit;
+    end;
+    rpNone:
+    begin
+      MessageDlg( 'This repository has no remote origin configured.', mtWarning, [ mbOK ], 0 );
+      Exit;
+    end;
+  end;
+
+  if MessageDlg( Format( 'Make repository "%s" PRIVATE on %s?%s%s' +
+                         'This will make the repository visible only to you.',
+                         [ FRepoManager.Repos[ iIndex ].Name, sProviderName, sLineBreak, sLineBreak ] ),
+                 mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
+    Exit;
+
+  Screen.Cursor := crHourGlass;
+
+  try
+    if FRepoManager.SetRepositoryVisibility( iIndex, True, sError ) then
+    begin
+      Log( Format( 'Repository "%s" set to PRIVATE on %s',
+           [ FRepoManager.Repos[ iIndex ].Name, sProviderName ] ) );
+      MessageDlg( 'Repository visibility changed to PRIVATE.', mtInformation, [ mbOK ], 0 );
+    end
+    else
+    begin
+      Log( 'Error: ' + sError );
+      MessageDlg( 'Failed to change visibility: ' + sError, mtError, [ mbOK ], 0 );
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
 
 end;
 
