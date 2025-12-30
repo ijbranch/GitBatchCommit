@@ -1,0 +1,45 @@
+# Delphi compiled files
+*.exe
+*.dll
+*.bpl
+*.dcp
+*.dcu
+*.obj
+*.o
+*.ppu
+*.res
+*.rsm
+*.map
+*.local
+*.identcache
+*.projdata
+*.tvsconfig
+*.dsk
+*.stat
+
+# Delphi local files
+__history/
+__recovery/
+*.~*
+
+# Build output directories
+Win32/
+Win64/
+OSX32/
+OSX64/
+Android/
+iOSDevice32/
+iOSDevice64/
+iOSSimulator/
+Linux64/
+
+# IDE files
+*.dproj.local
+*.groupproj.local
+*.deployproj.local
+
+# User-specific files
+*.user
+
+# Claude Code local settings
+.claude/
