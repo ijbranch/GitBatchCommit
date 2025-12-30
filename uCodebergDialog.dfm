@@ -12,12 +12,11 @@ object CodebergDialog: TCodebergDialog
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poMainFormCenter
-  PixelsPerInch = 96
   TextHeight = 15
   object lblRepoName: TLabel
     Left = 16
     Top = 20
-    Width = 95
+    Width = 94
     Height = 15
     Caption = 'Repository Name:'
   end

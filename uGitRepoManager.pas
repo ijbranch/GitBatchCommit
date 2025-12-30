@@ -1,13 +1,45 @@
+﻿(* GITLAK Software
+  ***************************************************************************
+
+    © 2025 Ian Branch (GITLAK Software). All rights reserved.
+
+    This Project, including all code, proprietary algorithms, and associated
+  intellectual property and confidential information, is the exclusive
+  property of Ian Branch (GITLAK Software).
+
+    A licence is granted for the sole purpose of personal use. only.
+
+    THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED.
+    IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DAMAGES ARISING IN
+  CONNECTION WITH THE USE OF THIS SOFTWARE.
+
+  ***************************************************************************
+
+  This code Unit is part of the GitBatchCommit Application/project.
+  This project was developed jointly by the Author and Claude Code.
+
+  ***************************************************************************
+
+  Author(s) :
+  Ian Branch - GITLAK Software.    Claude Code.
+
+  ***************************************************************************
+  File last update : 2025-12-31T09:31:53.286+11:00
+  Signature : 1f35c22a9cb154675eaec1c006328c34615a180b
+  ***************************************************************************
+*)
+
 (*
   uGitRepoManager.pas - Git Repository Manager Class
 
   Copyright (c) 2025 GITLAK Software
   All Rights Reserved
 
-  Licence: Provided as-is for personal and commercial use
+  Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.2.0
+  Version: 1.1.0
 
   Part of GitBatchCommit Application
 
@@ -22,9 +54,9 @@ unit uGitRepoManager;
 interface
 
 uses
-  System.SysUtils, System.StrUtils, System.Classes, System.IOUtils, System.JSON, System.Generics.Collections,
-  System.Net.HttpClient, System.Net.HttpClientComponent, System.Net.URLClient, System.NetEncoding,
-  Winapi.Windows;
+  Winapi.Windows,
+  System.SysUtils, System.StrUtils, System.Classes, System.IOUtils, System.JSON, System.Generics.Collections, System.Net.HttpClient,
+  System.Net.HttpClientComponent, System.Net.URLClient, System.NetEncoding, System.Threading, System.SyncObjs;
 
 const
   /// <summary>
@@ -35,12 +67,12 @@ const
   /// <summary>
   ///   Codeberg API base URL.
   /// </summary>
-  CODEBERG_API_URL = 'https://codeberg.org/api/v1';
+  CODEBERG_API_URL  = 'https://codeberg.org/api/v1';
 
   /// <summary>
   ///   GitHub API base URL.
   /// </summary>
-  GITHUB_API_URL = 'https://api.github.com';
+  GITHUB_API_URL    = 'https://api.github.com';
 
 type
   /// <summary>
@@ -86,15 +118,20 @@ type
     FCodebergToken: string;
     FGitHubUsername: string;
     FGitHubToken: string;
+    FGitClientPath: string;
+    FFilePattern: string;
+    FCommitHistory: TArray<string>;
+    const
+      MAX_HISTORY_ITEMS = 20;
 
-    /// <summary>
-    ///   Executes a Git command in the specified repository directory.
-    /// </summary>
-    /// <param name="sRepoPath">Path to the repository.</param>
-    /// <param name="sCommand">Git command to execute (without 'git' prefix).</param>
-    /// <param name="sOutput">Output from the command.</param>
-    /// <param name="iTimeout">Timeout in milliseconds (default: GIT_COMMAND_TIMEOUT).</param>
-    /// <returns>True if the command executed successfully with exit code 0.</returns>
+      /// <summary>
+      ///   Executes a Git command in the specified repository directory.
+      /// </summary>
+      /// <param name="sRepoPath">Path to the repository.</param>
+      /// <param name="sCommand">Git command to execute (without 'git' prefix).</param>
+      /// <param name="sOutput">Output from the command.</param>
+      /// <param name="iTimeout">Timeout in milliseconds (default: GIT_COMMAND_TIMEOUT).</param>
+      /// <returns>True if the command executed successfully with exit code 0.</returns>
     function ExecuteGitCommand( const sRepoPath, sCommand: string; out sOutput: string;
       const iTimeout: Cardinal = GIT_COMMAND_TIMEOUT ): Boolean;
 
@@ -235,11 +272,11 @@ type
     /// </summary>
     /// <param name="sName">Repository name.</param>
     /// <param name="sDescription">Repository description.</param>
-    /// <param name="bPrivate">True to create a private repository.</param>
+    /// <param name="lPrivate">True to create a private repository.</param>
     /// <param name="sRemoteURL">Returns the clone URL of the created repository.</param>
     /// <param name="sError">Returns error message if failed.</param>
     /// <returns>True if creation succeeded.</returns>
-    function CreateCodebergRepository( const sName, sDescription: string; const bPrivate: Boolean;
+    function CreateCodebergRepository( const sName, sDescription: string; const lPrivate: Boolean;
       out sRemoteURL, sError: string ): Boolean;
 
     /// <summary>
@@ -270,11 +307,11 @@ type
     /// </summary>
     /// <param name="sName">Repository name.</param>
     /// <param name="sDescription">Repository description.</param>
-    /// <param name="bPrivate">True to create a private repository.</param>
+    /// <param name="lPrivate">True to create a private repository.</param>
     /// <param name="sRemoteURL">Returns the clone URL of the created repository.</param>
     /// <param name="sError">Returns error message if failed.</param>
     /// <returns>True if creation succeeded.</returns>
-    function CreateGitHubRepository( const sName, sDescription: string; const bPrivate: Boolean;
+    function CreateGitHubRepository( const sName, sDescription: string; const lPrivate: Boolean;
       out sRemoteURL, sError: string ): Boolean;
 
     /// <summary>
@@ -293,11 +330,29 @@ type
     ///   Changes the visibility of a remote repository.
     /// </summary>
     /// <param name="iIndex">Index of the repository.</param>
-    /// <param name="bPrivate">True to make private, False to make public.</param>
+    /// <param name="lPrivate">True to make private, False to make public.</param>
     /// <param name="sError">Returns error message if failed.</param>
     /// <returns>True if the operation succeeded.</returns>
-    function SetRepositoryVisibility( const iIndex: Integer; const bPrivate: Boolean;
+    function SetRepositoryVisibility( const iIndex: Integer; const lPrivate: Boolean;
       out sError: string ): Boolean;
+
+    /// <summary>
+    ///   Pulls changes from remote for a repository.
+    /// </summary>
+    /// <param name="iIndex">Index of the repository.</param>
+    /// <param name="sLog">Output log of the operation.</param>
+    /// <returns>True if the operation succeeded.</returns>
+    function PullRepository( const iIndex: Integer; out sLog: string ): Boolean;
+
+    /// <summary>
+    ///   Adds a commit message to the history.
+    /// </summary>
+    procedure AddToCommitHistory( const sMessage: string );
+
+    /// <summary>
+    ///   Refreshes all repository statuses in parallel.
+    /// </summary>
+    procedure RefreshAllStatusParallel;
 
     property Repos: TRepoInfoArray read FRepos;
     property ConfigPath: string read FConfigPath;
@@ -305,6 +360,9 @@ type
     property CodebergToken: string read FCodebergToken write FCodebergToken;
     property GitHubUsername: string read FGitHubUsername write FGitHubUsername;
     property GitHubToken: string read FGitHubToken write FGitHubToken;
+    property GitClientPath: string read FGitClientPath write FGitClientPath;
+    property FilePattern: string read FFilePattern write FFilePattern;
+    property CommitHistory: TArray<string> read FCommitHistory;
   end;
 
 /// <summary>
@@ -323,10 +381,10 @@ function RepoStatusToString( const Status: TRepoStatus ): string;
 begin
 
   case Status of
-    rsClean:        Result := 'Clean';
-    rsModified:     Result := 'Modified';
+    rsClean: Result := 'Clean';
+    rsModified: Result := 'Modified';
     rsPullRequired: Result := 'Pull Required';
-    rsError:        Result := 'Error';
+    rsError: Result := 'Error';
   else
     Result := 'Unknown';
   end;
@@ -338,8 +396,8 @@ begin
 
   case Provider of
     rpCodeberg: Result := 'Codeberg';
-    rpGitHub:   Result := 'GitHub';
-    rpOther:    Result := 'Other';
+    rpGitHub: Result := 'GitHub';
+    rpOther: Result := 'Other';
   else
     Result := 'None';
   end;
@@ -367,7 +425,7 @@ end;
 
 function TGitRepoManager.GetConfigFilePath: string;
 var
-  sDir: string;
+  sDir              : string;
 begin
 
   sDir := TPath.Combine( TPath.GetHomePath, 'GitBatchCommit' );
@@ -392,25 +450,25 @@ end;
 function TGitRepoManager.ExecuteGitCommand( const sRepoPath, sCommand: string; out sOutput: string;
   const iTimeout: Cardinal ): Boolean;
 var
-  StartupInfo: TStartupInfo;
-  ProcessInfo: TProcessInformation;
-  SecurityAttr: TSecurityAttributes;
+  StartupInfo       : TStartupInfo;
+  ProcessInfo       : TProcessInformation;
+  SecurityAttr      : TSecurityAttributes;
   hReadPipe, hWritePipe: THandle;
-  Buffer: TBytes;
-  dwBytesRead: DWORD;
-  dwBytesAvail: DWORD;
-  lSuccess: Boolean;
-  dwWaitResult: DWORD;
-  dwExitCode: DWORD;
-  sFullCommand: string;
-  iRemainingTimeout: Integer;
+  Buffer            : TBytes;
+  dwBytesRead       : DWORD;
+  dwBytesAvail      : DWORD;
+  lSuccess          : Boolean;
+  dwWaitResult      : DWORD;
+  dwExitCode        : DWORD;
+  sFullCommand      : string;
+  iRemainingTimeout : Integer;
 begin
 
-  Result  := False;
+  Result := False;
   sOutput := '';
 
-  SecurityAttr.nLength              := SizeOf( TSecurityAttributes );
-  SecurityAttr.bInheritHandle       := True;
+  SecurityAttr.nLength := SizeOf( TSecurityAttributes );
+  SecurityAttr.bInheritHandle := True;
   SecurityAttr.lpSecurityDescriptor := nil;
 
   if ( not CreatePipe( hReadPipe, hWritePipe, @SecurityAttr, 0 ) ) then
@@ -418,10 +476,10 @@ begin
 
   try
     ZeroMemory( @StartupInfo, SizeOf( TStartupInfo ) );
-    StartupInfo.cb          := SizeOf( TStartupInfo );
-    StartupInfo.hStdOutput  := hWritePipe;
-    StartupInfo.hStdError   := hWritePipe;
-    StartupInfo.dwFlags     := STARTF_USESTDHANDLES or STARTF_USESHOWWINDOW;
+    StartupInfo.cb := SizeOf( TStartupInfo );
+    StartupInfo.hStdOutput := hWritePipe;
+    StartupInfo.hStdError := hWritePipe;
+    StartupInfo.dwFlags := STARTF_USESTDHANDLES or STARTF_USESHOWWINDOW;
     StartupInfo.wShowWindow := SW_HIDE;
 
     ZeroMemory( @ProcessInfo, SizeOf( TProcessInformation ) );
@@ -439,7 +497,7 @@ begin
       nil,
       StartupInfo,
       ProcessInfo
-    );
+      );
 
     if lSuccess then
     begin
@@ -515,7 +573,7 @@ end;
 
 function TGitRepoManager.GetRepoBranch( const sRepoPath: string ): string;
 var
-  sOutput: string;
+  sOutput           : string;
 begin
 
   Result := '';
@@ -530,7 +588,7 @@ end;
 
 function TGitRepoManager.NeedsPull( const sRepoPath: string ): Boolean;
 var
-  sOutput: string;
+  sOutput           : string;
 begin
 
   Result := False;
@@ -546,8 +604,8 @@ end;
 
 function TGitRepoManager.GetTrackedFileCount( const sRepoPath: string ): Integer;
 var
-  sOutput: string;
-  Lines: TArray<string>;
+  sOutput           : string;
+  Lines             : TArray<string>;
 begin
 
   Result := 0;
@@ -559,7 +617,7 @@ begin
 
     if ( not sOutput.IsEmpty ) then
     begin
-      Lines  := sOutput.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
+      Lines := sOutput.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
       Result := Length( Lines );
     end;
   end;
@@ -568,8 +626,8 @@ end;
 
 function TGitRepoManager.GetModifiedFileCount( const sRepoPath: string ): Integer;
 var
-  sOutput: string;
-  Lines: TArray<string>;
+  sOutput           : string;
+  Lines             : TArray<string>;
 begin
 
   Result := 0;
@@ -581,7 +639,7 @@ begin
 
     if ( not sOutput.IsEmpty ) then
     begin
-      Lines  := sOutput.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
+      Lines := sOutput.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
       Result := Length( Lines );
     end;
   end;
@@ -590,7 +648,7 @@ end;
 
 function TGitRepoManager.GetRepoStatus( const sRepoPath: string ): TRepoStatus;
 var
-  sOutput: string;
+  sOutput           : string;
 begin
 
   if ( not TDirectory.Exists( TPath.Combine( sRepoPath, '.git' ) ) ) then
@@ -620,23 +678,27 @@ end;
 
 function TGitRepoManager.LoadConfig: Boolean;
 var
-  sJSON: string;
-  JSONValue: TJSONValue;
-  JSONRoot: TJSONObject;
-  JSONArray: TJSONArray;
-  JSONObj: TJSONObject;
+  sJSON             : string;
+  JSONValue         : TJSONValue;
+  JSONRoot          : TJSONObject;
+  JSONArray         : TJSONArray;
+  JSONHistoryArray  : TJSONArray;
+  JSONObj           : TJSONObject;
 begin
 
   Result := False;
   SetLength( FRepos, 0 );
+  SetLength( FCommitHistory, 0 );
   FCodebergUsername := '';
-  FCodebergToken    := '';
-  FGitHubUsername   := '';
-  FGitHubToken      := '';
+  FCodebergToken := '';
+  FGitHubUsername := '';
+  FGitHubToken := '';
+  FGitClientPath := '';
+  FFilePattern := '';
 
   if ( not TFile.Exists( FConfigPath ) ) then
   begin
-    Result := True; // No config file is not an error
+    Result := True;                     // No config file is not an error
     Exit;
   end;
 
@@ -675,11 +737,25 @@ begin
 
       // Load Codeberg credentials
       FCodebergUsername := JSONRoot.GetValue<string>( 'codeberg_username', '' );
-      FCodebergToken    := JSONRoot.GetValue<string>( 'codeberg_token', '' );
+      FCodebergToken := JSONRoot.GetValue<string>( 'codeberg_token', '' );
 
       // Load GitHub credentials
       FGitHubUsername := JSONRoot.GetValue<string>( 'github_username', '' );
-      FGitHubToken    := JSONRoot.GetValue<string>( 'github_token', '' );
+      FGitHubToken := JSONRoot.GetValue<string>( 'github_token', '' );
+
+      // Load settings
+      FGitClientPath := JSONRoot.GetValue<string>( 'git_client_path', '' );
+      FFilePattern := JSONRoot.GetValue<string>( 'file_pattern', '' );
+
+      // Load commit history
+      if JSONRoot.GetValue( 'commit_history' ) is TJSONArray then
+      begin
+        JSONHistoryArray := JSONRoot.GetValue( 'commit_history' ) as TJSONArray;
+        SetLength( FCommitHistory, JSONHistoryArray.Count );
+
+        for var i := 0 to JSONHistoryArray.Count - 1 do
+          FCommitHistory[ i ] := JSONHistoryArray.Items[ i ].Value;
+      end;
 
       // Get repositories array
       if JSONRoot.GetValue( 'repositories' ) is TJSONArray then
@@ -700,7 +776,7 @@ begin
       if ( not ( JSONArray.Items[ i ] is TJSONObject ) ) then
       begin
         // Skip invalid items but continue processing
-        FRepos[ i ].Path   := '';
+        FRepos[ i ].Path := '';
         FRepos[ i ].Status := rsError;
         Continue;
       end;
@@ -710,13 +786,13 @@ begin
       FRepos[ i ].Path := JSONObj.GetValue<string>( 'path', '' );
       FRepos[ i ].Name := ExtractFileName( ExcludeTrailingPathDelimiter( FRepos[ i ].Path ) );
 
-      FRepos[ i ].Branch            := '';
-      FRepos[ i ].Status            := rsUnknown;
-      FRepos[ i ].StatusText        := '';
-      FRepos[ i ].Selected          := False;
-      FRepos[ i ].TrackedFileCount  := 0;
+      FRepos[ i ].Branch := '';
+      FRepos[ i ].Status := rsUnknown;
+      FRepos[ i ].StatusText := '';
+      FRepos[ i ].Selected := False;
+      FRepos[ i ].TrackedFileCount := 0;
       FRepos[ i ].ModifiedFileCount := 0;
-      FRepos[ i ].Provider          := rpNone;
+      FRepos[ i ].Provider := rpNone;
     end;
 
     Result := True;
@@ -728,12 +804,13 @@ end;
 
 function TGitRepoManager.SaveConfig: Boolean;
 var
-  JSONRoot: TJSONObject;
-  JSONArray: TJSONArray;
-  JSONObj: TJSONObject;
+  JSONRoot          : TJSONObject;
+  JSONArray         : TJSONArray;
+  JSONHistoryArray  : TJSONArray;
+  JSONObj           : TJSONObject;
 begin
 
-  Result   := False;
+  Result := False;
   JSONRoot := TJSONObject.Create;
 
   try
@@ -744,6 +821,18 @@ begin
     // Save GitHub credentials
     JSONRoot.AddPair( 'github_username', FGitHubUsername );
     JSONRoot.AddPair( 'github_token', FGitHubToken );
+
+    // Save settings
+    JSONRoot.AddPair( 'git_client_path', FGitClientPath );
+    JSONRoot.AddPair( 'file_pattern', FFilePattern );
+
+    // Save commit history
+    JSONHistoryArray := TJSONArray.Create;
+
+    for var i := 0 to High( FCommitHistory ) do
+      JSONHistoryArray.Add( FCommitHistory[ i ] );
+
+    JSONRoot.AddPair( 'commit_history', JSONHistoryArray );
 
     // Save repositories
     JSONArray := TJSONArray.Create;
@@ -762,7 +851,7 @@ begin
       Result := True;
     except
       on E: Exception do
-        ; // Silently fail, Result remains False
+        ;                               // Silently fail, Result remains False
     end;
   finally
     JSONRoot.Free;
@@ -772,7 +861,7 @@ end;
 
 procedure TGitRepoManager.AddRepository( const sPath: string );
 var
-  iLen: Integer;
+  iLen              : Integer;
 begin
 
   // Check if already exists
@@ -785,15 +874,15 @@ begin
   iLen := Length( FRepos );
   SetLength( FRepos, iLen + 1 );
 
-  FRepos[ iLen ].Path              := sPath;
-  FRepos[ iLen ].Name              := ExtractFileName( ExcludeTrailingPathDelimiter( sPath ) );
-  FRepos[ iLen ].Branch            := '';
-  FRepos[ iLen ].Status            := rsUnknown;
-  FRepos[ iLen ].StatusText        := '';
-  FRepos[ iLen ].Selected          := False;
-  FRepos[ iLen ].TrackedFileCount  := 0;
+  FRepos[ iLen ].Path := sPath;
+  FRepos[ iLen ].Name := ExtractFileName( ExcludeTrailingPathDelimiter( sPath ) );
+  FRepos[ iLen ].Branch := '';
+  FRepos[ iLen ].Status := rsUnknown;
+  FRepos[ iLen ].StatusText := '';
+  FRepos[ iLen ].Selected := False;
+  FRepos[ iLen ].TrackedFileCount := 0;
   FRepos[ iLen ].ModifiedFileCount := 0;
-  FRepos[ iLen ].Provider          := rpNone;
+  FRepos[ iLen ].Provider := rpNone;
 
   RefreshStatus( iLen );
   SaveConfig;
@@ -816,20 +905,20 @@ end;
 
 procedure TGitRepoManager.RefreshStatus( const iIndex: Integer );
 var
-  sOriginURL: string;
+  sOriginURL        : string;
 begin
 
   if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
     Exit;
 
-  FRepos[ iIndex ].Branch            := GetRepoBranch( FRepos[ iIndex ].Path );
-  FRepos[ iIndex ].Status            := GetRepoStatus( FRepos[ iIndex ].Path );
-  FRepos[ iIndex ].StatusText        := RepoStatusToString( FRepos[ iIndex ].Status );
-  FRepos[ iIndex ].TrackedFileCount  := GetTrackedFileCount( FRepos[ iIndex ].Path );
+  FRepos[ iIndex ].Branch := GetRepoBranch( FRepos[ iIndex ].Path );
+  FRepos[ iIndex ].Status := GetRepoStatus( FRepos[ iIndex ].Path );
+  FRepos[ iIndex ].StatusText := RepoStatusToString( FRepos[ iIndex ].Status );
+  FRepos[ iIndex ].TrackedFileCount := GetTrackedFileCount( FRepos[ iIndex ].Path );
   FRepos[ iIndex ].ModifiedFileCount := GetModifiedFileCount( FRepos[ iIndex ].Path );
 
-  sOriginURL                         := GetRemoteOriginURL( FRepos[ iIndex ].Path );
-  FRepos[ iIndex ].Provider          := DetectRemoteProvider( sOriginURL );
+  sOriginURL := GetRemoteOriginURL( FRepos[ iIndex ].Path );
+  FRepos[ iIndex ].Provider := DetectRemoteProvider( sOriginURL );
 
 end;
 
@@ -843,12 +932,12 @@ end;
 
 function TGitRepoManager.CommitAndPush( const iIndex: Integer; const sMessage: string; out sLog: string ): Boolean;
 var
-  sOutput: string;
-  sTempFile: string;
+  sOutput           : string;
+  sTempFile         : string;
 begin
 
   Result := False;
-  sLog   := '';
+  sLog := '';
 
   if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
   begin
@@ -858,14 +947,27 @@ begin
 
   sLog := Format( '=== %s ===%s', [ FRepos[ iIndex ].Name, sLineBreak ] );
 
-  // Stage all changes
-  if ( not ExecuteGitCommand( FRepos[ iIndex ].Path, 'add -A', sOutput ) ) then
+  // Stage changes (use file pattern if specified)
+  if FFilePattern.Trim.IsEmpty then
   begin
-    sLog := sLog + 'Failed to stage changes: ' + Trim( sOutput ) + sLineBreak;
-    Exit;
-  end;
+    if ( not ExecuteGitCommand( FRepos[ iIndex ].Path, 'add -A', sOutput ) ) then
+    begin
+      sLog := sLog + 'Failed to stage changes: ' + Trim( sOutput ) + sLineBreak;
+      Exit;
+    end;
 
-  sLog := sLog + 'Staged changes' + sLineBreak;
+    sLog := sLog + 'Staged all changes' + sLineBreak;
+  end
+  else
+  begin
+    if ( not ExecuteGitCommand( FRepos[ iIndex ].Path, 'add ' + FFilePattern, sOutput ) ) then
+    begin
+      sLog := sLog + 'Failed to stage changes: ' + Trim( sOutput ) + sLineBreak;
+      Exit;
+    end;
+
+    sLog := sLog + 'Staged changes matching: ' + FFilePattern + sLineBreak;
+  end;
 
   // Create temp file for commit message (avoids command injection)
   if ( not CreateCommitMessageFile( sMessage, sTempFile ) ) then
@@ -890,7 +992,7 @@ begin
       try
         TFile.Delete( sTempFile );
       except
-        ; // Ignore cleanup errors
+        ;                               // Ignore cleanup errors
       end;
     end;
   end;
@@ -903,6 +1005,9 @@ begin
   end;
 
   sLog := sLog + 'Pushed successfully' + sLineBreak;
+
+  // Add to commit history
+  AddToCommitHistory( sMessage );
 
   Result := True;
   RefreshStatus( iIndex );
@@ -919,17 +1024,17 @@ end;
 function TGitRepoManager.ExecuteCodebergApiPost( const sEndpoint, sBody: string; out sResponse: string;
   out iStatusCode: Integer ): Boolean;
 var
-  HttpClient: TNetHTTPClient;
-  Response: IHTTPResponse;
-  RequestStream: TStringStream;
-  Headers: TArray<TNameValuePair>;
+  HttpClient        : TNetHTTPClient;
+  Response          : IHTTPResponse;
+  RequestStream     : TStringStream;
+  Headers           : TArray<TNameValuePair>;
 begin
 
-  Result      := False;
-  sResponse   := '';
+  Result := False;
+  sResponse := '';
   iStatusCode := 0;
 
-  HttpClient    := TNetHTTPClient.Create( nil );
+  HttpClient := TNetHTTPClient.Create( nil );
   RequestStream := TStringStream.Create( sBody, TEncoding.UTF8 );
 
   try
@@ -943,8 +1048,8 @@ begin
       Response := HttpClient.Post( CODEBERG_API_URL + sEndpoint, RequestStream, nil, Headers );
 
       iStatusCode := Response.StatusCode;
-      sResponse   := Response.ContentAsString;
-      Result      := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
+      sResponse := Response.ContentAsString;
+      Result := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
     except
       on E: Exception do
         sResponse := 'HTTP Error: ' + E.Message;
@@ -959,17 +1064,17 @@ end;
 function TGitRepoManager.ExecuteGitHubApiPost( const sEndpoint, sBody: string; out sResponse: string;
   out iStatusCode: Integer ): Boolean;
 var
-  HttpClient: TNetHTTPClient;
-  Response: IHTTPResponse;
-  RequestStream: TStringStream;
-  Headers: TArray<TNameValuePair>;
+  HttpClient        : TNetHTTPClient;
+  Response          : IHTTPResponse;
+  RequestStream     : TStringStream;
+  Headers           : TArray<TNameValuePair>;
 begin
 
-  Result      := False;
-  sResponse   := '';
+  Result := False;
+  sResponse := '';
   iStatusCode := 0;
 
-  HttpClient    := TNetHTTPClient.Create( nil );
+  HttpClient := TNetHTTPClient.Create( nil );
   RequestStream := TStringStream.Create( sBody, TEncoding.UTF8 );
 
   try
@@ -984,8 +1089,8 @@ begin
       Response := HttpClient.Post( GITHUB_API_URL + sEndpoint, RequestStream, nil, Headers );
 
       iStatusCode := Response.StatusCode;
-      sResponse   := Response.ContentAsString;
-      Result      := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
+      sResponse := Response.ContentAsString;
+      Result := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
     except
       on E: Exception do
         sResponse := 'HTTP Error: ' + E.Message;
@@ -1000,17 +1105,17 @@ end;
 function TGitRepoManager.ExecuteCodebergApiPatch( const sEndpoint, sBody: string; out sResponse: string;
   out iStatusCode: Integer ): Boolean;
 var
-  HttpClient: TNetHTTPClient;
-  Response: IHTTPResponse;
-  RequestStream: TStringStream;
-  Headers: TArray<TNameValuePair>;
+  HttpClient        : TNetHTTPClient;
+  Response          : IHTTPResponse;
+  RequestStream     : TStringStream;
+  Headers           : TArray<TNameValuePair>;
 begin
 
-  Result      := False;
-  sResponse   := '';
+  Result := False;
+  sResponse := '';
   iStatusCode := 0;
 
-  HttpClient    := TNetHTTPClient.Create( nil );
+  HttpClient := TNetHTTPClient.Create( nil );
   RequestStream := TStringStream.Create( sBody, TEncoding.UTF8 );
 
   try
@@ -1024,8 +1129,8 @@ begin
       Response := HttpClient.Patch( CODEBERG_API_URL + sEndpoint, RequestStream, nil, Headers );
 
       iStatusCode := Response.StatusCode;
-      sResponse   := Response.ContentAsString;
-      Result      := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
+      sResponse := Response.ContentAsString;
+      Result := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
     except
       on E: Exception do
         sResponse := 'HTTP Error: ' + E.Message;
@@ -1040,17 +1145,17 @@ end;
 function TGitRepoManager.ExecuteGitHubApiPatch( const sEndpoint, sBody: string; out sResponse: string;
   out iStatusCode: Integer ): Boolean;
 var
-  HttpClient: TNetHTTPClient;
-  Response: IHTTPResponse;
-  RequestStream: TStringStream;
-  Headers: TArray<TNameValuePair>;
+  HttpClient        : TNetHTTPClient;
+  Response          : IHTTPResponse;
+  RequestStream     : TStringStream;
+  Headers           : TArray<TNameValuePair>;
 begin
 
-  Result      := False;
-  sResponse   := '';
+  Result := False;
+  sResponse := '';
   iStatusCode := 0;
 
-  HttpClient    := TNetHTTPClient.Create( nil );
+  HttpClient := TNetHTTPClient.Create( nil );
   RequestStream := TStringStream.Create( sBody, TEncoding.UTF8 );
 
   try
@@ -1065,8 +1170,8 @@ begin
       Response := HttpClient.Patch( GITHUB_API_URL + sEndpoint, RequestStream, nil, Headers );
 
       iStatusCode := Response.StatusCode;
-      sResponse   := Response.ContentAsString;
-      Result      := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
+      sResponse := Response.ContentAsString;
+      Result := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
     except
       on E: Exception do
         sResponse := 'HTTP Error: ' + E.Message;
@@ -1080,7 +1185,7 @@ end;
 
 function TGitRepoManager.GetRemoteOriginURL( const sRepoPath: string ): string;
 var
-  sOutput: string;
+  sOutput           : string;
 begin
 
   Result := '';
@@ -1092,7 +1197,7 @@ end;
 
 function TGitRepoManager.DetectRemoteProvider( const sOriginURL: string ): TRemoteProvider;
 var
-  sLower: string;
+  sLower            : string;
 begin
 
   Result := rpNone;
@@ -1113,15 +1218,15 @@ end;
 
 function TGitRepoManager.ParseOwnerRepo( const sOriginURL: string; out sOwner, sRepo: string ): Boolean;
 var
-  sURL: string;
-  iPosLastSlash: Integer;
+  sURL              : string;
+  iPosLastSlash     : Integer;
   iPosSecondLastSlash: Integer;
-  sRepoWithExt: string;
+  sRepoWithExt      : string;
 begin
 
   Result := False;
   sOwner := '';
-  sRepo  := '';
+  sRepo := '';
 
   sURL := Trim( sOriginURL );
 
@@ -1157,7 +1262,7 @@ begin
     Exit;
 
   sOwner := Copy( sURL, iPosSecondLastSlash + 2, iPosLastSlash - iPosSecondLastSlash - 1 );
-  sRepo  := sRepoWithExt;
+  sRepo := sRepoWithExt;
 
   Result := ( not sOwner.IsEmpty ) and ( not sRepo.IsEmpty );
 
@@ -1165,7 +1270,7 @@ end;
 
 function TGitRepoManager.GetRepoProvider( const iIndex: Integer ): TRemoteProvider;
 var
-  sOriginURL: string;
+  sOriginURL        : string;
 begin
 
   Result := rpNone;
@@ -1174,19 +1279,19 @@ begin
     Exit;
 
   sOriginURL := GetRemoteOriginURL( FRepos[ iIndex ].Path );
-  Result     := DetectRemoteProvider( sOriginURL );
+  Result := DetectRemoteProvider( sOriginURL );
 
 end;
 
-function TGitRepoManager.SetRepositoryVisibility( const iIndex: Integer; const bPrivate: Boolean;
+function TGitRepoManager.SetRepositoryVisibility( const iIndex: Integer; const lPrivate: Boolean;
   out sError: string ): Boolean;
 var
-  sOriginURL: string;
-  Provider: TRemoteProvider;
-  sOwner, sRepo: string;
-  sRequestBody: string;
-  sResponse: string;
-  iStatusCode: Integer;
+  sOriginURL        : string;
+  Provider          : TRemoteProvider;
+  sOwner, sRepo     : string;
+  sRequestBody      : string;
+  sResponse         : string;
+  iStatusCode       : Integer;
 begin
 
   Result := False;
@@ -1199,7 +1304,7 @@ begin
   end;
 
   sOriginURL := GetRemoteOriginURL( FRepos[ iIndex ].Path );
-  Provider   := DetectRemoteProvider( sOriginURL );
+  Provider := DetectRemoteProvider( sOriginURL );
 
   if Provider = rpNone then
   begin
@@ -1219,54 +1324,54 @@ begin
     Exit;
   end;
 
-  sRequestBody := Format( '{"private": %s}', [ IfThen( bPrivate, 'true', 'false' ) ] );
+  sRequestBody := Format( '{"private": %s}', [ IfThen( lPrivate, 'true', 'false' ) ] );
 
   case Provider of
     rpCodeberg:
-    begin
-      if ( not HasCodebergCredentials ) then
       begin
-        sError := 'Codeberg credentials not configured';
-        Exit;
+        if ( not HasCodebergCredentials ) then
+        begin
+          sError := 'Codeberg credentials not configured';
+          Exit;
+        end;
+
+        if ( not ExecuteCodebergApiPatch( Format( '/repos/%s/%s', [ sOwner, sRepo ] ), sRequestBody, sResponse, iStatusCode ) ) then
+        begin
+          if iStatusCode = 404 then
+            sError := 'Repository not found or no permission'
+          else if iStatusCode = 401 then
+            sError := 'Invalid Codeberg credentials'
+          else
+            sError := Format( 'Codeberg API error (%d): %s', [ iStatusCode, sResponse ] );
+
+          Exit;
+        end;
+
+        Result := True;
       end;
-
-      if ( not ExecuteCodebergApiPatch( Format( '/repos/%s/%s', [ sOwner, sRepo ] ), sRequestBody, sResponse, iStatusCode ) ) then
-      begin
-        if iStatusCode = 404 then
-          sError := 'Repository not found or no permission'
-        else if iStatusCode = 401 then
-          sError := 'Invalid Codeberg credentials'
-        else
-          sError := Format( 'Codeberg API error (%d): %s', [ iStatusCode, sResponse ] );
-
-        Exit;
-      end;
-
-      Result := True;
-    end;
 
     rpGitHub:
-    begin
-      if ( not HasGitHubCredentials ) then
       begin
-        sError := 'GitHub credentials not configured';
-        Exit;
+        if ( not HasGitHubCredentials ) then
+        begin
+          sError := 'GitHub credentials not configured';
+          Exit;
+        end;
+
+        if ( not ExecuteGitHubApiPatch( Format( '/repos/%s/%s', [ sOwner, sRepo ] ), sRequestBody, sResponse, iStatusCode ) ) then
+        begin
+          if iStatusCode = 404 then
+            sError := 'Repository not found or no permission'
+          else if iStatusCode = 401 then
+            sError := 'Invalid GitHub credentials'
+          else
+            sError := Format( 'GitHub API error (%d): %s', [ iStatusCode, sResponse ] );
+
+          Exit;
+        end;
+
+        Result := True;
       end;
-
-      if ( not ExecuteGitHubApiPatch( Format( '/repos/%s/%s', [ sOwner, sRepo ] ), sRequestBody, sResponse, iStatusCode ) ) then
-      begin
-        if iStatusCode = 404 then
-          sError := 'Repository not found or no permission'
-        else if iStatusCode = 401 then
-          sError := 'Invalid GitHub credentials'
-        else
-          sError := Format( 'GitHub API error (%d): %s', [ iStatusCode, sResponse ] );
-
-        Exit;
-      end;
-
-      Result := True;
-    end;
   end;
 
 end;
@@ -1278,18 +1383,18 @@ begin
 
 end;
 
-function TGitRepoManager.CreateGitHubRepository( const sName, sDescription: string; const bPrivate: Boolean;
+function TGitRepoManager.CreateGitHubRepository( const sName, sDescription: string; const lPrivate: Boolean;
   out sRemoteURL, sError: string ): Boolean;
 var
-  sRequestBody: string;
-  sResponse: string;
-  iStatusCode: Integer;
-  JSONResponse: TJSONObject;
+  sRequestBody      : string;
+  sResponse         : string;
+  iStatusCode       : Integer;
+  JSONResponse      : TJSONObject;
 begin
 
-  Result     := False;
+  Result := False;
   sRemoteURL := '';
-  sError     := '';
+  sError := '';
 
   if ( not HasGitHubCredentials ) then
   begin
@@ -1300,8 +1405,8 @@ begin
   // Build request JSON
   sRequestBody := Format(
     '{"name": "%s", "description": "%s", "private": %s, "auto_init": false}',
-    [ sName, sDescription, IfThen( bPrivate, 'true', 'false' ) ]
-  );
+    [ sName, sDescription, IfThen( lPrivate, 'true', 'false' ) ]
+    );
 
   if ( not ExecuteGitHubApiPost( '/user/repos', sRequestBody, sResponse, iStatusCode ) ) then
   begin
@@ -1336,14 +1441,14 @@ begin
     begin
       // Fallback URL construction
       sRemoteURL := Format( 'https://github.com/%s/%s.git', [ FGitHubUsername, sName ] );
-      Result     := True;
+      Result := True;
     end;
   except
     on E: Exception do
     begin
       // Fallback URL construction
       sRemoteURL := Format( 'https://github.com/%s/%s.git', [ FGitHubUsername, sName ] );
-      Result     := True;
+      Result := True;
     end;
   end;
 
@@ -1351,11 +1456,11 @@ end;
 
 function TGitRepoManager.InitializeRepository( const sPath: string; out sLog: string ): Boolean;
 var
-  sOutput: string;
+  sOutput           : string;
 begin
 
   Result := False;
-  sLog   := '';
+  sLog := '';
 
   // Check if folder exists
   if ( not TDirectory.Exists( sPath ) ) then
@@ -1390,18 +1495,18 @@ begin
 
 end;
 
-function TGitRepoManager.CreateCodebergRepository( const sName, sDescription: string; const bPrivate: Boolean;
+function TGitRepoManager.CreateCodebergRepository( const sName, sDescription: string; const lPrivate: Boolean;
   out sRemoteURL, sError: string ): Boolean;
 var
-  sRequestBody: string;
-  sResponse: string;
-  iStatusCode: Integer;
-  JSONResponse: TJSONObject;
+  sRequestBody      : string;
+  sResponse         : string;
+  iStatusCode       : Integer;
+  JSONResponse      : TJSONObject;
 begin
 
-  Result     := False;
+  Result := False;
   sRemoteURL := '';
-  sError     := '';
+  sError := '';
 
   if ( not HasCodebergCredentials ) then
   begin
@@ -1412,8 +1517,8 @@ begin
   // Build request JSON
   sRequestBody := Format(
     '{"name": "%s", "description": "%s", "private": %s, "auto_init": false}',
-    [ sName, sDescription, IfThen( bPrivate, 'true', 'false' ) ]
-  );
+    [ sName, sDescription, IfThen( lPrivate, 'true', 'false' ) ]
+    );
 
   if ( not ExecuteCodebergApiPost( '/user/repos', sRequestBody, sResponse, iStatusCode ) ) then
   begin
@@ -1448,14 +1553,14 @@ begin
     begin
       // Fallback URL construction
       sRemoteURL := Format( 'https://codeberg.org/%s/%s.git', [ FCodebergUsername, sName ] );
-      Result     := True;
+      Result := True;
     end;
   except
     on E: Exception do
     begin
       // Fallback URL construction
       sRemoteURL := Format( 'https://codeberg.org/%s/%s.git', [ FCodebergUsername, sName ] );
-      Result     := True;
+      Result := True;
     end;
   end;
 
@@ -1463,11 +1568,11 @@ end;
 
 function TGitRepoManager.AddRemoteOrigin( const sRepoPath, sRemoteURL: string; out sLog: string ): Boolean;
 var
-  sOutput: string;
+  sOutput           : string;
 begin
 
   Result := False;
-  sLog   := '';
+  sLog := '';
 
   if ( not ExecuteGitCommand( sRepoPath, Format( 'remote add origin "%s"', [ sRemoteURL ] ), sOutput ) ) then
   begin
@@ -1475,19 +1580,19 @@ begin
     Exit;
   end;
 
-  sLog   := 'Added remote origin: ' + sRemoteURL + sLineBreak;
+  sLog := 'Added remote origin: ' + sRemoteURL + sLineBreak;
   Result := True;
 
 end;
 
 function TGitRepoManager.InitialCommitAndPush( const sRepoPath, sMessage: string; out sLog: string ): Boolean;
 var
-  sOutput: string;
-  sTempFile: string;
+  sOutput           : string;
+  sTempFile         : string;
 begin
 
   Result := False;
-  sLog   := '';
+  sLog := '';
 
   // Stage all files
   if ( not ExecuteGitCommand( sRepoPath, 'add -A', sOutput ) ) then
@@ -1520,7 +1625,7 @@ begin
       try
         TFile.Delete( sTempFile );
       except
-        ; // Ignore cleanup errors
+        ;                               // Ignore cleanup errors
       end;
     end;
   end;
@@ -1532,9 +1637,115 @@ begin
     Exit;
   end;
 
-  sLog   := sLog + 'Pushed to origin/main' + sLineBreak;
+  sLog := sLog + 'Pushed to origin/main' + sLineBreak;
   Result := True;
 
 end;
 
+function TGitRepoManager.PullRepository( const iIndex: Integer; out sLog: string ): Boolean;
+var
+  sOutput           : string;
+begin
+
+  Result := False;
+  sLog := '';
+
+  if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
+  begin
+    sLog := 'Invalid repository index';
+    Exit;
+  end;
+
+  if ( not ExecuteGitCommand( FRepos[ iIndex ].Path, 'pull', sOutput ) ) then
+  begin
+    sLog := 'Pull failed: ' + Trim( sOutput );
+    Exit;
+  end;
+
+  sLog := Trim( sOutput );
+  Result := True;
+
+end;
+
+procedure TGitRepoManager.AddToCommitHistory( const sMessage: string );
+var
+  sTrimmed          : string;
+  iNewLen           : Integer;
+begin
+
+  sTrimmed := Trim( sMessage );
+
+  if sTrimmed.IsEmpty then
+    Exit;
+
+  // Check if already at top of history
+  if ( Length( FCommitHistory ) > 0 ) and SameText( FCommitHistory[ 0 ], sTrimmed ) then
+    Exit;
+
+  // Remove if already exists elsewhere in history
+  for var i := High( FCommitHistory ) downto 0 do
+  begin
+    if SameText( FCommitHistory[ i ], sTrimmed ) then
+    begin
+      for var j := i to High( FCommitHistory ) - 1 do
+        FCommitHistory[ j ] := FCommitHistory[ j + 1 ];
+
+      SetLength( FCommitHistory, Length( FCommitHistory ) - 1 );
+      Break;
+    end;
+  end;
+
+  // Add to front
+  iNewLen := Length( FCommitHistory ) + 1;
+
+  if iNewLen > MAX_HISTORY_ITEMS then
+    iNewLen := MAX_HISTORY_ITEMS;
+
+  SetLength( FCommitHistory, iNewLen );
+
+  // Shift existing items
+  for var i := High( FCommitHistory ) downto 1 do
+    FCommitHistory[ i ] := FCommitHistory[ i - 1 ];
+
+  FCommitHistory[ 0 ] := sTrimmed;
+
+  SaveConfig;
+
+end;
+
+procedure TGitRepoManager.RefreshAllStatusParallel;
+var
+  Tasks             : TArray<ITask>;
+  iCount            : Integer;
+begin
+
+  iCount := Length( FRepos );
+
+  if iCount = 0 then
+    Exit;
+
+  SetLength( Tasks, iCount );
+
+  for var i := 0 to iCount - 1 do
+  begin
+    var iIndex := i;                    // Capture by value
+
+    Tasks[ i ] := TTask.Run(
+      procedure
+      begin
+        FRepos[ iIndex ].Branch := GetRepoBranch( FRepos[ iIndex ].Path );
+        FRepos[ iIndex ].Status := GetRepoStatus( FRepos[ iIndex ].Path );
+        FRepos[ iIndex ].StatusText := RepoStatusToString( FRepos[ iIndex ].Status );
+        FRepos[ iIndex ].TrackedFileCount := GetTrackedFileCount( FRepos[ iIndex ].Path );
+        FRepos[ iIndex ].ModifiedFileCount := GetModifiedFileCount( FRepos[ iIndex ].Path );
+        FRepos[ iIndex ].Provider := DetectRemoteProvider( GetRemoteOriginURL( FRepos[ iIndex ].Path ) );
+      end
+      );
+  end;
+
+  TTask.WaitForAll( Tasks );
+
+end;
+
 end.
+

@@ -21,17 +21,37 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 
   Status is determined by running `git status --porcelain`. Any output indicates modifications.
 - **Branch Display** - Shows the current branch for each repository
+- **Remote Provider Display** - Shows the remote provider (GitHub, Codeberg, Other, None) for each repository
 - **Batch Operations** - Commit and push to multiple repositories with one click
 - **Quick Selection** - Buttons to select all, none, or only modified repositories
+- **Shift-Click Selection** - Hold Shift and click to select/deselect a range of repositories
+- **Edit .gitignore** - Right-click a repository to edit its .gitignore file
 - **Column Sorting** - Click any column header to sort; click again to reverse order
 - **Status Filtering** - Use View > Filter menu to show only repositories with specific status
+- **Smart Button State** - Commit & Push button only enabled when repositories are selected and commit message is entered
 - **Operation Log** - Detailed log of all Git operations performed
+- **Help System** - Press F1 to view README documentation; Help > About for version info
+- **Colour-Coded Status** - Repository rows are colour-coded by status (green=Clean, yellow=Modified, orange=Pull Required, red=Error)
+- **Open in Git Client** - Right-click to open repository in configured external Git client (e.g., Fork)
+- **Open in Explorer** - Right-click to open repository folder in Windows Explorer
+- **Pull Operation** - Right-click to pull changes from remote for a single repository
+- **Commit Message History** - Click the dropdown button next to the commit message to select from recent messages (up to 20 stored)
+- **File Pattern Filtering** - Optionally stage only files matching a pattern (e.g., `*.pas`) via File > Settings
 
 ## Requirements
 
 - Delphi 10.3 Rio or higher (uses inline variable declarations)
 - Git installed and available in system PATH
 - Windows operating system
+
+### Third-Party Dependencies
+
+| Component | Description | Source |
+|-----------|-------------|--------|
+| FastMM5 | High-performance memory manager | https://github.com/pleriche/FastMM5 |
+| Aqua Light Slate | VCL visual style (optional - falls back to default if unavailable) | Included with RAD Studio Premium Styles |
+
+**Note:** To remove the FastMM5 dependency, remove `FastMM5` from the uses clause in `GitBatchCommit.dpr`. The project will then use Delphi's default memory manager.
 
 ## Installation
 
@@ -94,7 +114,14 @@ git push
 
 ### Handling Pull Required Status
 
-Repositories flagged as **Pull Required** should be updated manually using your preferred Git client (e.g., Fork) before committing new changes. This prevents potential merge conflicts and ensures you're working with the latest code.
+Repositories flagged as **Pull Required** can be updated using the right-click context menu:
+
+1. Right-click on a repository with **Pull Required** status
+2. Select **Pull**
+3. Confirm the operation
+4. The repository status will be refreshed after the pull completes
+
+Alternatively, use your preferred external Git client for more complex merge scenarios.
 
 ### Creating a New Codeberg Repository
 
@@ -159,6 +186,55 @@ You can change the visibility of GitHub and Codeberg repositories directly from 
 - You must have the appropriate credentials configured
 - You must have permission to modify the repository settings
 
+### Editing .gitignore
+
+You can view and edit a repository's .gitignore file directly from the application:
+
+1. Right-click on a repository in the list
+2. Select **Edit .gitignore...**
+3. If no .gitignore file exists, you'll be prompted to create one
+4. The file opens in your system's default text editor
+
+### Shift-Click Selection
+
+To quickly select or deselect multiple consecutive repositories:
+
+1. Click on a repository to set the anchor point
+2. Hold **Shift** and click on another repository
+3. All repositories between the two clicks will be set to match the checkbox state of the shift-clicked item
+
+### Configuring Settings
+
+Select **File > Settings** to configure:
+
+- **Git Client Path** - Full path to your external Git client executable (e.g., `C:\Program Files\Fork\Fork.exe`)
+- **File Pattern** - Optional pattern for staging files (e.g., `*.pas`). Leave empty to stage all files.
+
+These settings are saved to the configuration file and persist between sessions.
+
+### Using Commit Message History
+
+The application remembers your last 20 commit messages:
+
+1. Click the dropdown button (▼) next to the commit message field
+2. Select a previous message from the list
+3. The message is inserted into the commit field
+
+Messages are automatically added to history when you successfully commit and push.
+
+### Opening Repositories Externally
+
+Right-click on a repository to access quick actions:
+
+- **Open in Explorer** - Opens the repository folder in Windows Explorer
+- **Open in Git Client** - Opens the repository in your configured Git client (requires Git Client Path in Settings)
+- **Pull** - Pulls changes from the remote repository
+
+### Getting Help
+
+- Press **F1** or select **Help > Help Contents** to open the README.md documentation
+- Select **Help > About** to view version information and application details
+
 ## Configuration
 
 Repository paths and credentials are stored in a JSON file located at:
@@ -189,89 +265,35 @@ The file is created automatically when you first add a repository or configure c
 - Requires Git to be installed and in the system PATH
 - Does not handle merge conflicts - repositories requiring a pull should be handled manually
 - Single commit message for all repositories (by design)
+- Cannot delete remote repositories - must be done manually via GitHub/Codeberg web interface
 
 ## Future Enhancements
 
 Potential features for future versions:
 
-- Colour-coded status indicators in the list
-- Context menu to open repository in external Git client
-- File pattern filtering (e.g., only stage `*.pas` files)
-- Parallel status refresh for improved performance
-- Commit message history/templates
-- Pull operation for clean repositories
 - Support for additional Git hosting providers (GitLab, Bitbucket)
+- Parallel status refresh for improved performance
+- Commit message templates (predefined messages)
+- Repository groups/categories
 
 ## Licence
 
-This project is provided as-is for personal and commercial use.
+This project is provided as-is for personal use only.
 
 ## Version History
 
-### 1.7.0
-
-- **Visibility Management:** Change repository visibility (public/private) via right-click context menu
-- **Provider Detection:** Automatically detects GitHub/Codeberg from remote origin URL
-
-### 1.6.0
-
-- **GitHub Integration:** Initialize local folders and push to GitHub in one operation
-- **GitHub Repository Creation:** Create new repositories on GitHub with public/private option
-- **GitHub Credential Storage:** Save GitHub username and access token in configuration
-- **GitHub Settings Dialog:** Configure GitHub credentials via dedicated dialog
-- **File Count Display:** New columns showing tracked files and modified files per repository
-
-### 1.5.0
-
-- **Menu System:** Reorganized UI with main menu bar for cleaner interface
-  - **File menu:** Add Repository, Remove Selected, Refresh Status (F5), Exit
-  - **Codeberg menu:** Initialize & Push to Codeberg, Settings
-  - **GitHub menu:** Initialize & Push to GitHub, Settings
-  - **View menu:** Filter submenu (All, Clean, Modified, Pull Required, Error)
-- **Streamlined Toolbar:** Selection buttons only (Select Modified, Select All, Select None)
-
-### 1.4.0
-
-- **Codeberg Integration:** Initialize local folders and push to Codeberg in one operation
-- **Repository Creation:** Create new repositories on Codeberg with public/private option
-- **Credential Storage:** Save Codeberg username and access token in configuration
-- **Settings Dialog:** Configure Codeberg credentials via dedicated dialog
-
-### 1.3.0
-
-- **Column Sorting:** Click column headers to sort by Name, Path, Branch, or Status
-- **Sort Indicators:** Visual arrows show current sort column and direction
-- **Status Filter:** Dropdown to filter list by status (All, Clean, Modified, Pull Required, Error)
-
-### 1.2.0
-
-- **Drag and Drop:** Added support for dragging repository folders from Windows Explorer onto the application
-- **Multi-select:** Multiple folders can be dropped at once; invalid folders are automatically skipped
-
 ### 1.1.0
 
-- **Security:** Fixed command injection vulnerability in commit messages (now uses temp file)
-- **Reliability:** Git commands now check exit codes to properly detect success/failure
-- **Encoding:** Fixed UTF-8 handling for Git output (supports non-ASCII characters)
-- **Robustness:** Added 60-second timeout to prevent hanging on unresponsive Git operations
-- **Error Handling:** Added proper error handling for file and JSON operations
-- **Persistence:** Selection state now saved and restored between sessions
-- **UI:** Fixed log scroll behaviour to reliably scroll to end
+- Added colour-coded status indicators (green=Clean, yellow=Modified, orange=Pull Required, red=Error)
+- Added context menu options: Open in Explorer, Open in Git Client, Pull
+- Added commit message history (up to 20 messages, accessible via dropdown)
+- Added Settings dialog for Git client path and file pattern filtering
+- Added file pattern filtering for selective staging
 
 ### 1.0.0
 
 - Initial release
-- Basic repository management
-- Status detection with pull required flag
-- Batch commit and push functionality
 
 ---
-*Version: 1.0 – 31 December 2025 05:15*
-*Version: 1.1 – 31 December 2025 05:30 – Renamed uMain to MainFrm*
-*Version: 1.2 – 31 December 2025 06:21 – Added v1.1.0 security and reliability fixes*
-*Version: 1.3 – 31 December 2025 06:31 – Added v1.2.0 drag-and-drop support*
-*Version: 1.4 – 31 December 2025 06:40 – Added v1.3.0 column sorting and status filtering*
-*Version: 1.5 – 31 December 2025 06:41 – Documented status detection criteria*
-*Version: 1.6 – 31 December 2025 07:00 – Added v1.4.0 Codeberg integration*
-*Version: 1.7 – 31 December 2025 07:05 – Documented minimum Delphi version*
-*Version: 1.8 – 31 December 2025 07:10 – Added v1.5.0 menu system*
+*Version: 1.0 – 31 December 2025 09:00*
+*Version: 1.1 – 31 December 2025 09:30*

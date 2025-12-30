@@ -3,7 +3,7 @@ object MainForm: TMainForm
   Top = 0
   Caption = 'Git Batch Commit'
   ClientHeight = 600
-  ClientWidth = 946
+  ClientWidth = 1012
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -19,7 +19,7 @@ object MainForm: TMainForm
   object splitter: TSplitter
     Left = 0
     Top = 400
-    Width = 946
+    Width = 1012
     Height = 5
     Cursor = crVSplit
     Align = alBottom
@@ -27,7 +27,7 @@ object MainForm: TMainForm
   object pnlTop: TPanel
     Left = 0
     Top = 0
-    Width = 946
+    Width = 1012
     Height = 41
     Align = alTop
     BevelOuter = bvNone
@@ -63,7 +63,7 @@ object MainForm: TMainForm
   object pnlBottom: TPanel
     Left = 0
     Top = 555
-    Width = 946
+    Width = 1012
     Height = 45
     Align = alBottom
     BevelOuter = bvNone
@@ -78,9 +78,22 @@ object MainForm: TMainForm
     object edtCommitMessage: TEdit
       Left = 112
       Top = 11
-      Width = 600
+      Width = 573
       Height = 23
-      TabOrder = 1
+      TabOrder = 2
+      OnChange = edtCommitMessageChange
+    end
+    object btnHistory: TButton
+      Left = 691
+      Top = 10
+      Width = 25
+      Height = 25
+      Hint = 'Commit message history'
+      Caption = #9660
+      ParentShowHint = False
+      ShowHint = True
+      TabOrder = 0
+      OnClick = btnHistoryClick
     end
     object btnCommitPush: TButton
       Left = 720
@@ -88,14 +101,14 @@ object MainForm: TMainForm
       Width = 170
       Height = 25
       Caption = 'Commit && Push Selected'
-      TabOrder = 0
+      TabOrder = 1
       OnClick = btnCommitPushClick
     end
   end
   object pnlClient: TPanel
     Left = 0
     Top = 41
-    Width = 946
+    Width = 1012
     Height = 359
     Align = alClient
     BevelOuter = bvNone
@@ -103,7 +116,7 @@ object MainForm: TMainForm
     object lvRepos: TListView
       Left = 0
       Top = 0
-      Width = 946
+      Width = 1012
       Height = 359
       Hint = 
         'Ready. Drag and drop repository folders to add them. Click colum' +
@@ -147,17 +160,19 @@ object MainForm: TMainForm
       ReadOnly = True
       RowSelect = True
       ParentShowHint = False
+      PopupMenu = pmRepos
       ShowHint = True
       TabOrder = 0
       ViewStyle = vsReport
+      OnClick = lvReposClick
+      OnCustomDrawItem = lvReposCustomDrawItem
       OnItemChecked = lvReposItemChecked
-      PopupMenu = pmRepos
     end
   end
   object mmoLog: TMemo
     Left = 0
     Top = 405
-    Width = 946
+    Width = 1012
     Height = 150
     Align = alBottom
     Font.Charset = DEFAULT_CHARSET
@@ -192,6 +207,13 @@ object MainForm: TMainForm
         OnClick = mnuRefreshStatusClick
       end
       object mnuFileSep2: TMenuItem
+        Caption = '-'
+      end
+      object mnuSettings: TMenuItem
+        Caption = '&Settings...'
+        OnClick = mnuSettingsClick
+      end
+      object mnuFileSep3: TMenuItem
         Caption = '-'
       end
       object mnuExit: TMenuItem
@@ -258,11 +280,26 @@ object MainForm: TMainForm
         end
       end
     end
+    object mnuHelp: TMenuItem
+      Caption = '&Help'
+      object mnuHelpContents: TMenuItem
+        Caption = '&Help Contents'
+        ShortCut = 112
+        OnClick = mnuHelpContentsClick
+      end
+      object mnuHelpSep1: TMenuItem
+        Caption = '-'
+      end
+      object mnuAbout: TMenuItem
+        Caption = '&About...'
+        OnClick = mnuAboutClick
+      end
+    end
   end
   object pmRepos: TPopupMenu
+    OnPopup = pmReposPopup
     Left = 450
     Top = 200
-    OnPopup = pmReposPopup
     object pmSetPublic: TMenuItem
       Caption = 'Set &Public'
       OnClick = pmSetPublicClick
@@ -278,5 +315,27 @@ object MainForm: TMainForm
       Caption = 'Edit .&gitignore...'
       OnClick = pmEditGitignoreClick
     end
+    object pmSep2: TMenuItem
+      Caption = '-'
+    end
+    object pmOpenInExplorer: TMenuItem
+      Caption = 'Open in &Explorer'
+      OnClick = pmOpenInExplorerClick
+    end
+    object pmOpenInGitClient: TMenuItem
+      Caption = 'Open in &Git Client'
+      OnClick = pmOpenInGitClientClick
+    end
+    object pmSep3: TMenuItem
+      Caption = '-'
+    end
+    object pmPull: TMenuItem
+      Caption = 'Pu&ll'
+      OnClick = pmPullClick
+    end
+  end
+  object pmHistory: TPopupMenu
+    Left = 500
+    Top = 200
   end
 end

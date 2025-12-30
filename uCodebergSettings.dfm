@@ -12,27 +12,26 @@ object CodebergSettingsDialog: TCodebergSettingsDialog
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poMainFormCenter
-  PixelsPerInch = 96
   TextHeight = 15
   object lblUsername: TLabel
     Left = 16
     Top = 20
-    Width = 58
+    Width = 56
     Height = 15
     Caption = 'Username:'
   end
   object lblToken: TLabel
     Left = 16
     Top = 60
-    Width = 80
+    Width = 74
     Height = 15
     Caption = 'Access Token:'
   end
   object lblHelp: TLabel
     Left = 16
     Top = 93
-    Width = 330
-    Height = 15
+    Width = 307
+    Height = 13
     Caption = 'Generate token at: codeberg.org/user/settings/applications'
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clGray

@@ -12,27 +12,26 @@ object GitHubSettingsDialog: TGitHubSettingsDialog
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poMainFormCenter
-  PixelsPerInch = 96
   TextHeight = 15
   object lblUsername: TLabel
     Left = 16
     Top = 20
-    Width = 58
+    Width = 56
     Height = 15
     Caption = 'Username:'
   end
   object lblToken: TLabel
     Left = 16
     Top = 60
-    Width = 80
+    Width = 74
     Height = 15
     Caption = 'Access Token:'
   end
   object lblHelp: TLabel
     Left = 16
     Top = 93
-    Width = 310
-    Height = 15
+    Width = 242
+    Height = 13
     Caption = 'Generate token at: github.com/settings/tokens'
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clGray
