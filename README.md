@@ -13,6 +13,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Codeberg Integration** - Create new Codeberg repositories and push directly from the application
 - **GitHub Integration** - Create new GitHub repositories and push directly from the application
 - **Visibility Management** - Change repository visibility (public/private) via right-click context menu
+- **Parallel Status Refresh** - Repository status checks run in parallel on background threads, keeping the UI responsive
 - **Status Detection** - Automatically detects repository status:
   - **Clean** - No local changes, up to date with remote
   - **Modified** - Local uncommitted changes present (modified, staged, untracked, or deleted files)
@@ -272,7 +273,6 @@ The file is created automatically when you first add a repository or configure c
 Potential features for future versions:
 
 - Support for additional Git hosting providers (GitLab, Bitbucket)
-- Parallel status refresh for improved performance
 - Commit message templates (predefined messages)
 - Repository groups/categories
 
@@ -281,6 +281,13 @@ Potential features for future versions:
 This project is provided as-is for personal use only.
 
 ## Version History
+
+### 1.2.0
+
+- Added parallel status refresh - repositories are now checked concurrently for faster performance
+- UI remains responsive during status refresh operations
+- Optimized git command execution (reduced redundant calls)
+- Real-time list updates as each repository status completes
 
 ### 1.1.0
 
@@ -297,3 +304,4 @@ This project is provided as-is for personal use only.
 ---
 *Version: 1.0 – 31 December 2025 09:00*
 *Version: 1.1 – 31 December 2025 09:30*
+*Version: 1.2 – 1 January 2026 14:40*

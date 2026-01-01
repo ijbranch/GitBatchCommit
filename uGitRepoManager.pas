@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.1.0
+  Version: 1.2.0
 
   Part of GitBatchCommit Application
 
@@ -55,8 +55,10 @@ interface
 
 uses
   Winapi.Windows,
-  System.SysUtils, System.StrUtils, System.Classes, System.IOUtils, System.JSON, System.Generics.Collections, System.Net.HttpClient,
-  System.Net.HttpClientComponent, System.Net.URLClient, System.NetEncoding, System.Threading, System.SyncObjs;
+
+  System.SysUtils, System.StrUtils, System.Classes, System.IOUtils, System.JSON,
+  System.Generics.Collections, System.Net.HttpClient, System.Net.HttpClientComponent,
+  System.Net.URLClient, System.NetEncoding, System.Threading, System.SyncObjs;
 
 const
   /// <summary>

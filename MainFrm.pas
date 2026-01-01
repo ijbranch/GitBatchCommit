@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.1.0
+  Version: 1.2.0
 
   Part of GitBatchCommit Application
 
@@ -55,8 +55,12 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, Winapi.ShellAPI, Winapi.CommCtrl,
+
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.FileCtrl, Vcl.Menus,
-  System.SysUtils, System.StrUtils, System.Variants, System.Classes, System.Types, System.UITypes, System.Generics.Collections, System.Generics.Defaults, System.Threading,
+
+  System.SysUtils, System.StrUtils, System.Variants, System.Classes, System.Types, System.UITypes,
+  System.Generics.Collections, System.Generics.Defaults, System.Threading,
+
   uGitRepoManager, uCodebergDialog, uCodebergSettings, uGitHubSettings;
 
 type
@@ -862,7 +866,7 @@ begin
 
     FRepoManager.AddRepository( sFolder );
     PopulateListView;
-    Log( 'Added repository: ' + sFolder );
+    Log( Format( 'Added repository: %s', [ sFolder ] ) );
   end;
 
 end;
@@ -884,7 +888,7 @@ begin
   if MessageDlg( Format( 'Remove repository "%s" from the list?', [ FRepoManager.Repos[ iIndex ].Name ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) = mrYes then
   begin
-    Log( 'Removed repository: ' + FRepoManager.Repos[ iIndex ].Name );
+    Log( Format( 'Removed repository: %s', [ FRepoManager.Repos[ iIndex ].Name ] ) );
     FRepoManager.RemoveRepository( iIndex );
     PopulateListView;
   end;
@@ -1561,7 +1565,7 @@ end;
 /// </summary>
 procedure TMainForm.mnuAboutClick( Sender: TObject );
 const
-  APP_VERSION       = '1.1.0';
+  APP_VERSION       = '1.2.0';
 begin
 
   MessageDlg(
