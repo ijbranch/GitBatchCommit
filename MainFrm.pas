@@ -132,6 +132,10 @@ type
     cboGroupFilter: TComboBox;
     lblGroupFilter: TLabel;
     pmSetGroup: TMenuItem;
+    btnDetails: TButton;
+    pnlDetails: TPanel;
+    lblDetails: TLabel;
+    mmoDetails: TMemo;
     procedure FormCreate( Sender: TObject );
     procedure FormDestroy( Sender: TObject );
     procedure FormShow( Sender: TObject );
@@ -167,6 +171,7 @@ type
     procedure btnTemplatesClick( Sender: TObject );
     procedure mnuTemplateSettingsClick( Sender: TObject );
     procedure cboGroupFilterChange( Sender: TObject );
+    procedure btnDetailsClick( Sender: TObject );
   private
     const
       WM_LOAD_REPOS = WM_USER + 100;
@@ -964,16 +969,27 @@ procedure TMainForm.btnCommitPushClick( Sender: TObject );
 var
   sLog              : string;
   iRepoIndex        : Integer;
+  sSummary          : string;
+  sDetails          : string;
+  sMessage          : string;
 begin
 
-  var sMessage := Trim( edtCommitMessage.Text );
+  sSummary := Trim( edtCommitMessage.Text );
 
-  if sMessage.IsEmpty then
+  if sSummary.IsEmpty then
   begin
     MessageDlg( 'Please enter a commit message.', mtWarning, [ mbOK ], 0 );
     edtCommitMessage.SetFocus;
     Exit;
   end;
+
+  // Build full commit message with optional details
+  sDetails := Trim( mmoDetails.Text );
+
+  if sDetails.IsEmpty then
+    sMessage := sSummary
+  else
+    sMessage := sSummary + sLineBreak + sLineBreak + sDetails;
 
   // Count selected repositories with modifications
   var iCount := 0;
@@ -1019,6 +1035,14 @@ begin
   end;
 
   Log( Format( 'Completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+
+  // Clear details after successful commit
+  if iSuccess > 0 then
+  begin
+    mmoDetails.Clear;
+    pnlDetails.Visible := False;
+  end;
+
   MessageDlg( Format( 'Completed: %d of %d successful.', [ iSuccess, iCount ] ), mtInformation, [ mbOK ], 0 );
 
 end;
@@ -1975,6 +1999,19 @@ begin
     FRepoManager.SaveConfig;
     Log( 'Templates updated.' );
   end;
+
+end;
+
+/// <summary>
+///   Toggles the visibility of the commit details panel.
+/// </summary>
+procedure TMainForm.btnDetailsClick( Sender: TObject );
+begin
+
+  pnlDetails.Visible := not pnlDetails.Visible;
+
+  if pnlDetails.Visible then
+    mmoDetails.SetFocus;
 
 end;
 

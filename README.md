@@ -38,6 +38,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Pull Operation** - Right-click to pull changes from remote for a single repository
 - **Commit Message History** - Click the dropdown button next to the commit message to select from recent messages (up to 20 stored)
 - **Commit Message Templates** - Define reusable commit message templates via File > Templates; select from the templates dropdown (▽) next to the commit message
+- **Commit Details** - Click the "..." button to add a detailed description below the summary line (standard Git commit format)
 - **Repository Groups** - Assign repositories to groups for easy filtering; use the Group dropdown in the toolbar to filter by group
 - **File Pattern Filtering** - Optionally stage only files matching a pattern (e.g., `*.pas`) via File > Settings
 
@@ -225,6 +226,26 @@ The application remembers your last 20 commit messages:
 
 Messages are automatically added to history when you successfully commit and push.
 
+### Using Commit Details
+
+For more detailed commit messages, you can add a description below the summary line:
+
+1. Enter your summary in the main commit message field
+2. Click the **...** button to reveal the details panel
+3. Enter your detailed description in the memo field
+4. Click **Commit & Push Selected**
+
+The commit message will be formatted as:
+
+```
+Summary line
+
+Detailed description explaining the changes,
+which can span multiple lines.
+```
+
+After a successful commit, the details panel is automatically cleared and hidden.
+
 ### Using Commit Message Templates
 
 Create reusable commit message templates for common operations:
@@ -331,9 +352,11 @@ This project is provided as-is for personal use only.
 ### 1.3.0
 
 - Added commit message templates - create and manage reusable commit messages via File > Templates
+- Added commit details panel - click "..." to add detailed description (standard Git format)
 - Added repository groups - organise repositories into groups for filtering
 - Added Group filter dropdown in toolbar
 - Added Set Group context menu item
+- Fixed shift-click range selection for checking/unchecking repositories
 
 ### 1.2.0
 

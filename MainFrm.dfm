@@ -94,13 +94,25 @@ object MainForm: TMainForm
     object edtCommitMessage: TEdit
       Left = 112
       Top = 11
-      Width = 573
+      Width = 541
       Height = 23
       TabOrder = 2
       OnChange = edtCommitMessageChange
     end
+    object btnDetails: TButton
+      Left = 659
+      Top = 10
+      Width = 25
+      Height = 25
+      Hint = 'Show/hide commit details'
+      Caption = '...'
+      ParentShowHint = False
+      ShowHint = True
+      TabOrder = 3
+      OnClick = btnDetailsClick
+    end
     object btnHistory: TButton
-      Left = 691
+      Left = 690
       Top = 10
       Width = 25
       Height = 25
@@ -112,7 +124,7 @@ object MainForm: TMainForm
       OnClick = btnHistoryClick
     end
     object btnTemplates: TButton
-      Left = 722
+      Left = 721
       Top = 10
       Width = 25
       Height = 25
@@ -120,17 +132,42 @@ object MainForm: TMainForm
       Caption = #9661
       ParentShowHint = False
       ShowHint = True
-      TabOrder = 3
+      TabOrder = 4
       OnClick = btnTemplatesClick
     end
     object btnCommitPush: TButton
-      Left = 753
+      Left = 752
       Top = 10
       Width = 170
       Height = 25
       Caption = 'Commit && Push Selected'
       TabOrder = 1
       OnClick = btnCommitPushClick
+    end
+  end
+  object pnlDetails: TPanel
+    Left = 0
+    Top = 480
+    Width = 1012
+    Height = 75
+    Align = alBottom
+    BevelOuter = bvNone
+    TabOrder = 4
+    Visible = False
+    object lblDetails: TLabel
+      Left = 8
+      Top = 4
+      Width = 38
+      Height = 15
+      Caption = 'Details:'
+    end
+    object mmoDetails: TMemo
+      Left = 112
+      Top = 1
+      Width = 810
+      Height = 70
+      ScrollBars = ssVertical
+      TabOrder = 0
     end
   end
   object pnlClient: TPanel
