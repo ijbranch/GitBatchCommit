@@ -56,7 +56,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, Winapi.ShellAPI, Winapi.CommCtrl,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.FileCtrl, Vcl.Menus,
-  System.SysUtils, System.StrUtils, System.Variants, System.Classes, System.Types, System.UITypes, System.Generics.Collections, System.Generics.Defaults,
+  System.SysUtils, System.StrUtils, System.Variants, System.Classes, System.Types, System.UITypes, System.Generics.Collections, System.Generics.Defaults, System.Threading,
   uGitRepoManager, uCodebergDialog, uCodebergSettings, uGitHubSettings;
 
 type
@@ -165,11 +165,17 @@ type
       FStatusFilter : Integer;
       FInitialLoadDone: Boolean;
       FLastClickedIndex: Integer;
+      FRefreshing   : Boolean;
 
       /// <summary>
       ///   Handles custom message to load repositories after form is visible.
       /// </summary>
     procedure WMLoadRepos( var Msg: TMessage ); message WM_USER + 100;
+
+    /// <summary>
+    ///   Refreshes all repositories asynchronously in background threads.
+    /// </summary>
+    procedure RefreshReposAsync;
 
     /// <summary>
     ///   Populates the list view with all repositories from the manager.
@@ -313,29 +319,69 @@ begin
     PopulateListView;
     Update;
 
-    // Refresh each repository individually so user sees activity
-    if iCount > 0 then
-    begin
-      for var i := 0 to iCount - 1 do
-      begin
-        mmoLog.Lines.Add( Format( 'Checking %s... (%d of %d)',
-          [ FRepoManager.Repos[ i ].Name, i + 1, iCount ] ) );
-        ScrollLogToEnd;
-        Update;
-
-        FRepoManager.RefreshStatus( i );
-        UpdateListItem( i );
-        Update;
-      end;
-    end;
-
     mmoLog.Lines.Add( '' );
     mmoLog.Lines.Add( 'Ready. Drag and drop repository folders to add them.' );
     mmoLog.Lines.Add( 'Click column headers to sort. Use View > Filter to filter by status.' );
     ScrollLogToEnd;
+
+    // Refresh repositories asynchronously to keep UI responsive
+    if iCount > 0 then
+      RefreshReposAsync;
   finally
     Screen.Cursor := crDefault;
   end;
+
+end;
+
+/// <summary>
+///   Refreshes all repositories asynchronously using parallel processing.
+/// </summary>
+procedure TMainForm.RefreshReposAsync;
+var
+  iCount            : Integer;
+begin
+
+  if FRefreshing then
+  begin
+    Log( 'Refresh already in progress...' );
+    Exit;
+  end;
+
+  iCount := Length( FRepoManager.Repos );
+  if iCount = 0 then
+    Exit;
+
+  FRefreshing := True;
+  Screen.Cursor := crHourGlass;
+
+  TThread.CreateAnonymousThread(
+    procedure
+    begin
+      TParallel.For( 0, iCount - 1,
+        procedure( AIndex: Integer )
+        var
+          sName: string;
+        begin
+          FRepoManager.RefreshStatus( AIndex );
+          sName := FRepoManager.Repos[ AIndex ].Name;
+
+          TThread.Queue( nil,
+            procedure
+            begin
+              UpdateListItem( AIndex );
+              mmoLog.Lines.Add( Format( 'Checked %s', [ sName ] ) );
+              ScrollLogToEnd;
+            end );
+        end );
+
+      TThread.Synchronize( nil,
+        procedure
+        begin
+          FRefreshing := False;
+          Screen.Cursor := crDefault;
+          Log( 'Refresh complete.' );
+        end );
+    end ).Start;
 
 end;
 
@@ -775,6 +821,7 @@ begin
         Item.SubItems[ 3 ] := IntToStr( FRepoManager.Repos[ iIndex ].TrackedFileCount );
         Item.SubItems[ 4 ] := IntToStr( FRepoManager.Repos[ iIndex ].ModifiedFileCount );
         Item.SubItems[ 5 ] := FRepoManager.Repos[ iIndex ].StatusText;
+        lvRepos.UpdateItems( i, i );
       finally
         FUpdatingList := False;
       end;
@@ -848,32 +895,10 @@ end;
 ///   Handles the File > Refresh Status menu click.
 /// </summary>
 procedure TMainForm.mnuRefreshStatusClick( Sender: TObject );
-var
-  iCount            : Integer;
 begin
 
-  Screen.Cursor := crHourGlass;
-
-  try
-    iCount := Length( FRepoManager.Repos );
-    Log( Format( 'Refreshing %d repositories...', [ iCount ] ) );
-
-    for var i := 0 to iCount - 1 do
-    begin
-      mmoLog.Lines.Add( Format( 'Checking %s... (%d of %d)',
-        [ FRepoManager.Repos[ i ].Name, i + 1, iCount ] ) );
-      ScrollLogToEnd;
-      Update;
-
-      FRepoManager.RefreshStatus( i );
-      UpdateListItem( i );
-      Update;
-    end;
-
-    Log( 'Refresh complete.' );
-  finally
-    Screen.Cursor := crDefault;
-  end;
+  Log( Format( 'Refreshing %d repositories...', [ Length( FRepoManager.Repos ) ] ) );
+  RefreshReposAsync;
 
 end;
 

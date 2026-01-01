@@ -906,18 +906,54 @@ end;
 procedure TGitRepoManager.RefreshStatus( const iIndex: Integer );
 var
   sOriginURL        : string;
+  sStatusOutput     : string;
+  sRepoPath         : string;
+  Lines             : TArray<string>;
 begin
 
   if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
     Exit;
 
-  FRepos[ iIndex ].Branch := GetRepoBranch( FRepos[ iIndex ].Path );
-  FRepos[ iIndex ].Status := GetRepoStatus( FRepos[ iIndex ].Path );
-  FRepos[ iIndex ].StatusText := RepoStatusToString( FRepos[ iIndex ].Status );
-  FRepos[ iIndex ].TrackedFileCount := GetTrackedFileCount( FRepos[ iIndex ].Path );
-  FRepos[ iIndex ].ModifiedFileCount := GetModifiedFileCount( FRepos[ iIndex ].Path );
+  sRepoPath := FRepos[ iIndex ].Path;
 
-  sOriginURL := GetRemoteOriginURL( FRepos[ iIndex ].Path );
+  // Get branch
+  FRepos[ iIndex ].Branch := GetRepoBranch( sRepoPath );
+
+  // Get status and modified count from single git status call
+  if ( not TDirectory.Exists( TPath.Combine( sRepoPath, '.git' ) ) ) then
+  begin
+    FRepos[ iIndex ].Status := rsError;
+    FRepos[ iIndex ].ModifiedFileCount := 0;
+  end
+  else if ExecuteGitCommand( sRepoPath, 'status --porcelain', sStatusOutput ) then
+  begin
+    sStatusOutput := Trim( sStatusOutput );
+
+    if sStatusOutput.IsEmpty then
+    begin
+      FRepos[ iIndex ].ModifiedFileCount := 0;
+      if NeedsPull( sRepoPath ) then
+        FRepos[ iIndex ].Status := rsPullRequired
+      else
+        FRepos[ iIndex ].Status := rsClean;
+    end
+    else
+    begin
+      Lines := sStatusOutput.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
+      FRepos[ iIndex ].ModifiedFileCount := Length( Lines );
+      FRepos[ iIndex ].Status := rsModified;
+    end;
+  end
+  else
+  begin
+    FRepos[ iIndex ].Status := rsError;
+    FRepos[ iIndex ].ModifiedFileCount := 0;
+  end;
+
+  FRepos[ iIndex ].StatusText := RepoStatusToString( FRepos[ iIndex ].Status );
+  FRepos[ iIndex ].TrackedFileCount := GetTrackedFileCount( sRepoPath );
+
+  sOriginURL := GetRemoteOriginURL( sRepoPath );
   FRepos[ iIndex ].Provider := DetectRemoteProvider( sOriginURL );
 
 end;
