@@ -59,6 +59,22 @@ object MainForm: TMainForm
       TabOrder = 2
       OnClick = btnSelectNoneClick
     end
+    object lblGroupFilter: TLabel
+      Left = 296
+      Top = 12
+      Width = 34
+      Height = 15
+      Caption = 'Group:'
+    end
+    object cboGroupFilter: TComboBox
+      Left = 336
+      Top = 8
+      Width = 145
+      Height = 23
+      Style = csDropDownList
+      TabOrder = 3
+      OnChange = cboGroupFilterChange
+    end
   end
   object pnlBottom: TPanel
     Left = 0
@@ -95,8 +111,20 @@ object MainForm: TMainForm
       TabOrder = 0
       OnClick = btnHistoryClick
     end
+    object btnTemplates: TButton
+      Left = 722
+      Top = 10
+      Width = 25
+      Height = 25
+      Hint = 'Commit message templates'
+      Caption = #9661
+      ParentShowHint = False
+      ShowHint = True
+      TabOrder = 3
+      OnClick = btnTemplatesClick
+    end
     object btnCommitPush: TButton
-      Left = 720
+      Left = 753
       Top = 10
       Width = 170
       Height = 25
@@ -212,6 +240,10 @@ object MainForm: TMainForm
       object mnuSettings: TMenuItem
         Caption = '&Settings...'
         OnClick = mnuSettingsClick
+      end
+      object mnuTemplateSettings: TMenuItem
+        Caption = '&Templates...'
+        OnClick = mnuTemplateSettingsClick
       end
       object mnuFileSep3: TMenuItem
         Caption = '-'
@@ -333,9 +365,19 @@ object MainForm: TMainForm
       Caption = 'Pu&ll'
       OnClick = pmPullClick
     end
+    object pmSep4: TMenuItem
+      Caption = '-'
+    end
+    object pmSetGroup: TMenuItem
+      Caption = 'Set &Group'
+    end
   end
   object pmHistory: TPopupMenu
     Left = 500
+    Top = 200
+  end
+  object pmTemplates: TPopupMenu
+    Left = 550
     Top = 200
   end
 end

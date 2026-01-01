@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.2.0
+  Version: 1.3.0
 
   Part of GitBatchCommit Application
 
@@ -100,6 +100,7 @@ type
     TrackedFileCount: Integer;
     ModifiedFileCount: Integer;
     Provider: TRemoteProvider;
+    Group: string;
   end;
 
   TRepoInfoArray = TArray<TRepoInfo>;
@@ -123,6 +124,7 @@ type
     FGitClientPath: string;
     FFilePattern: string;
     FCommitHistory: TArray<string>;
+    FCommitTemplates: TArray<string>;
     const
       MAX_HISTORY_ITEMS = 20;
 
@@ -352,6 +354,31 @@ type
     procedure AddToCommitHistory( const sMessage: string );
 
     /// <summary>
+    ///   Adds a commit message template.
+    /// </summary>
+    procedure AddTemplate( const sTemplate: string );
+
+    /// <summary>
+    ///   Removes a commit message template by index.
+    /// </summary>
+    procedure RemoveTemplate( const iIndex: Integer );
+
+    /// <summary>
+    ///   Updates a commit message template.
+    /// </summary>
+    procedure UpdateTemplate( const iIndex: Integer; const sTemplate: string );
+
+    /// <summary>
+    ///   Returns all unique group names from repositories.
+    /// </summary>
+    function GetAllGroups: TArray<string>;
+
+    /// <summary>
+    ///   Sets the group for a repository.
+    /// </summary>
+    procedure SetRepoGroup( const iIndex: Integer; const sGroup: string );
+
+    /// <summary>
     ///   Refreshes all repository statuses in parallel.
     /// </summary>
     procedure RefreshAllStatusParallel;
@@ -365,6 +392,7 @@ type
     property GitClientPath: string read FGitClientPath write FGitClientPath;
     property FilePattern: string read FFilePattern write FFilePattern;
     property CommitHistory: TArray<string> read FCommitHistory;
+    property CommitTemplates: TArray<string> read FCommitTemplates write FCommitTemplates;
   end;
 
 /// <summary>
@@ -691,6 +719,7 @@ begin
   Result := False;
   SetLength( FRepos, 0 );
   SetLength( FCommitHistory, 0 );
+  SetLength( FCommitTemplates, 0 );
   FCodebergUsername := '';
   FCodebergToken := '';
   FGitHubUsername := '';
@@ -759,6 +788,16 @@ begin
           FCommitHistory[ i ] := JSONHistoryArray.Items[ i ].Value;
       end;
 
+      // Load commit templates
+      if JSONRoot.GetValue( 'commit_templates' ) is TJSONArray then
+      begin
+        JSONHistoryArray := JSONRoot.GetValue( 'commit_templates' ) as TJSONArray;
+        SetLength( FCommitTemplates, JSONHistoryArray.Count );
+
+        for var i := 0 to JSONHistoryArray.Count - 1 do
+          FCommitTemplates[ i ] := JSONHistoryArray.Items[ i ].Value;
+      end;
+
       // Get repositories array
       if JSONRoot.GetValue( 'repositories' ) is TJSONArray then
         JSONArray := JSONRoot.GetValue( 'repositories' ) as TJSONArray
@@ -795,6 +834,7 @@ begin
       FRepos[ i ].TrackedFileCount := 0;
       FRepos[ i ].ModifiedFileCount := 0;
       FRepos[ i ].Provider := rpNone;
+      FRepos[ i ].Group := JSONObj.GetValue<string>( 'group', '' );
     end;
 
     Result := True;
@@ -836,6 +876,14 @@ begin
 
     JSONRoot.AddPair( 'commit_history', JSONHistoryArray );
 
+    // Save commit templates
+    JSONHistoryArray := TJSONArray.Create;
+
+    for var i := 0 to High( FCommitTemplates ) do
+      JSONHistoryArray.Add( FCommitTemplates[ i ] );
+
+    JSONRoot.AddPair( 'commit_templates', JSONHistoryArray );
+
     // Save repositories
     JSONArray := TJSONArray.Create;
 
@@ -843,6 +891,7 @@ begin
     begin
       JSONObj := TJSONObject.Create;
       JSONObj.AddPair( 'path', FRepos[ i ].Path );
+      JSONObj.AddPair( 'group', FRepos[ i ].Group );
       JSONArray.AddElement( JSONObj );
     end;
 
@@ -885,6 +934,7 @@ begin
   FRepos[ iLen ].TrackedFileCount := 0;
   FRepos[ iLen ].ModifiedFileCount := 0;
   FRepos[ iLen ].Provider := rpNone;
+  FRepos[ iLen ].Group := '';
 
   RefreshStatus( iLen );
   SaveConfig;
@@ -1746,6 +1796,89 @@ begin
     FCommitHistory[ i ] := FCommitHistory[ i - 1 ];
 
   FCommitHistory[ 0 ] := sTrimmed;
+
+  SaveConfig;
+
+end;
+
+procedure TGitRepoManager.AddTemplate( const sTemplate: string );
+var
+  sTrimmed          : string;
+  iLen              : Integer;
+begin
+
+  sTrimmed := Trim( sTemplate );
+
+  if sTrimmed.IsEmpty then
+    Exit;
+
+  iLen := Length( FCommitTemplates );
+  SetLength( FCommitTemplates, iLen + 1 );
+  FCommitTemplates[ iLen ] := sTrimmed;
+
+  SaveConfig;
+
+end;
+
+procedure TGitRepoManager.RemoveTemplate( const iIndex: Integer );
+begin
+
+  if ( iIndex < 0 ) or ( iIndex > High( FCommitTemplates ) ) then
+    Exit;
+
+  for var i := iIndex to High( FCommitTemplates ) - 1 do
+    FCommitTemplates[ i ] := FCommitTemplates[ i + 1 ];
+
+  SetLength( FCommitTemplates, Length( FCommitTemplates ) - 1 );
+
+  SaveConfig;
+
+end;
+
+procedure TGitRepoManager.UpdateTemplate( const iIndex: Integer; const sTemplate: string );
+begin
+
+  if ( iIndex < 0 ) or ( iIndex > High( FCommitTemplates ) ) then
+    Exit;
+
+  FCommitTemplates[ iIndex ] := Trim( sTemplate );
+
+  SaveConfig;
+
+end;
+
+function TGitRepoManager.GetAllGroups: TArray<string>;
+var
+  Groups            : TList<string>;
+  sGroup            : string;
+begin
+
+  Groups := TList<string>.Create;
+
+  try
+    for var i := 0 to High( FRepos ) do
+    begin
+      sGroup := Trim( FRepos[ i ].Group );
+
+      if ( not sGroup.IsEmpty ) and ( not Groups.Contains( sGroup ) ) then
+        Groups.Add( sGroup );
+    end;
+
+    Groups.Sort;
+    Result := Groups.ToArray;
+  finally
+    Groups.Free;
+  end;
+
+end;
+
+procedure TGitRepoManager.SetRepoGroup( const iIndex: Integer; const sGroup: string );
+begin
+
+  if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
+    Exit;
+
+  FRepos[ iIndex ].Group := Trim( sGroup );
 
   SaveConfig;
 

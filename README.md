@@ -37,6 +37,8 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Open in Explorer** - Right-click to open repository folder in Windows Explorer
 - **Pull Operation** - Right-click to pull changes from remote for a single repository
 - **Commit Message History** - Click the dropdown button next to the commit message to select from recent messages (up to 20 stored)
+- **Commit Message Templates** - Define reusable commit message templates via File > Templates; select from the templates dropdown (▽) next to the commit message
+- **Repository Groups** - Assign repositories to groups for easy filtering; use the Group dropdown in the toolbar to filter by group
 - **File Pattern Filtering** - Optionally stage only files matching a pattern (e.g., `*.pas`) via File > Settings
 
 ## Requirements
@@ -198,11 +200,11 @@ You can view and edit a repository's .gitignore file directly from the applicati
 
 ### Shift-Click Selection
 
-To quickly select or deselect multiple consecutive repositories:
+To quickly check or uncheck multiple consecutive repositories:
 
 1. Click on a repository to set the anchor point
 2. Hold **Shift** and click on another repository
-3. All repositories between the two clicks will be set to match the checkbox state of the shift-clicked item
+3. All repositories between the two clicks will be toggled (if anchor was unchecked, all become checked; if anchor was checked, all become unchecked)
 
 ### Configuring Settings
 
@@ -222,6 +224,51 @@ The application remembers your last 20 commit messages:
 3. The message is inserted into the commit field
 
 Messages are automatically added to history when you successfully commit and push.
+
+### Using Commit Message Templates
+
+Create reusable commit message templates for common operations:
+
+**Managing Templates:**
+
+1. Select **File > Templates...**
+2. Use **Add...** to create a new template
+3. Use **Edit...** to modify an existing template
+4. Use **Delete** to remove a template
+5. Click **OK** to save changes
+
+**Using Templates:**
+
+1. Click the templates dropdown button (▽) next to the commit message field (second button)
+2. Select a template from the list
+3. The template text is inserted into the commit field
+
+Templates are saved to the configuration file and persist between sessions.
+
+### Using Repository Groups
+
+Organise your repositories into groups for easier management:
+
+**Assigning a Group:**
+
+1. Tick the checkboxes next to the repositories you want to group
+2. Right-click on the list
+3. Select **Set Group**
+4. If no groups exist yet, you'll be prompted to enter a new group name
+5. If groups exist, choose from the submenu:
+   - Select an existing group name
+   - Select **New Group...** to create a new group
+   - Select **(Clear Group)** to remove the group assignment
+
+The group is applied to all checked repositories.
+
+**Filtering by Group:**
+
+1. Use the **Group** dropdown in the toolbar
+2. Select a group name to show only repositories in that group
+3. Select **(All Groups)** to show all repositories
+
+Groups are saved to the configuration file and persist between sessions.
 
 ### Opening Repositories Externally
 
@@ -259,6 +306,7 @@ The file is created automatically when you first add a repository or configure c
 | `uCodebergDialog.pas` | Dialog for entering new repository details |
 | `uCodebergSettings.pas` | Dialog for configuring Codeberg credentials |
 | `uGitHubSettings.pas` | Dialog for configuring GitHub credentials |
+| `uTemplateSettings.pas` | Dialog for managing commit message templates |
 
 ## Limitations
 
@@ -273,14 +321,19 @@ The file is created automatically when you first add a repository or configure c
 Potential features for future versions:
 
 - Support for additional Git hosting providers (GitLab, Bitbucket)
-- Commit message templates (predefined messages)
-- Repository groups/categories
 
 ## Licence
 
 This project is provided as-is for personal use only.
 
 ## Version History
+
+### 1.3.0
+
+- Added commit message templates - create and manage reusable commit messages via File > Templates
+- Added repository groups - organise repositories into groups for filtering
+- Added Group filter dropdown in toolbar
+- Added Set Group context menu item
 
 ### 1.2.0
 
@@ -305,3 +358,4 @@ This project is provided as-is for personal use only.
 *Version: 1.0 – 31 December 2025 09:00*
 *Version: 1.1 – 31 December 2025 09:30*
 *Version: 1.2 – 1 January 2026 14:40*
+*Version: 1.3 – 1 January 2026 15:00*

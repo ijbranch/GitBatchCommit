@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.2.0
+  Version: 1.3.0
 
   Part of GitBatchCommit Application
 
@@ -61,7 +61,7 @@ uses
   System.SysUtils, System.StrUtils, System.Variants, System.Classes, System.Types, System.UITypes,
   System.Generics.Collections, System.Generics.Defaults, System.Threading,
 
-  uGitRepoManager, uCodebergDialog, uCodebergSettings, uGitHubSettings;
+  uGitRepoManager, uCodebergDialog, uCodebergSettings, uGitHubSettings, uTemplateSettings;
 
 type
   /// <summary>
@@ -121,10 +121,17 @@ type
     pmOpenInGitClient: TMenuItem;
     pmSep3: TMenuItem;
     pmPull: TMenuItem;
+    pmSep4: TMenuItem;
     pmHistory: TPopupMenu;
     btnHistory: TButton;
     mnuSettings: TMenuItem;
     mnuFileSep3: TMenuItem;
+    btnTemplates: TButton;
+    pmTemplates: TPopupMenu;
+    mnuTemplateSettings: TMenuItem;
+    cboGroupFilter: TComboBox;
+    lblGroupFilter: TLabel;
+    pmSetGroup: TMenuItem;
     procedure FormCreate( Sender: TObject );
     procedure FormDestroy( Sender: TObject );
     procedure FormShow( Sender: TObject );
@@ -157,6 +164,9 @@ type
     procedure pmPullClick( Sender: TObject );
     procedure btnHistoryClick( Sender: TObject );
     procedure mnuSettingsClick( Sender: TObject );
+    procedure btnTemplatesClick( Sender: TObject );
+    procedure mnuTemplateSettingsClick( Sender: TObject );
+    procedure cboGroupFilterChange( Sender: TObject );
   private
     const
       WM_LOAD_REPOS = WM_USER + 100;
@@ -170,6 +180,7 @@ type
       FInitialLoadDone: Boolean;
       FLastClickedIndex: Integer;
       FRefreshing   : Boolean;
+      FGroupFilter  : string;
 
       /// <summary>
       ///   Handles custom message to load repositories after form is visible.
@@ -242,6 +253,26 @@ type
     ///   Handles click on a history menu item.
     /// </summary>
     procedure HistoryMenuItemClick( Sender: TObject );
+
+    /// <summary>
+    ///   Builds the commit message templates popup menu.
+    /// </summary>
+    procedure BuildTemplatesMenu;
+
+    /// <summary>
+    ///   Handles click on a template menu item.
+    /// </summary>
+    procedure TemplateMenuItemClick( Sender: TObject );
+
+    /// <summary>
+    ///   Updates the group filter combo box with available groups.
+    /// </summary>
+    procedure UpdateGroupFilterCombo;
+
+    /// <summary>
+    ///   Handles click on a Set Group submenu item.
+    /// </summary>
+    procedure SetGroupMenuItemClick( Sender: TObject );
   public
   end;
 
@@ -259,9 +290,10 @@ procedure TMainForm.FormCreate( Sender: TObject );
 begin
 
   FUpdatingList := False;
-  FSortColumn := -1;
+  FSortColumn := 0;
   FSortAscending := True;
   FStatusFilter := 0;
+  FGroupFilter := '';
   FInitialLoadDone := False;
   FLastClickedIndex := -1;
   FFilteredIndices := TList<Integer>.Create;
@@ -321,6 +353,8 @@ begin
 
     // Show list immediately with unknown status
     PopulateListView;
+    UpdateGroupFilterCombo;
+    SetColumnSortArrow( FSortColumn, FSortAscending );
     Update;
 
     mmoLog.Lines.Add( '' );
@@ -484,8 +518,8 @@ begin
       iEndIndex := FLastClickedIndex;
     end;
 
-    // Use the state of the current item as the target state
-    lNewState := lvRepos.Items[ iCurrentIndex ].Checked;
+    // Use the opposite of the anchor item's state as the target
+    lNewState := not lvRepos.Items[ FLastClickedIndex ].Checked;
 
     FUpdatingList := True;
 
@@ -497,10 +531,12 @@ begin
     end;
 
     UpdateCommitButtonState;
+  end
+  else
+  begin
+    // Always update last clicked index (only when not shift-clicking)
+    FLastClickedIndex := iCurrentIndex;
   end;
-
-  // Always update last clicked index
-  FLastClickedIndex := iCurrentIndex;
 
 end;
 
@@ -596,6 +632,11 @@ begin
   // Apply filter
   for var i := 0 to High( FRepoManager.Repos ) do
   begin
+    // Apply group filter first
+    if ( FGroupFilter <> '' ) and ( FRepoManager.Repos[ i ].Group <> FGroupFilter ) then
+      Continue;
+
+    // Apply status filter
     if FStatusFilter = 0 then
       FFilteredIndices.Add( i )
     else
@@ -1482,10 +1523,51 @@ end;
 ///   Handles the popup menu opening to enable/disable items.
 /// </summary>
 procedure TMainForm.pmReposPopup( Sender: TObject );
+var
+  Groups            : TArray<string>;
+  MenuItem          : TMenuItem;
+  SubMenu           : TMenuItem;
 begin
 
   // Enable .gitignore edit only when a single repository is selected
   pmEditGitignore.Enabled := ( lvRepos.Selected <> nil );
+
+  // Build the Set Group submenu
+  pmSetGroup.Clear;
+
+  Groups := FRepoManager.GetAllGroups;
+
+  // Add existing groups
+  for var i := 0 to High( Groups ) do
+  begin
+    MenuItem := TMenuItem.Create( pmSetGroup );
+    MenuItem.Caption := Groups[ i ];
+    MenuItem.Tag := i;
+    MenuItem.OnClick := SetGroupMenuItemClick;
+    pmSetGroup.Add( MenuItem );
+  end;
+
+  // Add separator if there are groups
+  if Length( Groups ) > 0 then
+  begin
+    SubMenu := TMenuItem.Create( pmSetGroup );
+    SubMenu.Caption := '-';
+    pmSetGroup.Add( SubMenu );
+  end;
+
+  // Add "Clear Group" option
+  MenuItem := TMenuItem.Create( pmSetGroup );
+  MenuItem.Caption := '(Clear Group)';
+  MenuItem.Tag := -1;
+  MenuItem.OnClick := SetGroupMenuItemClick;
+  pmSetGroup.Add( MenuItem );
+
+  // Add "New Group..." option
+  MenuItem := TMenuItem.Create( pmSetGroup );
+  MenuItem.Caption := 'New Group...';
+  MenuItem.Tag := -2;
+  MenuItem.OnClick := SetGroupMenuItemClick;
+  pmSetGroup.Add( MenuItem );
 
 end;
 
@@ -1565,7 +1647,7 @@ end;
 /// </summary>
 procedure TMainForm.mnuAboutClick( Sender: TObject );
 const
-  APP_VERSION       = '1.2.0';
+  APP_VERSION       = '1.3.0';
 begin
 
   MessageDlg(
@@ -1809,6 +1891,208 @@ begin
       Log( 'Settings updated.' );
     end;
   end;
+
+end;
+
+/// <summary>
+///   Shows the commit message templates popup menu.
+/// </summary>
+procedure TMainForm.btnTemplatesClick( Sender: TObject );
+var
+  Pt                : TPoint;
+begin
+
+  BuildTemplatesMenu;
+
+  Pt := btnTemplates.ClientToScreen( Point( 0, btnTemplates.Height ) );
+  pmTemplates.Popup( Pt.X, Pt.Y );
+
+end;
+
+/// <summary>
+///   Builds the commit message templates popup menu.
+/// </summary>
+procedure TMainForm.BuildTemplatesMenu;
+var
+  Templates         : TArray<string>;
+  MenuItem          : TMenuItem;
+begin
+
+  pmTemplates.Items.Clear;
+
+  Templates := FRepoManager.CommitTemplates;
+
+  if Length( Templates ) = 0 then
+  begin
+    MenuItem := TMenuItem.Create( pmTemplates );
+    MenuItem.Caption := '(No templates - use File > Template Settings to add)';
+    MenuItem.Enabled := False;
+    pmTemplates.Items.Add( MenuItem );
+    Exit;
+  end;
+
+  for var i := 0 to High( Templates ) do
+  begin
+    MenuItem := TMenuItem.Create( pmTemplates );
+    MenuItem.Caption := Templates[ i ];
+    MenuItem.Tag := i;
+    MenuItem.OnClick := TemplateMenuItemClick;
+    pmTemplates.Items.Add( MenuItem );
+  end;
+
+end;
+
+/// <summary>
+///   Handles click on a template menu item.
+/// </summary>
+procedure TMainForm.TemplateMenuItemClick( Sender: TObject );
+var
+  MenuItem          : TMenuItem;
+  Templates         : TArray<string>;
+begin
+
+  MenuItem := Sender as TMenuItem;
+  Templates := FRepoManager.CommitTemplates;
+
+  if ( MenuItem.Tag >= 0 ) and ( MenuItem.Tag <= High( Templates ) ) then
+    edtCommitMessage.Text := Templates[ MenuItem.Tag ];
+
+end;
+
+/// <summary>
+///   Shows the template settings dialog.
+/// </summary>
+procedure TMainForm.mnuTemplateSettingsClick( Sender: TObject );
+var
+  Templates         : TArray<string>;
+begin
+
+  Templates := FRepoManager.CommitTemplates;
+
+  if TTemplateSettingsDialog.Execute( Templates ) then
+  begin
+    FRepoManager.CommitTemplates := Templates;
+    FRepoManager.SaveConfig;
+    Log( 'Templates updated.' );
+  end;
+
+end;
+
+/// <summary>
+///   Updates the group filter combo box with available groups.
+/// </summary>
+procedure TMainForm.UpdateGroupFilterCombo;
+var
+  Groups            : TArray<string>;
+  sCurrentGroup     : string;
+begin
+
+  sCurrentGroup := cboGroupFilter.Text;
+  cboGroupFilter.Items.Clear;
+  cboGroupFilter.Items.Add( '(All Groups)' );
+
+  Groups := FRepoManager.GetAllGroups;
+
+  for var i := 0 to High( Groups ) do
+    cboGroupFilter.Items.Add( Groups[ i ] );
+
+  // Restore selection
+  if sCurrentGroup.IsEmpty or ( sCurrentGroup = '(All Groups)' ) then
+    cboGroupFilter.ItemIndex := 0
+  else
+  begin
+    var iIndex := cboGroupFilter.Items.IndexOf( sCurrentGroup );
+
+    if iIndex >= 0 then
+      cboGroupFilter.ItemIndex := iIndex
+    else
+      cboGroupFilter.ItemIndex := 0;
+  end;
+
+end;
+
+/// <summary>
+///   Handles group filter combo box change.
+/// </summary>
+procedure TMainForm.cboGroupFilterChange( Sender: TObject );
+begin
+
+  if cboGroupFilter.ItemIndex <= 0 then
+    FGroupFilter := ''
+  else
+    FGroupFilter := cboGroupFilter.Text;
+
+  PopulateListView;
+
+end;
+
+/// <summary>
+///   Handles click on a Set Group submenu item.
+/// </summary>
+procedure TMainForm.SetGroupMenuItemClick( Sender: TObject );
+var
+  MenuItem          : TMenuItem;
+  iRepoIndex        : Integer;
+  iCount            : Integer;
+  sGroup            : string;
+  Groups            : TArray<string>;
+begin
+
+  MenuItem := Sender as TMenuItem;
+  sGroup := '';
+
+  // Determine group name first
+  if MenuItem.Tag = -1 then
+  begin
+    // Clear group
+    sGroup := '';
+  end
+  else if MenuItem.Tag = -2 then
+  begin
+    // New group
+    if ( not InputQuery( 'New Group', 'Enter group name:', sGroup ) ) then
+      Exit;
+
+    sGroup := Trim( sGroup );
+
+    if sGroup.IsEmpty then
+      Exit;
+  end
+  else
+  begin
+    // Existing group
+    Groups := FRepoManager.GetAllGroups;
+
+    if ( MenuItem.Tag >= 0 ) and ( MenuItem.Tag <= High( Groups ) ) then
+      sGroup := Groups[ MenuItem.Tag ]
+    else
+      Exit;
+  end;
+
+  // Apply to all checked repositories
+  iCount := 0;
+
+  for var i := 0 to lvRepos.Items.Count - 1 do
+  begin
+    if lvRepos.Items[ i ].Checked then
+    begin
+      iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+      FRepoManager.SetRepoGroup( iRepoIndex, sGroup );
+      Inc( iCount );
+    end;
+  end;
+
+  if iCount > 0 then
+  begin
+    if MenuItem.Tag = -1 then
+      Log( Format( 'Cleared group for %d repository(ies)', [ iCount ] ) )
+    else
+      Log( Format( 'Set group "%s" for %d repository(ies)', [ sGroup, iCount ] ) );
+  end
+  else
+    Log( 'No repositories selected' );
+
+  UpdateGroupFilterCombo;
 
 end;
 
