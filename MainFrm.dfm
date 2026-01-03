@@ -18,7 +18,7 @@ object MainForm: TMainForm
   TextHeight = 15
   object splitter: TSplitter
     Left = 0
-    Top = 400
+    Top = 325
     Width = 1012
     Height = 5
     Cursor = crVSplit
@@ -32,6 +32,13 @@ object MainForm: TMainForm
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 0
+    object lblGroupFilter: TLabel
+      Left = 296
+      Top = 12
+      Width = 36
+      Height = 15
+      Caption = 'Group:'
+    end
     object btnSelectModified: TButton
       Left = 8
       Top = 8
@@ -59,13 +66,6 @@ object MainForm: TMainForm
       TabOrder = 2
       OnClick = btnSelectNoneClick
     end
-    object lblGroupFilter: TLabel
-      Left = 296
-      Top = 12
-      Width = 34
-      Height = 15
-      Caption = 'Group:'
-    end
     object cboGroupFilter: TComboBox
       Left = 336
       Top = 8
@@ -83,7 +83,7 @@ object MainForm: TMainForm
     Height = 45
     Align = alBottom
     BevelOuter = bvNone
-    TabOrder = 3
+    TabOrder = 4
     object lblCommitMessage: TLabel
       Left = 8
       Top = 14
@@ -96,7 +96,7 @@ object MainForm: TMainForm
       Top = 11
       Width = 541
       Height = 23
-      TabOrder = 2
+      TabOrder = 4
       OnChange = edtCommitMessageChange
     end
     object btnDetails: TButton
@@ -108,7 +108,7 @@ object MainForm: TMainForm
       Caption = '...'
       ParentShowHint = False
       ShowHint = True
-      TabOrder = 3
+      TabOrder = 0
       OnClick = btnDetailsClick
     end
     object btnHistory: TButton
@@ -120,7 +120,7 @@ object MainForm: TMainForm
       Caption = #9660
       ParentShowHint = False
       ShowHint = True
-      TabOrder = 0
+      TabOrder = 1
       OnClick = btnHistoryClick
     end
     object btnTemplates: TButton
@@ -132,7 +132,7 @@ object MainForm: TMainForm
       Caption = #9661
       ParentShowHint = False
       ShowHint = True
-      TabOrder = 4
+      TabOrder = 2
       OnClick = btnTemplatesClick
     end
     object btnCommitPush: TButton
@@ -141,18 +141,18 @@ object MainForm: TMainForm
       Width = 170
       Height = 25
       Caption = 'Commit && Push Selected'
-      TabOrder = 1
+      TabOrder = 3
       OnClick = btnCommitPushClick
     end
   end
   object pnlDetails: TPanel
     Left = 0
-    Top = 480
+    Top = 330
     Width = 1012
     Height = 75
     Align = alBottom
     BevelOuter = bvNone
-    TabOrder = 4
+    TabOrder = 2
     Visible = False
     object lblDetails: TLabel
       Left = 8
@@ -174,7 +174,7 @@ object MainForm: TMainForm
     Left = 0
     Top = 41
     Width = 1012
-    Height = 359
+    Height = 284
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 1
@@ -182,7 +182,7 @@ object MainForm: TMainForm
       Left = 0
       Top = 0
       Width = 1012
-      Height = 359
+      Height = 284
       Hint = 
         'Ready. Drag and drop repository folders to add them. Click colum' +
         'n headers to sort. Use View > Filter to filter by status.'
@@ -248,7 +248,7 @@ object MainForm: TMainForm
     ParentFont = False
     ReadOnly = True
     ScrollBars = ssVertical
-    TabOrder = 2
+    TabOrder = 3
   end
   object MainMenu: TMainMenu
     Left = 400

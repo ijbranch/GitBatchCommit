@@ -17,7 +17,7 @@
   ***************************************************************************
 
   This code Unit is part of the GitBatchCommit Application/project.
-  This project was developed jointly by the Author and Claude Code.
+  This project was developed jointly by the Author and Clode Code.
 
   ***************************************************************************
 
@@ -25,8 +25,8 @@
   Ian Branch - GITLAK Software.    Claude Code.
 
   ***************************************************************************
-  File last update : 2025-12-31T09:31:51.605+11:00
-  Signature : db94f33c5301b8d51b5498c9c0371cd161af833a
+  File last update : 2026-01-04T05:22:04.270+11:00
+  Signature : d26f7f5526780a3160043a967157d5bbcb6ffafb
   ***************************************************************************
 *)
 
@@ -48,6 +48,10 @@
     repositories and performing batch commit and push operations,
     including Codeberg repository creation.
 *)
+
+{
+04/01/2026 - Fixed issue with Remove Selected option.
+}
 
 unit MainFrm;
 
@@ -921,22 +925,47 @@ end;
 ///   Handles the File > Remove Selected menu click.
 /// </summary>
 procedure TMainForm.mnuRemoveSelectedClick( Sender: TObject );
+var
+  IndicesToRemove   : TList<Integer>;
+  iRepoIndex        : Integer;
 begin
 
-  if lvRepos.Selected = nil then
-  begin
-    MessageDlg( 'Please select a repository to remove.', mtInformation, [ mbOK ], 0 );
-    Exit;
-  end;
+  // Build list of checked repository indices
+  IndicesToRemove := TList<Integer>.Create;
 
-  var iIndex := Integer( lvRepos.Selected.Data );
+  try
+    for var i := 0 to lvRepos.Items.Count - 1 do
+    begin
+      if lvRepos.Items[ i ].Checked then
+        IndicesToRemove.Add( Integer( lvRepos.Items[ i ].Data ) );
+    end;
 
-  if MessageDlg( Format( 'Remove repository "%s" from the list?', [ FRepoManager.Repos[ iIndex ].Name ] ),
-    mtConfirmation, [ mbYes, mbNo ], 0 ) = mrYes then
-  begin
-    Log( Format( 'Removed repository: %s', [ FRepoManager.Repos[ iIndex ].Name ] ) );
-    FRepoManager.RemoveRepository( iIndex );
-    PopulateListView;
+    if IndicesToRemove.Count = 0 then
+    begin
+      MessageDlg( 'Please check one or more repositories to remove.', mtInformation, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    if MessageDlg( Format( 'Remove %d repository(ies) from the list?', [ IndicesToRemove.Count ] ),
+      mtConfirmation, [ mbYes, mbNo ], 0 ) = mrYes then
+    begin
+      // Sort descending so we remove from highest index first (avoids index shifting issues)
+      IndicesToRemove.Sort( TComparer<Integer>.Construct(
+        function( const A, B: Integer ): Integer
+        begin
+          Result := B - A;
+        end ) );
+
+      for iRepoIndex in IndicesToRemove do
+      begin
+        Log( Format( 'Removed repository: %s', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
+        FRepoManager.RemoveRepository( iRepoIndex );
+      end;
+
+      PopulateListView;
+    end;
+  finally
+    IndicesToRemove.Free;
   end;
 
 end;

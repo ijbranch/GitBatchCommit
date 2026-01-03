@@ -17,7 +17,7 @@
   ***************************************************************************
 
   This code Unit is part of the GitBatchCommit Application/project.
-  This project was developed jointly by the Author and Claude Code.
+  This project was developed jointly by the Author and Clode Code.
 
   ***************************************************************************
 
@@ -25,7 +25,7 @@
   Ian Branch - GITLAK Software.    Claude Code.
 
   ***************************************************************************
-  File last update : 2025-12-31T09:31:54.998+11:00
+  File last update : 2026-01-04T05:22:04.276+11:00
   Signature : 088c1f35a610ad1c2e5dbdab33651bf2995e2d17
   ***************************************************************************
 *)

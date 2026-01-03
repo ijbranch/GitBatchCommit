@@ -1,3 +1,35 @@
+﻿(* GITLAK Software
+  ***************************************************************************
+
+    © 2025 Ian Branch (GITLAK Software). All rights reserved.
+
+    This Project, including all code, proprietary algorithms, and associated
+  intellectual property and confidential information, is the exclusive
+  property of Ian Branch (GITLAK Software).
+
+    A licence is granted for the sole purpose of personal use. only.
+
+    THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED.
+    IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DAMAGES ARISING IN
+  CONNECTION WITH THE USE OF THIS SOFTWARE.
+
+  ***************************************************************************
+
+  This code Unit is part of the GitBatchCommit Application/project.
+  This project was developed jointly by the Author and Clode Code.
+
+  ***************************************************************************
+
+  Author(s) :
+  Ian Branch - GITLAK Software.    Claude Code.
+
+  ***************************************************************************
+  File last update : 2026-01-04T05:22:04.297+11:00
+  Signature : 00e2a5ab8555b189b195aa3a8d764b170e81efe1
+  ***************************************************************************
+*)
+
 (*  GITLAK Software
   ***************************************************************************
 
