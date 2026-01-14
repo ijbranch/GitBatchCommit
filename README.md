@@ -43,6 +43,9 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Commit Details** - Click the "..." button to add a detailed description below the summary line (standard Git commit format)
 - **Repository Groups** - Assign repositories to groups for easy filtering; use the Group dropdown in the toolbar to filter by group
 - **File Pattern Filtering** - Optionally stage only files matching a pattern (e.g., `*.pas`) via File > Settings
+- **Pull Selected** - Pull changes from remote for multiple selected repositories at once
+- **Resolve Conflicts** - Automatically resolve merge conflicts by keeping local versions for all selected repositories
+- **Push Only** - Push already-committed changes without creating a new commit (useful when local branch is ahead of remote)
 
 ## Requirements
 
@@ -135,14 +138,49 @@ The tags appear in your repository's **Tags** or **Releases** section on GitHub/
 
 ### Handling Pull Required Status
 
-Repositories flagged as **Pull Required** can be updated using the right-click context menu:
+Repositories flagged as **Pull Required** can be updated in several ways:
+
+**Single Repository (Right-Click):**
 
 1. Right-click on a repository with **Pull Required** status
 2. Select **Pull**
 3. Confirm the operation
 4. The repository status will be refreshed after the pull completes
 
-Alternatively, use your preferred external Git client for more complex merge scenarios.
+**Multiple Repositories (Pull Selected Button):**
+
+1. Tick the checkboxes next to the repositories you want to pull
+2. Click **Pull Selected** in the toolbar
+3. Confirm the operation
+4. All selected repositories will be pulled and their status refreshed
+
+Note: Pulling does not overwrite your local uncommitted changes. If you have local modifications, Git will attempt to merge them with the remote changes.
+
+### Resolving Merge Conflicts
+
+If pulling results in merge conflicts (shown in the log), you can resolve them automatically:
+
+1. Tick the checkboxes next to repositories with conflicts
+2. Click **Resolve Conflicts** in the toolbar
+3. Confirm the operation
+4. All conflicts are resolved by keeping your local versions
+5. The resolution is committed and pushed automatically
+
+This is a "keep local" strategy - your local file versions take precedence over remote changes. Use this when you want to ensure your local code is preserved.
+
+### Push Only
+
+For repositories where you have committed changes locally but haven't pushed them yet (branch is "ahead" of remote):
+
+1. Tick the checkboxes next to the repositories you want to push
+2. Click **Push Only** in the toolbar
+3. Confirm the operation
+4. Changes are pushed without creating a new commit
+
+This is useful when:
+- You've already committed manually in another Git client
+- You resolved conflicts and just need to push the result
+- Your local branch is ahead of remote and needs syncing
 
 ### Creating a New Codeberg Repository
 
@@ -350,7 +388,7 @@ The file is created automatically when you first add a repository or configure c
 
 - Windows only (uses Windows API for process creation)
 - Requires Git to be installed and in the system PATH
-- Does not handle merge conflicts - repositories requiring a pull should be handled manually
+- Merge conflict resolution uses "keep local" strategy only - for complex merges, use an external Git client
 - Single commit message for all repositories (by design)
 - Cannot delete remote repositories - must be done manually via GitHub/Codeberg web interface
 
@@ -372,6 +410,9 @@ This project is provided as-is for personal use only.
 - Searches repository root and all subdirectories for `.dproj` files
 - Added automatic version tagging for Delphi projects - creates Git tags (e.g., `v3.9.1.719`) on commit
 - Tags are automatically pushed to remote (GitHub/Codeberg) and appear in Releases section
+- Added **Pull Selected** button - pull changes for multiple repositories at once
+- Added **Resolve Conflicts** button - resolve merge conflicts by keeping local versions
+- Added **Push Only** button - push without committing (for repos that are ahead of remote)
 
 ### 1.3.0
 

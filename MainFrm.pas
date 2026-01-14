@@ -137,6 +137,9 @@ type
     lblGroupFilter: TLabel;
     pmSetGroup: TMenuItem;
     btnDetails: TButton;
+    btnPullSelected: TButton;
+    btnResolveConflicts: TButton;
+    btnPushOnly: TButton;
     pnlDetails: TPanel;
     lblDetails: TLabel;
     mmoDetails: TMemo;
@@ -176,6 +179,9 @@ type
     procedure mnuTemplateSettingsClick( Sender: TObject );
     procedure cboGroupFilterChange( Sender: TObject );
     procedure btnDetailsClick( Sender: TObject );
+    procedure btnPullSelectedClick( Sender: TObject );
+    procedure btnResolveConflictsClick( Sender: TObject );
+    procedure btnPushOnlyClick( Sender: TObject );
   private
     const
       WM_LOAD_REPOS = WM_USER + 100;
@@ -2167,6 +2173,196 @@ begin
     Log( 'No repositories selected' );
 
   UpdateGroupFilterCombo;
+
+end;
+
+/// <summary>
+///   Pulls changes for all selected repositories.
+/// </summary>
+procedure TMainForm.btnPullSelectedClick( Sender: TObject );
+var
+  iRepoIndex        : Integer;
+  sLog              : string;
+  iCount            : Integer;
+  iSuccess          : Integer;
+begin
+
+  // Count selected repositories
+  iCount := 0;
+
+  for var i := 0 to lvRepos.Items.Count - 1 do
+  begin
+    if lvRepos.Items[ i ].Checked then
+      Inc( iCount );
+  end;
+
+  if iCount = 0 then
+  begin
+    MessageDlg( 'No repositories selected.', mtInformation, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  if MessageDlg( Format( 'Pull changes for %d repository(ies)?', [ iCount ] ),
+    mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
+    Exit;
+
+  Screen.Cursor := crHourGlass;
+  iSuccess := 0;
+
+  try
+    for var i := 0 to lvRepos.Items.Count - 1 do
+    begin
+      if lvRepos.Items[ i ].Checked then
+      begin
+        iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+
+        Log( Format( '=== Pulling %s ===', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
+
+        if FRepoManager.PullRepository( iRepoIndex, sLog ) then
+        begin
+          Log( sLog );
+          Inc( iSuccess );
+        end
+        else
+          Log( 'Pull failed: ' + sLog );
+
+        FRepoManager.RefreshStatus( iRepoIndex );
+        UpdateListItem( iRepoIndex );
+        Application.ProcessMessages;
+      end;
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+
+  Log( Format( 'Pull completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+  ScrollLogToEnd;
+
+end;
+
+/// <summary>
+///   Resolves merge conflicts for all selected repositories by keeping local versions.
+/// </summary>
+procedure TMainForm.btnResolveConflictsClick( Sender: TObject );
+var
+  iRepoIndex        : Integer;
+  sLog              : string;
+  iCount            : Integer;
+  iSuccess          : Integer;
+begin
+
+  // Count selected repositories
+  iCount := 0;
+
+  for var i := 0 to lvRepos.Items.Count - 1 do
+  begin
+    if lvRepos.Items[ i ].Checked then
+      Inc( iCount );
+  end;
+
+  if iCount = 0 then
+  begin
+    MessageDlg( 'No repositories selected.', mtInformation, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  if MessageDlg( Format( 'Resolve conflicts for %d repository(ies) by keeping LOCAL versions?' + sLineBreak +
+    sLineBreak + 'This will:' + sLineBreak +
+    '- Keep your local version of all conflicted files' + sLineBreak +
+    '- Commit the merge resolution' + sLineBreak +
+    '- Push to remote', [ iCount ] ),
+    mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
+    Exit;
+
+  Screen.Cursor := crHourGlass;
+  iSuccess := 0;
+
+  try
+    for var i := 0 to lvRepos.Items.Count - 1 do
+    begin
+      if lvRepos.Items[ i ].Checked then
+      begin
+        iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+
+        if FRepoManager.ResolveConflictsKeepLocal( iRepoIndex, sLog ) then
+          Inc( iSuccess );
+
+        Log( sLog );
+        FRepoManager.RefreshStatus( iRepoIndex );
+        UpdateListItem( iRepoIndex );
+        Application.ProcessMessages;
+      end;
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+
+  Log( Format( 'Resolve conflicts completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+  ScrollLogToEnd;
+
+end;
+
+/// <summary>
+///   Pushes all selected repositories without committing.
+/// </summary>
+procedure TMainForm.btnPushOnlyClick( Sender: TObject );
+var
+  iRepoIndex        : Integer;
+  sLog              : string;
+  iCount            : Integer;
+  iSuccess          : Integer;
+begin
+
+  // Count selected repositories
+  iCount := 0;
+
+  for var i := 0 to lvRepos.Items.Count - 1 do
+  begin
+    if lvRepos.Items[ i ].Checked then
+      Inc( iCount );
+  end;
+
+  if iCount = 0 then
+  begin
+    MessageDlg( 'No repositories selected.', mtInformation, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  if MessageDlg( Format( 'Push %d repository(ies) without committing?', [ iCount ] ),
+    mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
+    Exit;
+
+  Screen.Cursor := crHourGlass;
+  iSuccess := 0;
+
+  try
+    for var i := 0 to lvRepos.Items.Count - 1 do
+    begin
+      if lvRepos.Items[ i ].Checked then
+      begin
+        iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+
+        Log( Format( '=== Pushing %s ===', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
+
+        if FRepoManager.PushRepository( iRepoIndex, sLog ) then
+        begin
+          Log( sLog );
+          Inc( iSuccess );
+        end
+        else
+          Log( sLog );
+
+        FRepoManager.RefreshStatus( iRepoIndex );
+        UpdateListItem( iRepoIndex );
+        Application.ProcessMessages;
+      end;
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+
+  Log( Format( 'Push completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+  ScrollLogToEnd;
 
 end;
 

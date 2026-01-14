@@ -3,7 +3,7 @@ object MainForm: TMainForm
   Top = 0
   Caption = 'Git Batch Commit'
   ClientHeight = 600
-  ClientWidth = 1151
+  ClientWidth = 1097
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,7 +18,7 @@ object MainForm: TMainForm
   object splitter: TSplitter
     Left = 0
     Top = 325
-    Width = 1151
+    Width = 1097
     Height = 5
     Cursor = crVSplit
     Align = alBottom
@@ -26,7 +26,7 @@ object MainForm: TMainForm
   object pnlTop: TPanel
     Left = 0
     Top = 0
-    Width = 1151
+    Width = 1097
     Height = 41
     Align = alTop
     BevelOuter = bvNone
@@ -74,11 +74,38 @@ object MainForm: TMainForm
       TabOrder = 3
       OnChange = cboGroupFilterChange
     end
+    object btnPullSelected: TButton
+      Left = 496
+      Top = 8
+      Width = 90
+      Height = 25
+      Caption = 'Pull Selected'
+      TabOrder = 4
+      OnClick = btnPullSelectedClick
+    end
+    object btnResolveConflicts: TButton
+      Left = 594
+      Top = 8
+      Width = 110
+      Height = 25
+      Caption = 'Resolve Conflicts'
+      TabOrder = 5
+      OnClick = btnResolveConflictsClick
+    end
+    object btnPushOnly: TButton
+      Left = 712
+      Top = 8
+      Width = 80
+      Height = 25
+      Caption = 'Push Only'
+      TabOrder = 6
+      OnClick = btnPushOnlyClick
+    end
   end
   object pnlBottom: TPanel
     Left = 0
     Top = 555
-    Width = 1151
+    Width = 1097
     Height = 45
     Align = alBottom
     BevelOuter = bvNone
@@ -147,7 +174,7 @@ object MainForm: TMainForm
   object pnlDetails: TPanel
     Left = 0
     Top = 330
-    Width = 1151
+    Width = 1097
     Height = 75
     Align = alBottom
     BevelOuter = bvNone
@@ -172,7 +199,7 @@ object MainForm: TMainForm
   object pnlClient: TPanel
     Left = 0
     Top = 41
-    Width = 1151
+    Width = 1097
     Height = 284
     Align = alClient
     BevelOuter = bvNone
@@ -180,7 +207,7 @@ object MainForm: TMainForm
     object lvRepos: TListView
       Left = 0
       Top = 0
-      Width = 1151
+      Width = 1097
       Height = 284
       Hint = 
         'Ready. Drag and drop repository folders to add them. Click colum' +
@@ -241,7 +268,7 @@ object MainForm: TMainForm
   object mmoLog: TMemo
     Left = 0
     Top = 405
-    Width = 1151
+    Width = 1097
     Height = 150
     Align = alBottom
     Font.Charset = DEFAULT_CHARSET

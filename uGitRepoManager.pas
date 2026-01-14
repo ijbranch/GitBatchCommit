@@ -364,6 +364,22 @@ type
     function PullRepository( const iIndex: Integer; out sLog: string ): Boolean;
 
     /// <summary>
+    ///   Resolves merge conflicts by keeping local versions of all files.
+    /// </summary>
+    /// <param name="iIndex">Index of the repository.</param>
+    /// <param name="sLog">Output log of the operation.</param>
+    /// <returns>True if the operation succeeded or there was nothing to resolve.</returns>
+    function ResolveConflictsKeepLocal( const iIndex: Integer; out sLog: string ): Boolean;
+
+    /// <summary>
+    ///   Pushes a repository to remote without committing.
+    /// </summary>
+    /// <param name="iIndex">Index of the repository.</param>
+    /// <param name="sLog">Output log of the operation.</param>
+    /// <returns>True if the operation succeeded.</returns>
+    function PushRepository( const iIndex: Integer; out sLog: string ): Boolean;
+
+    /// <summary>
     ///   Adds a commit message to the history.
     /// </summary>
     procedure AddToCommitHistory( const sMessage: string );
@@ -1911,6 +1927,100 @@ begin
   end;
 
   sLog := Trim( sOutput );
+  Result := True;
+
+end;
+
+function TGitRepoManager.ResolveConflictsKeepLocal( const iIndex: Integer; out sLog: string ): Boolean;
+var
+  sOutput           : string;
+  sRepoPath         : string;
+begin
+
+  Result := False;
+  sLog := '';
+
+  if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
+  begin
+    sLog := 'Invalid repository index';
+    Exit;
+  end;
+
+  sRepoPath := FRepos[ iIndex ].Path;
+  sLog := Format( '=== %s ===%s', [ FRepos[ iIndex ].Name, sLineBreak ] );
+
+  // Checkout all conflicted files using our (local) version
+  if ( not ExecuteGitCommand( sRepoPath, 'checkout --ours .', sOutput ) ) then
+  begin
+    sLog := sLog + 'Failed to checkout local versions: ' + Trim( sOutput ) + sLineBreak;
+    Exit;
+  end;
+
+  sLog := sLog + 'Checked out local versions' + sLineBreak;
+
+  // Stage all files
+  if ( not ExecuteGitCommand( sRepoPath, 'add .', sOutput ) ) then
+  begin
+    sLog := sLog + 'Failed to stage files: ' + Trim( sOutput ) + sLineBreak;
+    Exit;
+  end;
+
+  sLog := sLog + 'Staged all files' + sLineBreak;
+
+  // Commit the merge resolution - may fail if nothing to commit (which is OK)
+  if ( not ExecuteGitCommand( sRepoPath, 'commit -m "Resolved merge conflicts - kept local version"', sOutput ) ) then
+  begin
+    // Check if it's just "nothing to commit" - that's actually success
+    if sOutput.Contains( 'nothing to commit' ) then
+    begin
+      sLog := sLog + 'Already clean - no conflicts to resolve' + sLineBreak;
+      Result := True;
+      Exit;
+    end;
+
+    sLog := sLog + 'Failed to commit: ' + Trim( sOutput ) + sLineBreak;
+    Exit;
+  end;
+
+  sLog := sLog + 'Committed merge resolution' + sLineBreak;
+
+  // Push
+  if ( not ExecuteGitCommand( sRepoPath, 'push', sOutput ) ) then
+  begin
+    sLog := sLog + 'Push failed: ' + Trim( sOutput ) + sLineBreak;
+    Exit;
+  end;
+
+  sLog := sLog + 'Pushed successfully' + sLineBreak;
+  Result := True;
+
+end;
+
+function TGitRepoManager.PushRepository( const iIndex: Integer; out sLog: string ): Boolean;
+var
+  sOutput           : string;
+begin
+
+  Result := False;
+  sLog := '';
+
+  if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
+  begin
+    sLog := 'Invalid repository index';
+    Exit;
+  end;
+
+  if ( not ExecuteGitCommand( FRepos[ iIndex ].Path, 'push', sOutput ) ) then
+  begin
+    sLog := 'Push failed: ' + Trim( sOutput );
+    Exit;
+  end;
+
+  sLog := Trim( sOutput );
+
+  if sLog.IsEmpty then
+    sLog := 'Pushed successfully';
+
   Result := True;
 
 end;
