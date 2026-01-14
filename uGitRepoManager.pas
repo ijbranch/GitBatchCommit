@@ -1411,7 +1411,7 @@ end;
 
 function TGitRepoManager.GetProjectVersion( const sRepoPath: string ): string;
 var
-  SearchRec         : TSearchRec;
+  DprojFiles        : TArray<string>;
   sDprojPath        : string;
   sContent          : string;
   sLine             : string;
@@ -1426,74 +1426,74 @@ var
 begin
 
   Result := '';
-  sDprojPath := '';
   sBestVersion := '';
 
-  // Find .dproj file in repository root
-  if FindFirst( TPath.Combine( sRepoPath, '*.dproj' ), faAnyFile, SearchRec ) = 0 then
-  begin
-    try
-      sDprojPath := TPath.Combine( sRepoPath, SearchRec.Name );
-    finally
-      FindClose( SearchRec );
-    end;
-  end;
-
-  if sDprojPath.IsEmpty or ( not TFile.Exists( sDprojPath ) ) then
-    Exit;
-
-  // Read and parse the .dproj file
+  // Find .dproj files in repository and subdirectories
   try
-    sContent := TFile.ReadAllText( sDprojPath, TEncoding.UTF8 );
+    DprojFiles := TDirectory.GetFiles( sRepoPath, '*.dproj', TSearchOption.soAllDirectories );
   except
     Exit;
   end;
 
-  // Search for FileVersion= in VerInfo_Keys
-  Lines := sContent.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
+  if Length( DprojFiles ) = 0 then
+    Exit;
 
-  for sLine in Lines do
+  // Process each .dproj file found
+  for sDprojPath in DprojFiles do
   begin
-    if sLine.Contains( 'VerInfo_Keys' ) and sLine.Contains( 'FileVersion=' ) then
+    // Read and parse the .dproj file
+    try
+      sContent := TFile.ReadAllText( sDprojPath, TEncoding.UTF8 );
+    except
+      Continue;
+    end;
+
+    // Search for FileVersion= in VerInfo_Keys
+    Lines := sContent.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
+
+    for sLine in Lines do
     begin
-      // Extract FileVersion value
-      iPos := sLine.IndexOf( 'FileVersion=' );
-
-      if iPos >= 0 then
+      if sLine.Contains( 'VerInfo_Keys' ) and sLine.Contains( 'FileVersion=' ) then
       begin
-        iPos := iPos + Length( 'FileVersion=' );
-        iEndPos := sLine.IndexOf( ';', iPos );
+        // Extract FileVersion value
+        iPos := sLine.IndexOf( 'FileVersion=' );
 
-        if iEndPos < 0 then
-          iEndPos := sLine.IndexOf( '<', iPos );
-
-        if iEndPos > iPos then
+        if iPos >= 0 then
         begin
-          sVersion := sLine.Substring( iPos, iEndPos - iPos );
+          iPos := iPos + Length( 'FileVersion=' );
+          iEndPos := sLine.IndexOf( ';', iPos );
 
-          // Compare versions to find the highest
-          if sBestVersion.IsEmpty then
-            sBestVersion := sVersion
-          else
+          if iEndPos < 0 then
+            iEndPos := sLine.IndexOf( '<', iPos );
+
+          if iEndPos > iPos then
           begin
-            // Compare version numbers
-            VersionParts := sVersion.Split( [ '.' ] );
-            BestParts := sBestVersion.Split( [ '.' ] );
-            lIsBetter := False;
+            sVersion := sLine.Substring( iPos, iEndPos - iPos );
 
-            for var i := 0 to Min( High( VersionParts ), High( BestParts ) ) do
+            // Compare versions to find the highest
+            if sBestVersion.IsEmpty then
+              sBestVersion := sVersion
+            else
             begin
-              if StrToIntDef( VersionParts[ i ], 0 ) > StrToIntDef( BestParts[ i ], 0 ) then
-              begin
-                lIsBetter := True;
-                Break;
-              end
-              else if StrToIntDef( VersionParts[ i ], 0 ) < StrToIntDef( BestParts[ i ], 0 ) then
-                Break;
-            end;
+              // Compare version numbers
+              VersionParts := sVersion.Split( [ '.' ] );
+              BestParts := sBestVersion.Split( [ '.' ] );
+              lIsBetter := False;
 
-            if lIsBetter then
-              sBestVersion := sVersion;
+              for var i := 0 to Min( High( VersionParts ), High( BestParts ) ) do
+              begin
+                if StrToIntDef( VersionParts[ i ], 0 ) > StrToIntDef( BestParts[ i ], 0 ) then
+                begin
+                  lIsBetter := True;
+                  Break;
+                end
+                else if StrToIntDef( VersionParts[ i ], 0 ) < StrToIntDef( BestParts[ i ], 0 ) then
+                  Break;
+              end;
+
+              if lIsBetter then
+                sBestVersion := sVersion;
+            end;
           end;
         end;
       end;
