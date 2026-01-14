@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.3.0
+  Version: 1.4.0
 
   Part of GitBatchCommit Application
 
@@ -1707,7 +1707,7 @@ end;
 /// </summary>
 procedure TMainForm.mnuAboutClick( Sender: TObject );
 const
-  APP_VERSION       = '1.3.0';
+  APP_VERSION       = '1.4.0';
 begin
 
   MessageDlg(
@@ -1722,6 +1722,7 @@ begin
     '  - Batch commit and push to multiple repositories' + sLineBreak +
     '  - GitHub and Codeberg integration' + sLineBreak +
     '  - Repository status detection' + sLineBreak +
+    '  - Automatic version tagging for Delphi projects' + sLineBreak +
     '  - Drag and drop support' + sLineBreak +
     sLineBreak +
     'Copyright (c) 2025 GITLAK Software' + sLineBreak +

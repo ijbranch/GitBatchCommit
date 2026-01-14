@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.3.0
+  Version: 1.4.0
 
   Part of GitBatchCommit Application
 

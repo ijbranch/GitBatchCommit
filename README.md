@@ -23,6 +23,11 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
   Status is determined by running `git status --porcelain`. Any output indicates modifications.
 - **Branch Display** - Shows the current branch for each repository
 - **Remote Provider Display** - Shows the remote provider (GitHub, Codeberg, Other, None) for each repository
+- **Version Display** - Shows the Git version status for each repository using `git describe --tags --always`:
+  - Exactly on a tag: `v1.0.1.25`
+  - 3 commits after tag: `v1.0.1.25-3-gabc123`
+  - No tags: shows commit hash only
+- **Automatic Version Tagging** - For Delphi projects, automatically creates and pushes Git tags based on the version number in the `.dproj` file when committing
 - **Batch Operations** - Commit and push to multiple repositories with one click
 - **Quick Selection** - Buttons to select all, none, or only modified repositories
 - **Shift-Click Selection** - Hold Shift and click to select/deselect a range of repositories
@@ -115,6 +120,21 @@ git add -A
 git commit -m "Your message"
 git push
 ```
+
+**Automatic Version Tagging (Delphi Projects):**
+
+If the repository contains a Delphi project file (`.dproj`) with version information, GitBatchCommit will automatically:
+
+1. Extract the `FileVersion` from the `.dproj` file (e.g., `1.0.1.25`)
+2. Create an annotated Git tag with `v` prefix (e.g., `v1.0.1.25`)
+3. Push the tag to the remote repository
+
+Tags are only created if they don't already exist. This means:
+- First commit with version `1.0.1.25` → creates tag `v1.0.1.25`
+- Subsequent commits with same version → no new tag (already exists)
+- Commit after incrementing version to `1.0.1.26` → creates tag `v1.0.1.26`
+
+The tags appear in your repository's **Tags** or **Releases** section on GitHub/Codeberg.
 
 ### Handling Pull Required Status
 
@@ -349,6 +369,13 @@ This project is provided as-is for personal use only.
 
 ## Version History
 
+### 1.4.0
+
+- Added Version column to repository list - displays `git describe --tags --always` output showing version relative to nearest tag
+- Added automatic version tagging for Delphi projects - extracts version from `.dproj` and creates Git tags (e.g., `v1.0.1.25`)
+- Tags are automatically pushed to remote (GitHub/Codeberg) and appear in Releases section
+- Version column shows: exact tag when on tagged commit, or `tag-commits-hash` format when ahead of tag
+
 ### 1.3.0
 
 - Added commit message templates - create and manage reusable commit messages via File > Templates
@@ -382,3 +409,4 @@ This project is provided as-is for personal use only.
 *Version: 1.1 – 31 December 2025 09:30*
 *Version: 1.2 – 1 January 2026 14:40*
 *Version: 1.3 – 1 January 2026 15:00*
+*Version: 1.4 – 15 January 2026*
