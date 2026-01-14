@@ -58,7 +58,7 @@ uses
 
   System.SysUtils, System.StrUtils, System.Classes, System.IOUtils, System.JSON,
   System.Generics.Collections, System.Net.HttpClient, System.Net.HttpClientComponent,
-  System.Net.URLClient, System.NetEncoding, System.Threading, System.SyncObjs;
+  System.Net.URLClient, System.NetEncoding, System.Threading, System.SyncObjs, System.Math;
 
 const
   /// <summary>
@@ -101,6 +101,7 @@ type
     ModifiedFileCount: Integer;
     Provider: TRemoteProvider;
     Group: string;
+    Version: string;
   end;
 
   TRepoInfoArray = TArray<TRepoInfo>;
@@ -215,6 +216,13 @@ type
     ///   Parses owner and repository name from an origin URL.
     /// </summary>
     function ParseOwnerRepo( const sOriginURL: string; out sOwner, sRepo: string ): Boolean;
+
+    /// <summary>
+    ///   Gets the project version from a .dproj file in the repository.
+    /// </summary>
+    /// <param name="sRepoPath">Path to the repository.</param>
+    /// <returns>Version string (e.g., "1.0.1.25") or empty if not found.</returns>
+    function GetProjectVersion( const sRepoPath: string ): string;
   public
     constructor Create;
     destructor Destroy; override;
@@ -835,6 +843,7 @@ begin
       FRepos[ i ].ModifiedFileCount := 0;
       FRepos[ i ].Provider := rpNone;
       FRepos[ i ].Group := JSONObj.GetValue<string>( 'group', '' );
+      FRepos[ i ].Version := '';
     end;
 
     Result := True;
@@ -935,6 +944,7 @@ begin
   FRepos[ iLen ].ModifiedFileCount := 0;
   FRepos[ iLen ].Provider := rpNone;
   FRepos[ iLen ].Group := '';
+  FRepos[ iLen ].Version := '';
 
   RefreshStatus( iLen );
   SaveConfig;
@@ -1007,6 +1017,9 @@ begin
 
   sOriginURL := GetRemoteOriginURL( sRepoPath );
   FRepos[ iIndex ].Provider := DetectRemoteProvider( sOriginURL );
+
+  // Get project version from .dproj file if present
+  FRepos[ iIndex ].Version := GetProjectVersion( sRepoPath );
 
 end;
 
@@ -1353,6 +1366,101 @@ begin
   sRepo := sRepoWithExt;
 
   Result := ( not sOwner.IsEmpty ) and ( not sRepo.IsEmpty );
+
+end;
+
+function TGitRepoManager.GetProjectVersion( const sRepoPath: string ): string;
+var
+  SearchRec         : TSearchRec;
+  sDprojPath        : string;
+  sContent          : string;
+  sLine             : string;
+  Lines             : TArray<string>;
+  iPos              : Integer;
+  iEndPos           : Integer;
+  sVersion          : string;
+  sBestVersion      : string;
+  VersionParts      : TArray<string>;
+  BestParts         : TArray<string>;
+  lIsBetter         : Boolean;
+begin
+
+  Result := '';
+  sDprojPath := '';
+  sBestVersion := '';
+
+  // Find .dproj file in repository root
+  if FindFirst( TPath.Combine( sRepoPath, '*.dproj' ), faAnyFile, SearchRec ) = 0 then
+  begin
+    try
+      sDprojPath := TPath.Combine( sRepoPath, SearchRec.Name );
+    finally
+      FindClose( SearchRec );
+    end;
+  end;
+
+  if sDprojPath.IsEmpty or ( not TFile.Exists( sDprojPath ) ) then
+    Exit;
+
+  // Read and parse the .dproj file
+  try
+    sContent := TFile.ReadAllText( sDprojPath, TEncoding.UTF8 );
+  except
+    Exit;
+  end;
+
+  // Search for FileVersion= in VerInfo_Keys
+  Lines := sContent.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
+
+  for sLine in Lines do
+  begin
+    if sLine.Contains( 'VerInfo_Keys' ) and sLine.Contains( 'FileVersion=' ) then
+    begin
+      // Extract FileVersion value
+      iPos := sLine.IndexOf( 'FileVersion=' );
+
+      if iPos >= 0 then
+      begin
+        iPos := iPos + Length( 'FileVersion=' );
+        iEndPos := sLine.IndexOf( ';', iPos );
+
+        if iEndPos < 0 then
+          iEndPos := sLine.IndexOf( '<', iPos );
+
+        if iEndPos > iPos then
+        begin
+          sVersion := sLine.Substring( iPos, iEndPos - iPos );
+
+          // Compare versions to find the highest
+          if sBestVersion.IsEmpty then
+            sBestVersion := sVersion
+          else
+          begin
+            // Compare version numbers
+            VersionParts := sVersion.Split( [ '.' ] );
+            BestParts := sBestVersion.Split( [ '.' ] );
+            lIsBetter := False;
+
+            for var i := 0 to Min( High( VersionParts ), High( BestParts ) ) do
+            begin
+              if StrToIntDef( VersionParts[ i ], 0 ) > StrToIntDef( BestParts[ i ], 0 ) then
+              begin
+                lIsBetter := True;
+                Break;
+              end
+              else if StrToIntDef( VersionParts[ i ], 0 ) < StrToIntDef( BestParts[ i ], 0 ) then
+                Break;
+            end;
+
+            if lIsBetter then
+              sBestVersion := sVersion;
+          end;
+        end;
+      end;
+    end;
+  end;
+
+  Result := sBestVersion;
 
 end;
 
@@ -1886,7 +1994,6 @@ end;
 
 procedure TGitRepoManager.RefreshAllStatusParallel;
 var
-  Tasks             : TArray<ITask>;
   iCount            : Integer;
 begin
 
@@ -1895,26 +2002,17 @@ begin
   if iCount = 0 then
     Exit;
 
-  SetLength( Tasks, iCount );
-
-  for var i := 0 to iCount - 1 do
-  begin
-    var iIndex := i;                    // Capture by value
-
-    Tasks[ i ] := TTask.Run(
-      procedure
-      begin
-        FRepos[ iIndex ].Branch := GetRepoBranch( FRepos[ iIndex ].Path );
-        FRepos[ iIndex ].Status := GetRepoStatus( FRepos[ iIndex ].Path );
-        FRepos[ iIndex ].StatusText := RepoStatusToString( FRepos[ iIndex ].Status );
-        FRepos[ iIndex ].TrackedFileCount := GetTrackedFileCount( FRepos[ iIndex ].Path );
-        FRepos[ iIndex ].ModifiedFileCount := GetModifiedFileCount( FRepos[ iIndex ].Path );
-        FRepos[ iIndex ].Provider := DetectRemoteProvider( GetRemoteOriginURL( FRepos[ iIndex ].Path ) );
-      end
-      );
-  end;
-
-  TTask.WaitForAll( Tasks );
+  TParallel.For( 0, iCount - 1,
+    procedure( AIndex: Integer )
+    begin
+      FRepos[ AIndex ].Branch := GetRepoBranch( FRepos[ AIndex ].Path );
+      FRepos[ AIndex ].Status := GetRepoStatus( FRepos[ AIndex ].Path );
+      FRepos[ AIndex ].StatusText := RepoStatusToString( FRepos[ AIndex ].Status );
+      FRepos[ AIndex ].TrackedFileCount := GetTrackedFileCount( FRepos[ AIndex ].Path );
+      FRepos[ AIndex ].ModifiedFileCount := GetModifiedFileCount( FRepos[ AIndex ].Path );
+      FRepos[ AIndex ].Provider := DetectRemoteProvider( GetRemoteOriginURL( FRepos[ AIndex ].Path ) );
+      FRepos[ AIndex ].Version := GetProjectVersion( FRepos[ AIndex ].Path );
+    end );
 
 end;
 

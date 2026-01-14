@@ -725,6 +725,11 @@ begin
                 sValA := FRepoManager.Repos[ A ].StatusText;
                 sValB := FRepoManager.Repos[ B ].StatusText;
               end;
+            7:
+              begin
+                sValA := FRepoManager.Repos[ A ].Version;
+                sValB := FRepoManager.Repos[ B ].Version;
+              end;
           else
             sValA := '';
             sValB := '';
@@ -839,6 +844,7 @@ begin
         Item.SubItems.Add( IntToStr( FRepoManager.Repos[ iRepoIndex ].TrackedFileCount ) );
         Item.SubItems.Add( IntToStr( FRepoManager.Repos[ iRepoIndex ].ModifiedFileCount ) );
         Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].StatusText );
+        Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].Version );
         Item.Checked := FRepoManager.Repos[ iRepoIndex ].Selected;
         Item.Data := Pointer( iRepoIndex );
       end;
@@ -875,6 +881,7 @@ begin
         Item.SubItems[ 3 ] := IntToStr( FRepoManager.Repos[ iIndex ].TrackedFileCount );
         Item.SubItems[ 4 ] := IntToStr( FRepoManager.Repos[ iIndex ].ModifiedFileCount );
         Item.SubItems[ 5 ] := FRepoManager.Repos[ iIndex ].StatusText;
+        Item.SubItems[ 6 ] := FRepoManager.Repos[ iIndex ].Version;
         lvRepos.UpdateItems( i, i );
       finally
         FUpdatingList := False;

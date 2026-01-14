@@ -221,6 +221,11 @@ object MainForm: TMainForm
           Alignment = taCenter
           Caption = 'Status'
           Width = 100
+        end
+        item
+          Alignment = taCenter
+          Caption = 'Version'
+          Width = 80
         end>
       ReadOnly = True
       RowSelect = True
