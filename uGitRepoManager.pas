@@ -223,6 +223,13 @@ type
     /// <param name="sRepoPath">Path to the repository.</param>
     /// <returns>Version string (e.g., "1.0.1.25") or empty if not found.</returns>
     function GetProjectVersion( const sRepoPath: string ): string;
+
+    /// <summary>
+    ///   Gets the git describe version string for the repository.
+    /// </summary>
+    /// <param name="sRepoPath">Path to the repository.</param>
+    /// <returns>Git describe output (e.g., "v1.0.1-5-gabc123") or empty if not found.</returns>
+    function GetGitDescribeVersion( const sRepoPath: string ): string;
   public
     constructor Create;
     destructor Destroy; override;
@@ -1018,8 +1025,8 @@ begin
   sOriginURL := GetRemoteOriginURL( sRepoPath );
   FRepos[ iIndex ].Provider := DetectRemoteProvider( sOriginURL );
 
-  // Get project version from .dproj file if present
-  FRepos[ iIndex ].Version := GetProjectVersion( sRepoPath );
+  // Get git describe version (shows tag + commits since tag)
+  FRepos[ iIndex ].Version := GetGitDescribeVersion( sRepoPath );
 
 end;
 
@@ -1109,8 +1116,8 @@ begin
 
   sLog := sLog + 'Pushed successfully' + sLineBreak;
 
-  // Create and push version tag if version exists
-  sVersion := FRepos[ iIndex ].Version;
+  // Create and push version tag if .dproj version exists
+  sVersion := GetProjectVersion( FRepos[ iIndex ].Path );
 
   if ( not sVersion.IsEmpty ) then
   begin
@@ -1494,6 +1501,18 @@ begin
   end;
 
   Result := sBestVersion;
+
+end;
+
+function TGitRepoManager.GetGitDescribeVersion( const sRepoPath: string ): string;
+var
+  sOutput           : string;
+begin
+
+  Result := '';
+
+  if ExecuteGitCommand( sRepoPath, 'describe --tags --always', sOutput ) then
+    Result := Trim( sOutput );
 
 end;
 
@@ -2044,7 +2063,7 @@ begin
       FRepos[ AIndex ].TrackedFileCount := GetTrackedFileCount( FRepos[ AIndex ].Path );
       FRepos[ AIndex ].ModifiedFileCount := GetModifiedFileCount( FRepos[ AIndex ].Path );
       FRepos[ AIndex ].Provider := DetectRemoteProvider( GetRemoteOriginURL( FRepos[ AIndex ].Path ) );
-      FRepos[ AIndex ].Version := GetProjectVersion( FRepos[ AIndex ].Path );
+      FRepos[ AIndex ].Version := GetGitDescribeVersion( FRepos[ AIndex ].Path );
     end );
 
 end;
