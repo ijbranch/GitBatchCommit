@@ -23,10 +23,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
   Status is determined by running `git status --porcelain`. Any output indicates modifications.
 - **Branch Display** - Shows the current branch for each repository
 - **Remote Provider Display** - Shows the remote provider (GitHub, Codeberg, Other, None) for each repository
-- **Version Display** - Shows the Git version status for each repository using `git describe --tags --always`:
-  - Exactly on a tag: `v1.0.1.25`
-  - 3 commits after tag: `v1.0.1.25-3-gabc123`
-  - No tags: shows commit hash only
+- **Version Display** - Shows the project version extracted from Delphi `.dproj` files (searches repository and subdirectories)
 - **Automatic Version Tagging** - For Delphi projects, automatically creates and pushes Git tags based on the version number in the `.dproj` file when committing
 - **Batch Operations** - Commit and push to multiple repositories with one click
 - **Quick Selection** - Buttons to select all, none, or only modified repositories
@@ -371,10 +368,10 @@ This project is provided as-is for personal use only.
 
 ### 1.4.0
 
-- Added Version column to repository list - displays `git describe --tags --always` output showing version relative to nearest tag
-- Added automatic version tagging for Delphi projects - extracts version from `.dproj` and creates Git tags (e.g., `v1.0.1.25`)
+- Added Version column to repository list - displays version extracted from Delphi `.dproj` files
+- Searches repository root and all subdirectories for `.dproj` files
+- Added automatic version tagging for Delphi projects - creates Git tags (e.g., `v3.9.1.719`) on commit
 - Tags are automatically pushed to remote (GitHub/Codeberg) and appear in Releases section
-- Version column shows: exact tag when on tagged commit, or `tag-commits-hash` format when ahead of tag
 
 ### 1.3.0
 

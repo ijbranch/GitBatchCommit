@@ -1025,8 +1025,8 @@ begin
   sOriginURL := GetRemoteOriginURL( sRepoPath );
   FRepos[ iIndex ].Provider := DetectRemoteProvider( sOriginURL );
 
-  // Get git describe version (shows tag + commits since tag)
-  FRepos[ iIndex ].Version := GetGitDescribeVersion( sRepoPath );
+  // Get project version from .dproj file if present
+  FRepos[ iIndex ].Version := GetProjectVersion( sRepoPath );
 
 end;
 
@@ -2063,7 +2063,7 @@ begin
       FRepos[ AIndex ].TrackedFileCount := GetTrackedFileCount( FRepos[ AIndex ].Path );
       FRepos[ AIndex ].ModifiedFileCount := GetModifiedFileCount( FRepos[ AIndex ].Path );
       FRepos[ AIndex ].Provider := DetectRemoteProvider( GetRemoteOriginURL( FRepos[ AIndex ].Path ) );
-      FRepos[ AIndex ].Version := GetGitDescribeVersion( FRepos[ AIndex ].Path );
+      FRepos[ AIndex ].Version := GetProjectVersion( FRepos[ AIndex ].Path );
     end );
 
 end;
