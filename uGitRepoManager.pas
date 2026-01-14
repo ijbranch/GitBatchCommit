@@ -1035,6 +1035,8 @@ function TGitRepoManager.CommitAndPush( const iIndex: Integer; const sMessage: s
 var
   sOutput           : string;
   sTempFile         : string;
+  sVersion          : string;
+  sTagName          : string;
 begin
 
   Result := False;
@@ -1106,6 +1108,37 @@ begin
   end;
 
   sLog := sLog + 'Pushed successfully' + sLineBreak;
+
+  // Create and push version tag if version exists
+  sVersion := FRepos[ iIndex ].Version;
+
+  if ( not sVersion.IsEmpty ) then
+  begin
+    sTagName := 'v' + sVersion;
+
+    // Check if tag already exists
+    if ExecuteGitCommand( FRepos[ iIndex ].Path, Format( 'tag -l "%s"', [ sTagName ] ), sOutput ) then
+    begin
+      if Trim( sOutput ).IsEmpty then
+      begin
+        // Tag doesn't exist - create it
+        if ExecuteGitCommand( FRepos[ iIndex ].Path, Format( 'tag -a "%s" -m "Version %s"', [ sTagName, sVersion ] ), sOutput ) then
+        begin
+          sLog := sLog + Format( 'Created tag: %s', [ sTagName ] ) + sLineBreak;
+
+          // Push the tag
+          if ExecuteGitCommand( FRepos[ iIndex ].Path, Format( 'push origin "%s"', [ sTagName ] ), sOutput ) then
+            sLog := sLog + Format( 'Pushed tag: %s', [ sTagName ] ) + sLineBreak
+          else
+            sLog := sLog + 'Warning: Failed to push tag: ' + Trim( sOutput ) + sLineBreak;
+        end
+        else
+          sLog := sLog + 'Warning: Failed to create tag: ' + Trim( sOutput ) + sLineBreak;
+      end
+      else
+        sLog := sLog + Format( 'Tag %s already exists', [ sTagName ] ) + sLineBreak;
+    end;
+  end;
 
   // Add to commit history
   AddToCommitHistory( sMessage );

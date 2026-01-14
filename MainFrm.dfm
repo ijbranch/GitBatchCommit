@@ -3,7 +3,7 @@ object MainForm: TMainForm
   Top = 0
   Caption = 'Git Batch Commit'
   ClientHeight = 600
-  ClientWidth = 1012
+  ClientWidth = 1093
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -15,11 +15,10 @@ object MainForm: TMainForm
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnShow = FormShow
-  TextHeight = 15
   object splitter: TSplitter
     Left = 0
     Top = 325
-    Width = 1012
+    Width = 1093
     Height = 5
     Cursor = crVSplit
     Align = alBottom
@@ -27,7 +26,7 @@ object MainForm: TMainForm
   object pnlTop: TPanel
     Left = 0
     Top = 0
-    Width = 1012
+    Width = 1093
     Height = 41
     Align = alTop
     BevelOuter = bvNone
@@ -79,7 +78,7 @@ object MainForm: TMainForm
   object pnlBottom: TPanel
     Left = 0
     Top = 555
-    Width = 1012
+    Width = 1093
     Height = 45
     Align = alBottom
     BevelOuter = bvNone
@@ -148,7 +147,7 @@ object MainForm: TMainForm
   object pnlDetails: TPanel
     Left = 0
     Top = 330
-    Width = 1012
+    Width = 1093
     Height = 75
     Align = alBottom
     BevelOuter = bvNone
@@ -173,7 +172,7 @@ object MainForm: TMainForm
   object pnlClient: TPanel
     Left = 0
     Top = 41
-    Width = 1012
+    Width = 1093
     Height = 284
     Align = alClient
     BevelOuter = bvNone
@@ -181,7 +180,7 @@ object MainForm: TMainForm
     object lvRepos: TListView
       Left = 0
       Top = 0
-      Width = 1012
+      Width = 1093
       Height = 284
       Hint = 
         'Ready. Drag and drop repository folders to add them. Click colum' +
@@ -242,7 +241,7 @@ object MainForm: TMainForm
   object mmoLog: TMemo
     Left = 0
     Top = 405
-    Width = 1012
+    Width = 1093
     Height = 150
     Align = alBottom
     Font.Charset = DEFAULT_CHARSET
