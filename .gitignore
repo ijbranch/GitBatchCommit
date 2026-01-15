@@ -26,6 +26,9 @@
 #*.obj
 #
 
+# Windows null device file (created by bash redirection)
+nul
+
 # Delphi compiler-generated binaries (safe to delete)
 __history/
 *.exe
