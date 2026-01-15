@@ -101,6 +101,15 @@ object MainForm: TMainForm
       TabOrder = 6
       OnClick = btnPushOnlyClick
     end
+    object btnForcePush: TButton
+      Left = 800
+      Top = 8
+      Width = 90
+      Height = 25
+      Caption = 'Force Push'
+      TabOrder = 7
+      OnClick = btnForcePushClick
+    end
   end
   object pnlBottom: TPanel
     Left = 0
@@ -280,6 +289,7 @@ object MainForm: TMainForm
     ReadOnly = True
     ScrollBars = ssVertical
     TabOrder = 3
+    OnKeyDown = mmoLogKeyDown
   end
   object MainMenu: TMainMenu
     Left = 400

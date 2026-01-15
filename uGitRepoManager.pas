@@ -380,6 +380,32 @@ type
     function PushRepository( const iIndex: Integer; out sLog: string ): Boolean;
 
     /// <summary>
+    ///   Force pushes a repository to remote, overwriting remote history.
+    /// </summary>
+    /// <param name="iIndex">Index of the repository.</param>
+    /// <param name="sLog">Output log of the operation.</param>
+    /// <returns>True if the operation succeeded.</returns>
+    function ForcePushRepository( const iIndex: Integer; out sLog: string ): Boolean;
+
+    /// <summary>
+    ///   Creates a backup branch before a potentially destructive operation.
+    /// </summary>
+    /// <param name="iIndex">Index of the repository.</param>
+    /// <param name="sBranchName">Output: name of the created backup branch.</param>
+    /// <param name="sLog">Output log of the operation.</param>
+    /// <returns>True if the backup branch was created successfully.</returns>
+    function CreateBackupBranch( const iIndex: Integer; out sBranchName: string; out sLog: string ): Boolean;
+
+    /// <summary>
+    ///   Fetches from remote and returns a preview of incoming changes.
+    /// </summary>
+    /// <param name="iIndex">Index of the repository.</param>
+    /// <param name="sChanges">Output: description of files that will change.</param>
+    /// <param name="sLog">Output log of the operation.</param>
+    /// <returns>True if fetch succeeded (sChanges may be empty if no changes).</returns>
+    function GetIncomingChanges( const iIndex: Integer; out sChanges: string; out sLog: string ): Boolean;
+
+    /// <summary>
     ///   Adds a commit message to the history.
     /// </summary>
     procedure AddToCommitHistory( const sMessage: string );
@@ -2021,6 +2047,108 @@ begin
   if sLog.IsEmpty then
     sLog := 'Pushed successfully';
 
+  Result := True;
+
+end;
+
+function TGitRepoManager.ForcePushRepository( const iIndex: Integer; out sLog: string ): Boolean;
+var
+  sOutput           : string;
+begin
+
+  Result := False;
+  sLog := '';
+
+  if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
+  begin
+    sLog := 'Invalid repository index';
+    Exit;
+  end;
+
+  if ( not ExecuteGitCommand( FRepos[ iIndex ].Path, 'push --force', sOutput ) ) then
+  begin
+    sLog := 'Force push failed: ' + Trim( sOutput );
+    Exit;
+  end;
+
+  sLog := Trim( sOutput );
+
+  if sLog.IsEmpty then
+    sLog := 'Force pushed successfully';
+
+  Result := True;
+
+end;
+
+function TGitRepoManager.CreateBackupBranch( const iIndex: Integer; out sBranchName: string; out sLog: string ): Boolean;
+var
+  sOutput           : string;
+begin
+
+  Result := False;
+  sBranchName := '';
+  sLog := '';
+
+  if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
+  begin
+    sLog := 'Invalid repository index';
+    Exit;
+  end;
+
+  // Create a timestamped backup branch name
+  sBranchName := 'backup-' + FormatDateTime( 'yyyy-mm-dd-hhnnss', Now );
+
+  if ( not ExecuteGitCommand( FRepos[ iIndex ].Path, 'branch ' + sBranchName, sOutput ) ) then
+  begin
+    sLog := 'Failed to create backup branch: ' + Trim( sOutput );
+    sBranchName := '';
+    Exit;
+  end;
+
+  sLog := 'Created backup branch: ' + sBranchName;
+  Result := True;
+
+end;
+
+function TGitRepoManager.GetIncomingChanges( const iIndex: Integer; out sChanges: string; out sLog: string ): Boolean;
+var
+  sOutput           : string;
+  sRepoPath         : string;
+  sBranch           : string;
+begin
+
+  Result := False;
+  sChanges := '';
+  sLog := '';
+
+  if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
+  begin
+    sLog := 'Invalid repository index';
+    Exit;
+  end;
+
+  sRepoPath := FRepos[ iIndex ].Path;
+  sBranch := FRepos[ iIndex ].Branch;
+
+  // Fetch from remote first
+  if ( not ExecuteGitCommand( sRepoPath, 'fetch', sOutput ) ) then
+  begin
+    sLog := 'Fetch failed: ' + Trim( sOutput );
+    Exit;
+  end;
+
+  // Get diff stat between current HEAD and remote branch
+  if ( not ExecuteGitCommand( sRepoPath, 'diff --stat HEAD..origin/' + sBranch, sOutput ) ) then
+  begin
+    // May fail if no remote tracking branch - that's OK, no incoming changes
+    sChanges := '';
+    sLog := 'No remote tracking branch or no changes';
+    Result := True;
+    Exit;
+  end;
+
+  sChanges := Trim( sOutput );
+  sLog := 'Fetched successfully';
   Result := True;
 
 end;

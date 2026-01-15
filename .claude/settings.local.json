@@ -12,7 +12,14 @@
       "Bash(curl:*)",
       "Bash(git branch:*)",
       "Bash(git remote add:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git reset:*)",
+      "Bash(findstr:*)",
+      "Bash(dir /b /s \"C:\\\\Users\\\\*\\\\GitBatchCommit\\\\repositories.json\")",
+      "Bash(cmd.exe /c \"echo %USERPROFILE%\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\Ian\\\\GitBatchCommit\\\\repositories.json\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\*\\\\GitBatchCommit\\\\repositories.json\")",
+      "Bash(ls:*)"
     ]
   }
 }

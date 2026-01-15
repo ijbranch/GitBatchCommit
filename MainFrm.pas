@@ -140,6 +140,7 @@ type
     btnPullSelected: TButton;
     btnResolveConflicts: TButton;
     btnPushOnly: TButton;
+    btnForcePush: TButton;
     pnlDetails: TPanel;
     lblDetails: TLabel;
     mmoDetails: TMemo;
@@ -182,6 +183,8 @@ type
     procedure btnPullSelectedClick( Sender: TObject );
     procedure btnResolveConflictsClick( Sender: TObject );
     procedure btnPushOnlyClick( Sender: TObject );
+    procedure btnForcePushClick( Sender: TObject );
+    procedure mmoLogKeyDown( Sender: TObject; var Key: Word; Shift: TShiftState );
   private
     const
       WM_LOAD_REPOS = WM_USER + 100;
@@ -1836,6 +1839,8 @@ procedure TMainForm.pmPullClick( Sender: TObject );
 var
   iIndex            : Integer;
   sLog              : string;
+  sChanges          : string;
+  sBranchName       : string;
 begin
 
   if lvRepos.Selected = nil then
@@ -1843,19 +1848,54 @@ begin
 
   iIndex := Integer( lvRepos.Selected.Data );
 
-  if MessageDlg( Format( 'Pull changes for "%s"?', [ FRepoManager.Repos[ iIndex ].Name ] ),
-    mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
+  // Strong warning about local code being modified
+  if MessageDlg(
+    'WARNING: Pull will merge remote changes into your LOCAL code.' + sLineBreak + sLineBreak +
+    'Your local files for "' + FRepoManager.Repos[ iIndex ].Name + '" MAY BE MODIFIED.' + sLineBreak + sLineBreak +
+    'A backup branch will be created before pulling.' + sLineBreak + sLineBreak +
+    'Do you want to continue?',
+    mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
   Screen.Cursor := crHourGlass;
 
   try
+    // Preview incoming changes
+    Log( 'Fetching and previewing incoming changes...' );
+    if FRepoManager.GetIncomingChanges( iIndex, sChanges, sLog ) then
+    begin
+      if not sChanges.IsEmpty then
+      begin
+        Screen.Cursor := crDefault;
+        if MessageDlg(
+          'The following files will be MODIFIED:' + sLineBreak + sLineBreak +
+          sChanges + sLineBreak + sLineBreak +
+          'Do you want to proceed? (A backup branch will be created)',
+          mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
+        begin
+          Log( 'Pull cancelled by user.' );
+          Exit;
+        end;
+        Screen.Cursor := crHourGlass;
+      end
+      else
+        Log( 'No incoming changes detected.' );
+    end;
+
+    // Create backup branch
+    if FRepoManager.CreateBackupBranch( iIndex, sBranchName, sLog ) then
+      Log( sLog )
+    else
+      Log( 'Warning: Could not create backup branch: ' + sLog );
+
+    // Now pull
     Log( 'Pulling ' + FRepoManager.Repos[ iIndex ].Name + '...' );
 
     if FRepoManager.PullRepository( iIndex, sLog ) then
     begin
       Log( sLog );
       Log( 'Pull complete.' );
+      Log( 'Backup branch "' + sBranchName + '" was created. Delete with: git branch -d ' + sBranchName );
       FRepoManager.RefreshStatus( iIndex );
       UpdateListItem( iIndex );
     end
@@ -2183,8 +2223,12 @@ procedure TMainForm.btnPullSelectedClick( Sender: TObject );
 var
   iRepoIndex        : Integer;
   sLog              : string;
+  sChanges          : string;
+  sBranchName       : string;
   iCount            : Integer;
   iSuccess          : Integer;
+  slPreview         : TStringList;
+  bHasChanges       : Boolean;
 begin
 
   // Count selected repositories
@@ -2202,10 +2246,63 @@ begin
     Exit;
   end;
 
-  if MessageDlg( Format( 'Pull changes for %d repository(ies)?', [ iCount ] ),
-    mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
+  // Strong warning about local code being modified
+  if MessageDlg(
+    'WARNING: Pull will merge remote changes into your LOCAL code.' + sLineBreak + sLineBreak +
+    'Your local files MAY BE MODIFIED by this operation.' + sLineBreak + sLineBreak +
+    'A backup branch will be created before pulling.' + sLineBreak + sLineBreak +
+    'Do you want to continue?',
+    mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
+  // Fetch and preview incoming changes
+  Log( 'Fetching and previewing incoming changes...' );
+  Screen.Cursor := crHourGlass;
+  slPreview := TStringList.Create;
+  bHasChanges := False;
+
+  try
+    for var i := 0 to lvRepos.Items.Count - 1 do
+    begin
+      if lvRepos.Items[ i ].Checked then
+      begin
+        iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+        if FRepoManager.GetIncomingChanges( iRepoIndex, sChanges, sLog ) then
+        begin
+          if not sChanges.IsEmpty then
+          begin
+            slPreview.Add( '=== ' + FRepoManager.Repos[ iRepoIndex ].Name + ' ===' );
+            slPreview.Add( sChanges );
+            slPreview.Add( '' );
+            bHasChanges := True;
+          end;
+        end;
+      end;
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+
+  // Show preview and confirm
+  if bHasChanges then
+  begin
+    if MessageDlg(
+      'The following files will be MODIFIED by the pull:' + sLineBreak + sLineBreak +
+      slPreview.Text + sLineBreak +
+      'Do you want to proceed? (Backup branches will be created)',
+      mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
+    begin
+      slPreview.Free;
+      Log( 'Pull cancelled by user.' );
+      Exit;
+    end;
+  end
+  else
+    Log( 'No incoming changes detected (or could not determine changes).' );
+
+  slPreview.Free;
+
+  // Now perform the actual pull with backup
   Screen.Cursor := crHourGlass;
   iSuccess := 0;
 
@@ -2218,6 +2315,13 @@ begin
 
         Log( Format( '=== Pulling %s ===', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
 
+        // Create backup branch first
+        if FRepoManager.CreateBackupBranch( iRepoIndex, sBranchName, sLog ) then
+          Log( sLog )
+        else
+          Log( 'Warning: Could not create backup branch: ' + sLog );
+
+        // Now pull
         if FRepoManager.PullRepository( iRepoIndex, sLog ) then
         begin
           Log( sLog );
@@ -2236,6 +2340,7 @@ begin
   end;
 
   Log( Format( 'Pull completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+  Log( 'Backup branches were created. Use "git branch -d <branch-name>" to delete them if no longer needed.' );
   ScrollLogToEnd;
 
 end;
@@ -2364,6 +2469,92 @@ begin
   Log( Format( 'Push completed: %d of %d successful.', [ iSuccess, iCount ] ) );
   ScrollLogToEnd;
 
+end;
+
+procedure TMainForm.btnForcePushClick( Sender: TObject );
+var
+  iRepoIndex        : Integer;
+  sLog              : string;
+  iCount            : Integer;
+  iSuccess          : Integer;
+begin
+
+  // Count selected repositories
+  iCount := 0;
+
+  for var i := 0 to lvRepos.Items.Count - 1 do
+  begin
+    if lvRepos.Items[ i ].Checked then
+      Inc( iCount );
+  end;
+
+  if iCount = 0 then
+  begin
+    MessageDlg( 'No repositories selected.', mtInformation, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  // Strong warning about force push
+  if MessageDlg(
+    'WARNING: Force Push will OVERWRITE the remote repository history!' + sLineBreak + sLineBreak +
+    'This makes your local code the definitive version.' + sLineBreak +
+    'Any commits on the remote that are not in your local will be LOST.' + sLineBreak + sLineBreak +
+    'This operation affects ' + IntToStr( iCount ) + ' repository(ies).' + sLineBreak + sLineBreak +
+    'Are you ABSOLUTELY sure you want to continue?',
+    mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
+    Exit;
+
+  // Second confirmation for safety
+  if MessageDlg(
+    'FINAL CONFIRMATION' + sLineBreak + sLineBreak +
+    'You are about to force push ' + IntToStr( iCount ) + ' repository(ies).' + sLineBreak + sLineBreak +
+    'Remote history will be overwritten. This cannot be undone.' + sLineBreak + sLineBreak +
+    'Proceed with force push?',
+    mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
+    Exit;
+
+  Screen.Cursor := crHourGlass;
+  iSuccess := 0;
+
+  try
+    for var i := 0 to lvRepos.Items.Count - 1 do
+    begin
+      if lvRepos.Items[ i ].Checked then
+      begin
+        iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+
+        Log( Format( '=== Force Pushing %s ===', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
+
+        if FRepoManager.ForcePushRepository( iRepoIndex, sLog ) then
+        begin
+          Log( sLog );
+          Inc( iSuccess );
+        end
+        else
+          Log( sLog );
+
+        FRepoManager.RefreshStatus( iRepoIndex );
+        UpdateListItem( iRepoIndex );
+        Application.ProcessMessages;
+      end;
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+
+  Log( Format( 'Force push completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+  ScrollLogToEnd;
+
+end;
+
+procedure TMainForm.mmoLogKeyDown( Sender: TObject; var Key: Word; Shift: TShiftState );
+begin
+  // Handle Ctrl+A to select all text in the log memo
+  if ( ssCtrl in Shift ) and ( Key = Ord( 'A' ) ) then
+  begin
+    mmoLog.SelectAll;
+    Key := 0;
+  end;
 end;
 
 end.

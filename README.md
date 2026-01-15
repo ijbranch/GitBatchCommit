@@ -43,9 +43,14 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Commit Details** - Click the "..." button to add a detailed description below the summary line (standard Git commit format)
 - **Repository Groups** - Assign repositories to groups for easy filtering; use the Group dropdown in the toolbar to filter by group
 - **File Pattern Filtering** - Optionally stage only files matching a pattern (e.g., `*.pas`) via File > Settings
-- **Pull Selected** - Pull changes from remote for multiple selected repositories at once
+- **Pull Selected** - Pull changes from remote for multiple selected repositories at once (with safeguards)
 - **Resolve Conflicts** - Automatically resolve merge conflicts by keeping local versions for all selected repositories
 - **Push Only** - Push already-committed changes without creating a new commit (useful when local branch is ahead of remote)
+- **Force Push** - Force push to overwrite remote history when local code is the source of truth
+- **Pull Safeguards** - Multiple safety features protect your local code when pulling:
+  - Warning dialog clearly explains that local files may be modified
+  - Preview of incoming changes before pulling
+  - Automatic backup branch creation before any pull operation
 
 ## Requirements
 
@@ -151,10 +156,21 @@ Repositories flagged as **Pull Required** can be updated in several ways:
 
 1. Tick the checkboxes next to the repositories you want to pull
 2. Click **Pull Selected** in the toolbar
-3. Confirm the operation
-4. All selected repositories will be pulled and their status refreshed
+3. Review the warning about local files being modified
+4. Review the preview of files that will change
+5. Confirm to proceed - backup branches are created automatically
+6. All selected repositories will be pulled and their status refreshed
 
-Note: Pulling does not overwrite your local uncommitted changes. If you have local modifications, Git will attempt to merge them with the remote changes.
+**Pull Safeguards:**
+
+The Pull operation includes multiple safety features to protect your local code:
+
+- **Warning Dialog** - Clear warning that local files may be modified
+- **Change Preview** - Shows exactly which files will be modified before pulling
+- **Automatic Backup** - Creates a timestamped backup branch (e.g., `backup-2026-01-15-143022`) before pulling
+- **Recovery Option** - If something goes wrong, reset to the backup branch with: `git reset --hard backup-YYYY-MM-DD-HHMMSS`
+
+To delete backup branches after confirming everything is OK: `git branch -d backup-YYYY-MM-DD-HHMMSS`
 
 ### Resolving Merge Conflicts
 
@@ -181,6 +197,23 @@ This is useful when:
 - You've already committed manually in another Git client
 - You resolved conflicts and just need to push the result
 - Your local branch is ahead of remote and needs syncing
+
+### Force Push
+
+When your local code is the "source of truth" and you need to overwrite the remote:
+
+1. Tick the checkboxes next to the repositories you want to force push
+2. Click **Force Push** in the toolbar
+3. Read the warning carefully - remote history will be overwritten
+4. Confirm twice (two confirmation dialogs for safety)
+5. Remote repositories are updated to match your local code exactly
+
+**When to use Force Push:**
+- Your local code is the definitive version and remote has diverged
+- Push fails because remote is "ahead" but you don't want to pull those changes
+- You want to ensure remote exactly matches your local state
+
+**Warning:** Force push overwrites remote history. Any commits on the remote that are not in your local repository will be permanently lost. Use with caution.
 
 ### Creating a New Codeberg Repository
 
@@ -413,6 +446,12 @@ This project is provided as-is for personal use only.
 - Added **Pull Selected** button - pull changes for multiple repositories at once
 - Added **Resolve Conflicts** button - resolve merge conflicts by keeping local versions
 - Added **Push Only** button - push without committing (for repos that are ahead of remote)
+- Added **Force Push** button - overwrite remote with local code (with double confirmation)
+- Added **Pull Safeguards** to protect local code:
+  - Warning dialog about local files being modified
+  - Preview of incoming changes before pulling
+  - Automatic backup branch creation before any pull
+- Added Ctrl+A support in log panel to select all text
 
 ### 1.3.0
 
