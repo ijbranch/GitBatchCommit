@@ -120,6 +120,7 @@ type
     pmSetPrivate: TMenuItem;
     pmSep1: TMenuItem;
     pmEditGitignore: TMenuItem;
+    pmFixGitignore: TMenuItem;
     pmSep2: TMenuItem;
     pmOpenInExplorer: TMenuItem;
     pmOpenInGitClient: TMenuItem;
@@ -165,6 +166,7 @@ type
     procedure pmSetPrivateClick( Sender: TObject );
     procedure pmReposPopup( Sender: TObject );
     procedure pmEditGitignoreClick( Sender: TObject );
+    procedure pmFixGitignoreClick( Sender: TObject );
     procedure edtCommitMessageChange( Sender: TObject );
     procedure lvReposClick( Sender: TObject );
     procedure mnuHelpContentsClick( Sender: TObject );
@@ -1598,8 +1600,9 @@ var
   SubMenu           : TMenuItem;
 begin
 
-  // Enable .gitignore edit only when a single repository is selected
+  // Enable .gitignore options only when a single repository is selected
   pmEditGitignore.Enabled := ( lvRepos.Selected <> nil );
+  pmFixGitignore.Enabled := ( lvRepos.Selected <> nil );
 
   // Build the Set Group submenu
   pmSetGroup.Clear;
@@ -1688,6 +1691,144 @@ begin
 
   // Open in default editor
   ShellExecute( Handle, 'open', PChar( sGitignorePath ), nil, nil, SW_SHOWNORMAL );
+
+end;
+
+/// <summary>
+///   Handles the Fix .gitignore menu click - adds standard Delphi ignore patterns.
+/// </summary>
+procedure TMainForm.pmFixGitignoreClick( Sender: TObject );
+const
+  DELPHI_PATTERNS: array[0..24] of string = (
+    '# Delphi build artifacts',
+    '*.dcu',
+    '*.exe',
+    '*.dll',
+    '*.bpl',
+    '*.dcp',
+    '*.dres',
+    '*.res',
+    '*.map',
+    '*.drc',
+    '*.rsm',
+    '*.tds',
+    '*.dof',
+    '*.obj',
+    '*.hpp',
+    '*.o',
+    '__history/',
+    '__recovery/',
+    '*.local',
+    '*.identcache',
+    '*.projdata',
+    '*.tvsconfig',
+    '*.dsk',
+    'Win32/',
+    'Win64/'
+  );
+var
+  iIndex            : Integer;
+  sGitignorePath    : string;
+  slExisting        : TStringList;
+  slToAdd           : TStringList;
+  sPattern          : string;
+  sLowerContent     : string;
+  iAddedCount       : Integer;
+begin
+
+  if lvRepos.Selected = nil then
+  begin
+    MessageDlg( 'Please select a repository.', mtInformation, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  iIndex := Integer( lvRepos.Selected.Data );
+  sGitignorePath := IncludeTrailingPathDelimiter( FRepoManager.Repos[ iIndex ].Path ) + '.gitignore';
+
+  slExisting := TStringList.Create;
+  slToAdd := TStringList.Create;
+
+  try
+    // Read existing .gitignore content
+    if FileExists( sGitignorePath ) then
+    begin
+      try
+        slExisting.LoadFromFile( sGitignorePath );
+      except
+        on E: Exception do
+        begin
+          MessageDlg( 'Failed to read .gitignore: ' + E.Message, mtError, [ mbOK ], 0 );
+          Exit;
+        end;
+      end;
+    end;
+
+    // Build lowercase version for case-insensitive comparison
+    sLowerContent := slExisting.Text.ToLower;
+
+    // Check which patterns are missing
+    for sPattern in DELPHI_PATTERNS do
+    begin
+      // Skip the comment header - always add it if we're adding patterns
+      if sPattern.StartsWith( '#' ) then
+        Continue;
+
+      // Check if pattern already exists (case-insensitive)
+      if not sLowerContent.Contains( sPattern.ToLower ) then
+        slToAdd.Add( sPattern );
+    end;
+
+    if slToAdd.Count = 0 then
+    begin
+      MessageDlg( 'All standard Delphi patterns are already in .gitignore.', mtInformation, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    // Add patterns to file
+    try
+      // Add blank line separator if file has content
+      if slExisting.Count > 0 then
+        slExisting.Add( '' );
+
+      // Add header comment
+      slExisting.Add( '# Delphi build artifacts (added by GitBatchCommit)' );
+
+      // Add missing patterns
+      iAddedCount := 0;
+      for sPattern in DELPHI_PATTERNS do
+      begin
+        if sPattern.StartsWith( '#' ) then
+          Continue;
+
+        if not sLowerContent.Contains( sPattern.ToLower ) then
+        begin
+          slExisting.Add( sPattern );
+          Inc( iAddedCount );
+        end;
+      end;
+
+      // Save the file
+      slExisting.SaveToFile( sGitignorePath );
+
+      Log( Format( 'Added %d Delphi patterns to .gitignore in %s', [ iAddedCount, FRepoManager.Repos[ iIndex ].Name ] ) );
+      MessageDlg( Format( 'Added %d patterns to .gitignore.', [ iAddedCount ] ), mtInformation, [ mbOK ], 0 );
+
+      // Refresh the repository status
+      FRepoManager.RefreshStatus( iIndex );
+      UpdateListItem( iIndex );
+
+    except
+      on E: Exception do
+      begin
+        MessageDlg( 'Failed to save .gitignore: ' + E.Message, mtError, [ mbOK ], 0 );
+        Exit;
+      end;
+    end;
+
+  finally
+    slExisting.Free;
+    slToAdd.Free;
+  end;
 
 end;
 

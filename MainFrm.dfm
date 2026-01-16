@@ -425,6 +425,10 @@ object MainForm: TMainForm
       Caption = 'Edit .&gitignore...'
       OnClick = pmEditGitignoreClick
     end
+    object pmFixGitignore: TMenuItem
+      Caption = '&Fix .gitignore (Add Delphi Patterns)'
+      OnClick = pmFixGitignoreClick
+    end
     object pmSep2: TMenuItem
       Caption = '-'
     end

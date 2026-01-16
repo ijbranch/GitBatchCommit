@@ -230,6 +230,20 @@ type
     /// <param name="sRepoPath">Path to the repository.</param>
     /// <returns>Git describe output (e.g., "v1.0.1-5-gabc123") or empty if not found.</returns>
     function GetGitDescribeVersion( const sRepoPath: string ): string;
+
+    /// <summary>
+    ///   Checks if a filename is a known build artifact (e.g., .dcu, .exe, Win32/).
+    /// </summary>
+    /// <param name="sFileName">The filename to check (may include path).</param>
+    /// <returns>True if the file is a build artifact that should be ignored.</returns>
+    function IsBuildArtifact( const sFileName: string ): Boolean;
+
+    /// <summary>
+    ///   Checks if all changes in git status output are build artifacts.
+    /// </summary>
+    /// <param name="sPorcelainOutput">Output from 'git status --porcelain'.</param>
+    /// <returns>True if all changed files are build artifacts.</returns>
+    function AllChangesAreBuildArtifacts( const sPorcelainOutput: string ): Boolean;
   public
     constructor Create;
     destructor Destroy; override;
@@ -755,6 +769,14 @@ begin
       else
         Result := rsClean;
     end
+    else if AllChangesAreBuildArtifacts( sOutput ) then
+    begin
+      // All changes are build artifacts - treat as clean
+      if NeedsPull( sRepoPath ) then
+        Result := rsPullRequired
+      else
+        Result := rsClean;
+    end
     else
       Result := rsModified;
   end
@@ -1043,6 +1065,16 @@ begin
     if sStatusOutput.IsEmpty then
     begin
       FRepos[ iIndex ].ModifiedFileCount := 0;
+      if NeedsPull( sRepoPath ) then
+        FRepos[ iIndex ].Status := rsPullRequired
+      else
+        FRepos[ iIndex ].Status := rsClean;
+    end
+    else if AllChangesAreBuildArtifacts( sStatusOutput ) then
+    begin
+      // All changes are build artifacts - treat as clean
+      Lines := sStatusOutput.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
+      FRepos[ iIndex ].ModifiedFileCount := Length( Lines );
       if NeedsPull( sRepoPath ) then
         FRepos[ iIndex ].Status := rsPullRequired
       else
@@ -1555,6 +1587,101 @@ begin
 
   if ExecuteGitCommand( sRepoPath, 'describe --tags --always', sOutput ) then
     Result := Trim( sOutput );
+
+end;
+
+function TGitRepoManager.IsBuildArtifact( const sFileName: string ): Boolean;
+var
+  sLower            : string;
+  sExt              : string;
+begin
+
+  Result := False;
+  sLower := sFileName.ToLower.Replace( '\', '/' );
+
+  // Check by extension
+  sExt := ExtractFileExt( sLower );
+
+  if ( sExt = '.dcu' ) or ( sExt = '.exe' ) or ( sExt = '.dll' ) or
+     ( sExt = '.bpl' ) or ( sExt = '.dcp' ) or ( sExt = '.dres' ) or
+     ( sExt = '.res' ) or ( sExt = '.local' ) or ( sExt = '.identcache' ) or
+     ( sExt = '.dsk' ) or ( sExt = '.tds' ) or ( sExt = '.map' ) or
+     ( sExt = '.drc' ) or ( sExt = '.rsm' ) or ( sExt = '.obj' ) or
+     ( sExt = '.o' ) or ( sExt = '.hpp' ) or ( sExt = '.projdata' ) or
+     ( sExt = '.tvsconfig' ) then
+  begin
+    Result := True;
+    Exit;
+  end;
+
+  // Check by directory path
+  if sLower.Contains( '/win32/' ) or sLower.Contains( '/win64/' ) or
+     sLower.Contains( '/__history/' ) or sLower.Contains( '/__recovery/' ) or
+     sLower.Contains( '/debug/' ) or sLower.Contains( '/release/' ) or
+     sLower.Contains( '/osx32/' ) or sLower.Contains( '/osx64/' ) or
+     sLower.Contains( '/linux64/' ) or sLower.Contains( '/android/' ) or
+     sLower.Contains( '/iosdevice' ) then
+  begin
+    Result := True;
+    Exit;
+  end;
+
+  // Check for files starting with these directories
+  if sLower.StartsWith( 'win32/' ) or sLower.StartsWith( 'win64/' ) or
+     sLower.StartsWith( '__history/' ) or sLower.StartsWith( '__recovery/' ) or
+     sLower.StartsWith( 'debug/' ) or sLower.StartsWith( 'release/' ) or
+     sLower.StartsWith( 'osx32/' ) or sLower.StartsWith( 'osx64/' ) or
+     sLower.StartsWith( 'linux64/' ) or sLower.StartsWith( 'android/' ) or
+     sLower.StartsWith( 'iosdevice' ) then
+  begin
+    Result := True;
+    Exit;
+  end;
+
+end;
+
+function TGitRepoManager.AllChangesAreBuildArtifacts( const sPorcelainOutput: string ): Boolean;
+var
+  Lines             : TArray<string>;
+  sLine             : string;
+  sFileName         : string;
+begin
+
+  Result := False;
+
+  if Trim( sPorcelainOutput ).IsEmpty then
+    Exit;
+
+  Lines := sPorcelainOutput.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
+
+  if Length( Lines ) = 0 then
+    Exit;
+
+  // Check each changed file
+  for sLine in Lines do
+  begin
+    // Git porcelain format: XY filename (status code is first 2 chars, then space, then filename)
+    if Length( sLine ) > 3 then
+    begin
+      sFileName := Copy( sLine, 4, MaxInt );
+
+      // Handle renamed files (format: "R  old -> new")
+      if sFileName.Contains( ' -> ' ) then
+        sFileName := Copy( sFileName, Pos( ' -> ', sFileName ) + 4, MaxInt );
+
+      sFileName := Trim( sFileName );
+
+      // Remove quotes if present
+      if sFileName.StartsWith( '"' ) and sFileName.EndsWith( '"' ) then
+        sFileName := Copy( sFileName, 2, Length( sFileName ) - 2 );
+
+      if ( not IsBuildArtifact( sFileName ) ) then
+        Exit; // Found a non-build-artifact change
+    end;
+  end;
+
+  // All changes are build artifacts
+  Result := True;
 
 end;
 
