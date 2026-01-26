@@ -124,6 +124,7 @@ type
     FGitHubToken: string;
     FGitClientPath: string;
     FFilePattern: string;
+    FDelphiIndexerPath: string;
     FCommitHistory: TArray<string>;
     FCommitTemplates: TArray<string>;
     const
@@ -223,13 +224,6 @@ type
     /// <param name="sRepoPath">Path to the repository.</param>
     /// <returns>Version string (e.g., "1.0.1.25") or empty if not found.</returns>
     function GetProjectVersion( const sRepoPath: string ): string;
-
-    /// <summary>
-    ///   Gets the git describe version string for the repository.
-    /// </summary>
-    /// <param name="sRepoPath">Path to the repository.</param>
-    /// <returns>Git describe output (e.g., "v1.0.1-5-gabc123") or empty if not found.</returns>
-    function GetGitDescribeVersion( const sRepoPath: string ): string;
 
     /// <summary>
     ///   Checks if a filename is a known build artifact (e.g., .dcu, .exe, Win32/).
@@ -462,6 +456,7 @@ type
     property GitHubToken: string read FGitHubToken write FGitHubToken;
     property GitClientPath: string read FGitClientPath write FGitClientPath;
     property FilePattern: string read FFilePattern write FFilePattern;
+    property DelphiIndexerPath: string read FDelphiIndexerPath write FDelphiIndexerPath;
     property CommitHistory: TArray<string> read FCommitHistory;
     property CommitTemplates: TArray<string> read FCommitTemplates write FCommitTemplates;
   end;
@@ -856,6 +851,7 @@ begin
       // Load settings
       FGitClientPath := JSONRoot.GetValue<string>( 'git_client_path', '' );
       FFilePattern := JSONRoot.GetValue<string>( 'file_pattern', '' );
+      FDelphiIndexerPath := JSONRoot.GetValue<string>( 'delphi_indexer_path', '' );
 
       // Load commit history
       if JSONRoot.GetValue( 'commit_history' ) is TJSONArray then
@@ -947,6 +943,7 @@ begin
     // Save settings
     JSONRoot.AddPair( 'git_client_path', FGitClientPath );
     JSONRoot.AddPair( 'file_pattern', FFilePattern );
+    JSONRoot.AddPair( 'delphi_indexer_path', FDelphiIndexerPath );
 
     // Save commit history
     JSONHistoryArray := TJSONArray.Create;
@@ -1575,18 +1572,6 @@ begin
   end;
 
   Result := sBestVersion;
-
-end;
-
-function TGitRepoManager.GetGitDescribeVersion( const sRepoPath: string ): string;
-var
-  sOutput           : string;
-begin
-
-  Result := '';
-
-  if ExecuteGitCommand( sRepoPath, 'describe --tags --always', sOutput ) then
-    Result := Trim( sOutput );
 
 end;
 

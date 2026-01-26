@@ -43,6 +43,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Commit Details** - Click the "..." button to add a detailed description below the summary line (standard Git commit format)
 - **Repository Groups** - Assign repositories to groups for easy filtering; use the Group dropdown in the toolbar to filter by group
 - **File Pattern Filtering** - Optionally stage only files matching a pattern (e.g., `*.pas`) via File > Settings
+- **delphi-lookup Integration** - Automatically triggers incremental reindexing of committed repositories for delphi-lookup symbol search (optional, auto-detected)
 - **Pull Selected** - Pull changes from remote for multiple selected repositories at once (with safeguards)
 - **Resolve Conflicts** - Automatically resolve merge conflicts by keeping local versions for all selected repositories
 - **Push Only** - Push already-committed changes without creating a new commit (useful when local branch is ahead of remote)
@@ -64,8 +65,11 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 |-----------|-------------|--------|
 | FastMM5 | High-performance memory manager | https://github.com/pleriche/FastMM5 |
 | Aqua Light Slate | VCL visual style (optional - falls back to default if unavailable) | Included with RAD Studio Premium Styles |
+| delphi-lookup | Optional: Delphi symbol indexer for auto-reindex after commits | https://github.com/JavierusTk/delphi-lookup |
 
-**Note:** To remove the FastMM5 dependency, remove `FastMM5` from the uses clause in `GitBatchCommit.dpr`. The project will then use Delphi's default memory manager.
+**Notes:**
+- To remove the FastMM5 dependency, remove `FastMM5` from the uses clause in `GitBatchCommit.dpr`. The project will then use Delphi's default memory manager.
+- delphi-lookup integration is completely optional. GitBatchCommit works normally without it installed.
 
 ## Installation
 
@@ -301,8 +305,56 @@ Select **File > Settings** to configure:
 
 - **Git Client Path** - Full path to your external Git client executable (e.g., `C:\Program Files\Fork\Fork.exe`)
 - **File Pattern** - Optional pattern for staging files (e.g., `*.pas`). Leave empty to stage all files.
+- **delphi-indexer.exe Path** - Optional path to delphi-indexer.exe for automatic symbol reindexing after commits (auto-detected if not configured)
 
 These settings are saved to the configuration file and persist between sessions.
+
+#### delphi-lookup Integration
+
+GitBatchCommit includes optional integration with [delphi-lookup](https://github.com/JavierusTk/delphi-lookup), a high-performance Delphi symbol search tool. When enabled, GitBatchCommit automatically triggers incremental reindexing of committed repositories, keeping your symbol database up-to-date.
+
+**How it works:**
+
+1. After successfully pushing changes (Commit & Push, Push Only, Force Push, or Resolve Conflicts), GitBatchCommit checks if the repository path matches (or is a subdirectory of) any delphi-lookup indexed directories
+2. If a match is found, incremental reindexing runs in the background (non-blocking, typically 100-500ms)
+3. The parent indexed directory gets reindexed - no unnecessary processing of other indexed directories
+
+**Example:** If you have `E:\DBiWorkflow Development` indexed and commit to `E:\DBiWorkflow Development\DBiFoneology`, the entire `E:\DBiWorkflow Development` directory is reindexed (including DBiFoneology's changes). Other indexed directories are skipped.
+
+**Confirmation:** When reindexing is triggered, you'll see log messages:
+```
+Triggering delphi-lookup reindex: E:\DBiWorkflow Development
+delphi-lookup reindex completed successfully
+```
+
+If reindexing fails, you'll see:
+```
+Triggering delphi-lookup reindex: E:\DBiWorkflow Development
+delphi-lookup reindex FAILED
+Error: [error details from delphi-indexer]
+```
+
+**Setup:**
+
+- **Automatic Detection**: GitBatchCommit automatically finds delphi-indexer.exe if:
+  - It's in your system PATH environment variable, or
+  - It's installed at the default location: `D:\delphi-lookup\delphi-indexer.exe`
+  - The discovered path is saved to configuration for faster future lookups
+
+- **Manual Configuration**: If auto-detection fails, configure the path via File > Settings:
+  1. Select **File > Settings**
+  2. When prompted "Configure delphi-indexer.exe path?", click **Yes**
+  3. Browse to your delphi-indexer.exe location
+  4. Click **OK** to save
+
+**Requirements:**
+
+- delphi-lookup installed (from https://github.com/JavierusTk/delphi-lookup)
+- Repository must be configured as an indexed directory in delphi-lookup
+
+**Note:** If delphi-indexer.exe is not found, GitBatchCommit silently skips reindexing - all other functionality works normally. The integration is completely optional and non-intrusive.
+
+**Attribution:** delphi-lookup integration uses [delphi-indexer](https://github.com/JavierusTk/delphi-lookup) by JavierusTk for symbol indexing.
 
 ### Using Commit Message History
 
@@ -437,6 +489,18 @@ This project is provided as-is for personal use only.
 
 ## Version History
 
+### 1.5.0
+
+- Added **delphi-lookup Integration** - automatically triggers incremental reindexing after commits
+  - Auto-detects delphi-indexer.exe from PATH or default location
+  - Reindexes parent indexed directory when committing to exact match or subdirectory
+  - Captures output and reports success/failure with error details in log
+  - 30-second timeout with automatic termination if indexing hangs
+  - Manual path configuration via File > Settings if auto-detection fails
+  - Path verification with automatic fallback if configured path becomes invalid
+  - Completely optional - gracefully skips if delphi-indexer.exe not found
+- Attribution: Integration uses [delphi-indexer](https://github.com/JavierusTk/delphi-lookup) by JavierusTk
+
 ### 1.4.0
 
 - Added Version column to repository list - displays version extracted from Delphi `.dproj` files
@@ -487,3 +551,4 @@ This project is provided as-is for personal use only.
 *Version: 1.2 – 1 January 2026 14:40*
 *Version: 1.3 – 1 January 2026 15:00*
 *Version: 1.4 – 15 January 2026*
+*Version: 1.5 – 26 January 2026*

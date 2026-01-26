@@ -293,6 +293,29 @@ type
     ///   Handles click on a Set Group submenu item.
     /// </summary>
     procedure SetGroupMenuItemClick( Sender: TObject );
+
+    /// <summary>
+    ///   Executes a command and captures output.
+    /// </summary>
+    /// <param name="ACommand">Full command line to execute.</param>
+    /// <param name="AOutput">Captured stdout/stderr output.</param>
+    /// <param name="ATimeout">Timeout in milliseconds (default 30000 = 30s).</param>
+    /// <returns>True if command executed successfully (exit code 0).</returns>
+    function ExecuteCommand( const ACommand: string; out AOutput: string;
+      const ATimeout: Cardinal = 30000 ): Boolean;
+
+    /// <summary>
+    ///   Triggers delphi-lookup reindex for a specific repository path.
+    /// </summary>
+    /// <param name="ARepoPath">
+    ///   Full path to the repository that was committed.
+    /// </param>
+    /// <remarks>
+    ///   Captures output and logs success/failure with details.
+    ///   Only reindexes if the path matches one of the indexed directories.
+    ///   Incremental indexing is fast (~100ms when nothing changed).
+    /// </remarks>
+    procedure TriggerDelphiLookupReindex( const ARepoPath: string );
   public
   end;
 
@@ -1070,10 +1093,17 @@ begin
 
       if lvRepos.Items[ i ].Checked and ( FRepoManager.Repos[ iRepoIndex ].Status = rsModified ) then
       begin
-        if FRepoManager.CommitAndPush( iRepoIndex, sMessage, sLog ) then
+        var bCommitSuccess := FRepoManager.CommitAndPush( iRepoIndex, sMessage, sLog );
+
+        if bCommitSuccess then
           Inc( iSuccess );
 
         Log( sLog );
+
+        // Trigger reindex after logging commit details (only if commit succeeded)
+        if bCommitSuccess then
+          TriggerDelphiLookupReindex( FRepoManager.Repos[ iRepoIndex ].Path );
+
         UpdateListItem( iRepoIndex );
       end;
     end;
@@ -2123,18 +2153,46 @@ procedure TMainForm.mnuSettingsClick( Sender: TObject );
 var
   sClientPath       : string;
   sFilePattern      : string;
+  sIndexerPath      : string;
+  OpenDialog        : TOpenDialog;
 begin
 
   sClientPath := FRepoManager.GitClientPath;
   sFilePattern := FRepoManager.FilePattern;
+  sIndexerPath := FRepoManager.DelphiIndexerPath;
 
   // Use separate InputQuery calls since the multi-value version has issues
   if InputQuery( 'Settings', 'Git Client Path (e.g., C:\Program Files\Fork\Fork.exe):', sClientPath ) then
   begin
     if InputQuery( 'Settings', 'File Pattern (e.g., *.pas or empty for all):', sFilePattern ) then
     begin
+      // Ask if user wants to configure delphi-indexer path
+      if MessageDlg( 'Configure delphi-indexer.exe path?' + sLineBreak + sLineBreak +
+        'Current: ' + IfThen( sIndexerPath.IsEmpty, '(Auto-detect)', sIndexerPath ),
+        mtConfirmation, [ mbYes, mbNo ], 0 ) = mrYes then
+      begin
+        OpenDialog := TOpenDialog.Create( nil );
+        try
+          OpenDialog.Title := 'Locate delphi-indexer.exe';
+          OpenDialog.Filter := 'Delphi Indexer|delphi-indexer.exe|Executable Files|*.exe|All Files|*.*';
+          OpenDialog.FilterIndex := 1;
+          OpenDialog.Options := [ ofFileMustExist, ofPathMustExist ];
+
+          if not sIndexerPath.IsEmpty and FileExists( sIndexerPath ) then
+            OpenDialog.InitialDir := ExtractFileDir( sIndexerPath );
+
+          if OpenDialog.Execute then
+            sIndexerPath := OpenDialog.FileName
+          else
+            Exit;                       // User cancelled - don't save any settings
+        finally
+          OpenDialog.Free;
+        end;
+      end;
+
       FRepoManager.GitClientPath := sClientPath;
       FRepoManager.FilePattern := sFilePattern;
+      FRepoManager.DelphiIndexerPath := sIndexerPath;
       FRepoManager.SaveConfig;
       Log( 'Settings updated.' );
     end;
@@ -2530,10 +2588,17 @@ begin
       begin
         iRepoIndex := Integer( lvRepos.Items[ i ].Data );
 
-        if FRepoManager.ResolveConflictsKeepLocal( iRepoIndex, sLog ) then
-          Inc( iSuccess );
+        var bResolveSuccess := FRepoManager.ResolveConflictsKeepLocal( iRepoIndex, sLog );
 
         Log( sLog );
+
+        if bResolveSuccess then
+        begin
+          Inc( iSuccess );
+          // Trigger reindex after successful conflict resolution (commits and pushes)
+          TriggerDelphiLookupReindex( FRepoManager.Repos[ iRepoIndex ].Path );
+        end;
+
         FRepoManager.RefreshStatus( iRepoIndex );
         UpdateListItem( iRepoIndex );
         Application.ProcessMessages;
@@ -2590,13 +2655,16 @@ begin
 
         Log( Format( '=== Pushing %s ===', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
 
-        if FRepoManager.PushRepository( iRepoIndex, sLog ) then
+        var bPushSuccess := FRepoManager.PushRepository( iRepoIndex, sLog );
+
+        Log( sLog );
+
+        if bPushSuccess then
         begin
-          Log( sLog );
           Inc( iSuccess );
-        end
-        else
-          Log( sLog );
+          // Trigger reindex after successful push
+          TriggerDelphiLookupReindex( FRepoManager.Repos[ iRepoIndex ].Path );
+        end;
 
         FRepoManager.RefreshStatus( iRepoIndex );
         UpdateListItem( iRepoIndex );
@@ -2666,13 +2734,16 @@ begin
 
         Log( Format( '=== Force Pushing %s ===', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
 
-        if FRepoManager.ForcePushRepository( iRepoIndex, sLog ) then
+        var bPushSuccess := FRepoManager.ForcePushRepository( iRepoIndex, sLog );
+
+        Log( sLog );
+
+        if bPushSuccess then
         begin
-          Log( sLog );
           Inc( iSuccess );
-        end
-        else
-          Log( sLog );
+          // Trigger reindex after successful force push
+          TriggerDelphiLookupReindex( FRepoManager.Repos[ iRepoIndex ].Path );
+        end;
 
         FRepoManager.RefreshStatus( iRepoIndex );
         UpdateListItem( iRepoIndex );
@@ -2685,6 +2756,256 @@ begin
 
   Log( Format( 'Force push completed: %d of %d successful.', [ iSuccess, iCount ] ) );
   ScrollLogToEnd;
+
+end;
+
+/// <summary>
+///   Executes a command and captures output.
+/// </summary>
+/// <param name="ACommand">Full command line to execute.</param>
+/// <param name="AOutput">Captured stdout/stderr output.</param>
+/// <param name="ATimeout">Timeout in milliseconds (default 30000 = 30s).</param>
+/// <returns>True if command executed successfully (exit code 0).</returns>
+function TMainForm.ExecuteCommand( const ACommand: string; out AOutput: string;
+  const ATimeout: Cardinal ): Boolean;
+var
+  StartupInfo       : TStartupInfo;
+  ProcessInfo       : TProcessInformation;
+  SecurityAttr      : TSecurityAttributes;
+  hReadPipe, hWritePipe: THandle;
+  Buffer            : TBytes;
+  dwBytesRead       : DWORD;
+  dwBytesAvail      : DWORD;
+  lSuccess          : Boolean;
+  dwWaitResult      : DWORD;
+  dwExitCode        : DWORD;
+  iRemainingTimeout : Integer;
+begin
+
+  Result := False;
+  AOutput := '';
+
+  SecurityAttr.nLength := SizeOf( TSecurityAttributes );
+  SecurityAttr.bInheritHandle := True;
+  SecurityAttr.lpSecurityDescriptor := nil;
+
+  if not CreatePipe( hReadPipe, hWritePipe, @SecurityAttr, 0 ) then
+    Exit;
+
+  try
+    ZeroMemory( @StartupInfo, SizeOf( TStartupInfo ) );
+    StartupInfo.cb := SizeOf( TStartupInfo );
+    StartupInfo.hStdOutput := hWritePipe;
+    StartupInfo.hStdError := hWritePipe;
+    StartupInfo.dwFlags := STARTF_USESTDHANDLES or STARTF_USESHOWWINDOW;
+    StartupInfo.wShowWindow := SW_HIDE;
+
+    ZeroMemory( @ProcessInfo, SizeOf( TProcessInformation ) );
+
+    lSuccess := CreateProcess(
+      nil,
+      PChar( ACommand ),
+      nil,
+      nil,
+      True,
+      CREATE_NO_WINDOW,
+      nil,
+      nil,
+      StartupInfo,
+      ProcessInfo
+      );
+
+    if lSuccess then
+    begin
+      CloseHandle( hWritePipe );
+      hWritePipe := 0;
+
+      SetLength( Buffer, 4096 );
+      iRemainingTimeout := ATimeout;
+
+      // Read output while process is running
+      repeat
+        dwWaitResult := WaitForSingleObject( ProcessInfo.hProcess, 100 );
+
+        // Check for available data
+        while PeekNamedPipe( hReadPipe, nil, 0, nil, @dwBytesAvail, nil ) and ( dwBytesAvail > 0 ) do
+        begin
+          if ReadFile( hReadPipe, Buffer[ 0 ], Length( Buffer ), dwBytesRead, nil ) and ( dwBytesRead > 0 ) then
+            AOutput := AOutput + TEncoding.UTF8.GetString( Buffer, 0, dwBytesRead );
+        end;
+
+        // Check for timeout
+        if dwWaitResult = WAIT_TIMEOUT then
+        begin
+          Dec( iRemainingTimeout, 100 );
+
+          if iRemainingTimeout <= 0 then
+          begin
+            TerminateProcess( ProcessInfo.hProcess, 1 );
+            AOutput := AOutput + sLineBreak + 'Operation timed out';
+            Break;
+          end;
+        end;
+      until dwWaitResult = WAIT_OBJECT_0;
+
+      // Read any remaining output
+      while PeekNamedPipe( hReadPipe, nil, 0, nil, @dwBytesAvail, nil ) and ( dwBytesAvail > 0 ) do
+      begin
+        if ReadFile( hReadPipe, Buffer[ 0 ], Length( Buffer ), dwBytesRead, nil ) and ( dwBytesRead > 0 ) then
+          AOutput := AOutput + TEncoding.UTF8.GetString( Buffer, 0, dwBytesRead );
+      end;
+
+      // Check exit code to determine success
+      if GetExitCodeProcess( ProcessInfo.hProcess, dwExitCode ) then
+        Result := ( dwExitCode = 0 );
+
+      CloseHandle( ProcessInfo.hProcess );
+      CloseHandle( ProcessInfo.hThread );
+    end;
+  finally
+    if hWritePipe <> 0 then
+      CloseHandle( hWritePipe );
+
+    CloseHandle( hReadPipe );
+  end;
+
+end;
+
+/// <summary>
+///   Triggers delphi-lookup reindex for a specific repository path.
+/// </summary>
+/// <param name="ARepoPath">
+///   Full path to the repository that was committed.
+/// </param>
+/// <remarks>
+///   Captures output and logs success/failure with details.
+///   Only reindexes if the path matches one of the indexed directories.
+///   Incremental indexing is fast (~100ms when nothing changed).
+/// </remarks>
+procedure TMainForm.TriggerDelphiLookupReindex( const ARepoPath: string );
+const
+  DELPHI_INDEXER_EXE = 'delphi-indexer.exe';
+  DEFAULT_INSTALL_PATH = 'D:\delphi-lookup\delphi-indexer.exe';
+
+  // User-owned directories indexed by delphi-lookup
+  INDEXED_DIRS_USER: array[ 0..6 ] of string = (
+    'E:\DBiWorkflow Development',
+    'D:\GITLAKLib',
+    'D:\Delphi Tools\nlhTable',
+    'D:\Delphi Tools\EDBImage',
+    'D:\Delphi Tools\nlhImage',
+    'D:\Delphi Tools\utilcomps',
+    'D:\Rapid.Generics.v3'
+  );
+  // Standard library directories indexed by delphi-lookup
+  INDEXED_DIRS_STDLIB: array[ 0..0 ] of string = (
+    'D:\ElevateDB 2 VCL-CS-SRC\RAD Studio 13 (Delphi Win32)\code\source'
+  );
+var
+  sIndexedDir       : string;
+  sNormalizedRepo   : string;
+  sParams           : string;
+  sIndexerPath      : string;
+  sOutput           : string;
+  Buffer            : array[ 0..MAX_PATH ] of Char;
+  FilePart          : PChar;
+begin
+
+  // Find delphi-indexer.exe location
+  sIndexerPath := '';
+
+  // 1. Check user-configured path first (verify it still exists)
+  if not FRepoManager.DelphiIndexerPath.IsEmpty then
+  begin
+    if FileExists( FRepoManager.DelphiIndexerPath ) then
+      sIndexerPath := FRepoManager.DelphiIndexerPath
+    else
+    begin
+      // Configured path no longer valid - clear it and try auto-detection
+      FRepoManager.DelphiIndexerPath := '';
+      FRepoManager.SaveConfig;
+    end;
+  end;
+
+  // 2. If not found yet, check PATH environment variable
+  FilePart := nil;
+  if sIndexerPath.IsEmpty and ( SearchPath( nil, PChar( DELPHI_INDEXER_EXE ), nil, MAX_PATH, Buffer, FilePart ) <> 0 ) then
+  begin
+    sIndexerPath := Buffer;
+    // Save auto-detected path to config for faster future lookups
+    FRepoManager.DelphiIndexerPath := sIndexerPath;
+    FRepoManager.SaveConfig;
+  end;
+
+  // 3. If not found yet, check default installation location
+  if sIndexerPath.IsEmpty and FileExists( DEFAULT_INSTALL_PATH ) then
+  begin
+    sIndexerPath := DEFAULT_INSTALL_PATH;
+    // Save auto-detected path to config for faster future lookups
+    FRepoManager.DelphiIndexerPath := sIndexerPath;
+    FRepoManager.SaveConfig;
+  end;
+
+  // 4. Not found - skip reindexing
+  if sIndexerPath.IsEmpty then
+    Exit;
+
+  // Normalize the repository path (remove trailing backslash, uppercase for comparison)
+  sNormalizedRepo := ExcludeTrailingPathDelimiter( ARepoPath ).ToUpper;
+
+  // Check user directories (exact match or subdirectory)
+  for var i := Low( INDEXED_DIRS_USER ) to High( INDEXED_DIRS_USER ) do
+  begin
+    sIndexedDir := ExcludeTrailingPathDelimiter( INDEXED_DIRS_USER[ i ] ).ToUpper;
+
+    // Match if: exact match OR repo is subdirectory of indexed dir
+    if ( sNormalizedRepo = sIndexedDir ) or
+       ( sNormalizedRepo.StartsWith( sIndexedDir + '\' ) ) then
+    begin
+      // Found a match - trigger incremental reindex for parent indexed directory
+      Log( Format( 'Triggering delphi-lookup reindex: %s', [ INDEXED_DIRS_USER[ i ] ] ) );
+      sParams := Format( '"%s" "%s" --category user', [ sIndexerPath, INDEXED_DIRS_USER[ i ] ] );
+
+      if ExecuteCommand( sParams, sOutput ) then
+        Log( 'delphi-lookup reindex completed successfully' )
+      else
+      begin
+        Log( 'delphi-lookup reindex FAILED' );
+        if not sOutput.Trim.IsEmpty then
+          Log( 'Error: ' + sOutput.Trim );
+      end;
+
+      Exit;
+    end;
+  end;
+
+  // Check stdlib directories (exact match or subdirectory)
+  for var i := Low( INDEXED_DIRS_STDLIB ) to High( INDEXED_DIRS_STDLIB ) do
+  begin
+    sIndexedDir := ExcludeTrailingPathDelimiter( INDEXED_DIRS_STDLIB[ i ] ).ToUpper;
+
+    // Match if: exact match OR repo is subdirectory of indexed dir
+    if ( sNormalizedRepo = sIndexedDir ) or
+       ( sNormalizedRepo.StartsWith( sIndexedDir + '\' ) ) then
+    begin
+      // Found a match - trigger incremental reindex for parent indexed directory
+      Log( Format( 'Triggering delphi-lookup reindex: %s', [ INDEXED_DIRS_STDLIB[ i ] ] ) );
+      sParams := Format( '"%s" "%s" --category stdlib', [ sIndexerPath, INDEXED_DIRS_STDLIB[ i ] ] );
+
+      if ExecuteCommand( sParams, sOutput ) then
+        Log( 'delphi-lookup reindex completed successfully' )
+      else
+      begin
+        Log( 'delphi-lookup reindex FAILED' );
+        if not sOutput.Trim.IsEmpty then
+          Log( 'Error: ' + sOutput.Trim );
+      end;
+
+      Exit;
+    end;
+  end;
+
+  // Repository not in indexed list - skip reindexing
 
 end;
 

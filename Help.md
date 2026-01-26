@@ -20,6 +20,8 @@ A comprehensive reference for all GitBatchCommit capabilities.
 12. [Keyboard Shortcuts](#keyboard-shortcuts)
 13. [Troubleshooting](#troubleshooting)
 
+**Integration:** Uses [delphi-lookup](https://github.com/JavierusTk/delphi-lookup) by JavierusTk for optional symbol indexing
+
 ---
 
 ## Repository Management
@@ -482,6 +484,7 @@ git push
 |---------|---------|---------|
 | Git Client Path | External Git client executable | `C:\Program Files\Fork\Fork.exe` |
 | File Pattern | Only stage files matching pattern | `*.pas` (empty = all files) |
+| delphi-indexer.exe Path | Optional symbol indexer for auto-reindex | Auto-detected or custom path |
 
 ### Configuration File
 
@@ -506,6 +509,57 @@ git push
 | **How** | Right-click repo > Edit .gitignore > Edit in default text editor |
 | **Caveats** | Creates new file if doesn't exist (with confirmation). Opens in system default editor |
 | **Linkages** | None |
+
+### delphi-lookup Integration
+
+| Aspect | Details |
+|--------|---------|
+| **What** | Automatic symbol reindexing after push operations using delphi-indexer |
+| **Where** | Automatic after Commit & Push, Push Only, Force Push, or Resolve Conflicts; configurable via File > Settings |
+| **When** | After successfully pushing changes to a repository |
+| **Why** | Keeps delphi-lookup symbol database current with latest code changes |
+| **How** | Automatic - reindexes the parent indexed directory in background. Triggers for exact matches or subdirectories. Configure path via File > Settings if needed |
+| **Caveats** | Requires delphi-lookup installed. Only reindexes if repository is (or is within) a delphi-lookup indexed directory. Silently skips if not found |
+| **Linkages** | Uses [delphi-indexer](https://github.com/JavierusTk/delphi-lookup) by JavierusTk. Non-blocking (~100-500ms). Auto-detects from PATH or default location |
+
+**How Auto-Detection Works:**
+
+1. Checks user-configured custom path (if configured via Settings)
+2. Checks PATH environment variable for delphi-indexer.exe
+3. Checks default location: `D:\delphi-lookup\delphi-indexer.exe`
+4. Saves discovered path to configuration for faster future lookups
+5. Silently skips reindexing if not found
+
+**Path Verification:**
+
+- Configured paths are verified before each use
+- If configured path no longer exists (file moved/deleted), auto-detection runs again
+- Configuration self-heals automatically
+
+**Manual Configuration:**
+
+- File > Settings > "Configure delphi-indexer.exe path?" > Yes
+- Browse to delphi-indexer.exe location
+- Saved to configuration file immediately
+
+**Confirmation:**
+
+When reindexing is triggered after a commit, log messages appear:
+
+**Success:**
+```
+Triggering delphi-lookup reindex: E:\DBiWorkflow Development
+delphi-lookup reindex completed successfully
+```
+
+**Failure:**
+```
+Triggering delphi-lookup reindex: E:\DBiWorkflow Development
+delphi-lookup reindex FAILED
+Error: [error details from delphi-indexer]
+```
+
+This confirms which indexed directory is being updated and whether the operation succeeded.
 
 ---
 
@@ -615,5 +669,5 @@ Option B - Overwrite Remote:
 
 ---
 
-*GitBatchCommit Help Guide - Version 1.4.0*
-*Last Updated: 15 January 2026*
+*GitBatchCommit Help Guide - Version 1.5.0*
+*Last Updated: 26 January 2026*
