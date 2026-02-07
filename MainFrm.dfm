@@ -198,7 +198,7 @@ object MainForm: TMainForm
     end
     object mmoDetails: TMemo
       Left = 112
-      Top = 1
+      Top = -1
       Width = 810
       Height = 70
       ScrollBars = ssVertical
@@ -282,7 +282,7 @@ object MainForm: TMainForm
     Align = alBottom
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
-    Font.Height = -11
+    Font.Height = -12
     Font.Name = 'Consolas'
     Font.Style = []
     ParentFont = False

@@ -310,12 +310,23 @@ type
     /// <param name="ARepoPath">
     ///   Full path to the repository that was committed.
     /// </param>
+    /// <summary>
+    ///   Checks if a repository path matches an indexed directory.
+    /// </summary>
+    /// <param name="ARepoPath">Repository path to check</param>
+    /// <param name="ACategory">Output: 'user' or 'stdlib' if matched</param>
+    /// <returns>Matched indexed directory path, or empty string if no match</returns>
+    function GetReindexDir( const ARepoPath: string; out ACategory: string ): string;
+
+    /// <summary>
+    ///   Runs delphi-indexer for all unique directories in the list.
+    /// </summary>
+    /// <param name="ADirs">StringList with entries in format 'category|path'</param>
     /// <remarks>
     ///   Captures output and logs success/failure with details.
-    ///   Only reindexes if the path matches one of the indexed directories.
     ///   Incremental indexing is fast (~100ms when nothing changed).
     /// </remarks>
-    procedure TriggerDelphiLookupReindex( const ARepoPath: string );
+    procedure RunPendingReindexes( const ADirs: TStringList );
   public
   end;
 
@@ -1082,36 +1093,53 @@ begin
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
-  Screen.Cursor := crHourGlass;
-
   var iSuccess := 0;
-
+  var slReindexDirs := TStringList.Create;
   try
-    for var i := 0 to lvRepos.Items.Count - 1 do
-    begin
-      iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+    Screen.Cursor := crHourGlass;
 
-      if lvRepos.Items[ i ].Checked and ( FRepoManager.Repos[ iRepoIndex ].Status = rsModified ) then
+    try
+      for var i := 0 to lvRepos.Items.Count - 1 do
       begin
-        var bCommitSuccess := FRepoManager.CommitAndPush( iRepoIndex, sMessage, sLog );
+        iRepoIndex := Integer( lvRepos.Items[ i ].Data );
 
-        if bCommitSuccess then
-          Inc( iSuccess );
+        if lvRepos.Items[ i ].Checked and ( FRepoManager.Repos[ iRepoIndex ].Status = rsModified ) then
+        begin
+          var bCommitSuccess := FRepoManager.CommitAndPush( iRepoIndex, sMessage, sLog );
 
-        Log( sLog );
+          if bCommitSuccess then
+            Inc( iSuccess );
 
-        // Trigger reindex after logging commit details (only if commit succeeded)
-        if bCommitSuccess then
-          TriggerDelphiLookupReindex( FRepoManager.Repos[ iRepoIndex ].Path );
+          Log( sLog );
 
-        UpdateListItem( iRepoIndex );
+          // Track directories for reindexing after loop completes (only if commit succeeded)
+          if bCommitSuccess then
+          begin
+            var sCategory: string;
+            var sReindexDir := GetReindexDir( FRepoManager.Repos[ iRepoIndex ].Path, sCategory );
+            if not sReindexDir.IsEmpty then
+            begin
+              var sEntry := sCategory + '|' + sReindexDir;
+              if slReindexDirs.IndexOf( sEntry ) = -1 then
+                slReindexDirs.Add( sEntry );
+            end;
+          end;
+
+          UpdateListItem( iRepoIndex );
+        end;
       end;
+    finally
+      Screen.Cursor := crDefault;
     end;
-  finally
-    Screen.Cursor := crDefault;
-  end;
 
-  Log( Format( 'Completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+    Log( Format( 'Completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+
+    // Trigger all pending reindexes once after all commits complete
+    RunPendingReindexes( slReindexDirs );
+
+  finally
+    slReindexDirs.Free;
+  end;
 
   // Clear details after successful commit
   if iSuccess > 0 then
@@ -2578,37 +2606,53 @@ begin
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
-  Screen.Cursor := crHourGlass;
-  iSuccess := 0;
-
+  var slReindexDirs := TStringList.Create;
   try
-    for var i := 0 to lvRepos.Items.Count - 1 do
-    begin
-      if lvRepos.Items[ i ].Checked then
+    Screen.Cursor := crHourGlass;
+    iSuccess := 0;
+
+    try
+      for var i := 0 to lvRepos.Items.Count - 1 do
       begin
-        iRepoIndex := Integer( lvRepos.Items[ i ].Data );
-
-        var bResolveSuccess := FRepoManager.ResolveConflictsKeepLocal( iRepoIndex, sLog );
-
-        Log( sLog );
-
-        if bResolveSuccess then
+        if lvRepos.Items[ i ].Checked then
         begin
-          Inc( iSuccess );
-          // Trigger reindex after successful conflict resolution (commits and pushes)
-          TriggerDelphiLookupReindex( FRepoManager.Repos[ iRepoIndex ].Path );
+          iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+
+          var bResolveSuccess := FRepoManager.ResolveConflictsKeepLocal( iRepoIndex, sLog );
+
+          Log( sLog );
+
+          if bResolveSuccess then
+          begin
+            Inc( iSuccess );
+            // Track directories for reindexing after loop completes
+            var sCategory: string;
+            var sReindexDir := GetReindexDir( FRepoManager.Repos[ iRepoIndex ].Path, sCategory );
+            if not sReindexDir.IsEmpty then
+            begin
+              var sEntry := sCategory + '|' + sReindexDir;
+              if slReindexDirs.IndexOf( sEntry ) = -1 then
+                slReindexDirs.Add( sEntry );
+            end;
+          end;
+
+          FRepoManager.RefreshStatus( iRepoIndex );
+          UpdateListItem( iRepoIndex );
+          Application.ProcessMessages;
         end;
-
-        FRepoManager.RefreshStatus( iRepoIndex );
-        UpdateListItem( iRepoIndex );
-        Application.ProcessMessages;
       end;
+    finally
+      Screen.Cursor := crDefault;
     end;
-  finally
-    Screen.Cursor := crDefault;
-  end;
 
-  Log( Format( 'Resolve conflicts completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+    Log( Format( 'Resolve conflicts completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+
+    // Trigger all pending reindexes once after all operations complete
+    RunPendingReindexes( slReindexDirs );
+
+  finally
+    slReindexDirs.Free;
+  end;
   ScrollLogToEnd;
 
 end;
@@ -2643,39 +2687,55 @@ begin
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
-  Screen.Cursor := crHourGlass;
-  iSuccess := 0;
-
+  var slReindexDirs := TStringList.Create;
   try
-    for var i := 0 to lvRepos.Items.Count - 1 do
-    begin
-      if lvRepos.Items[ i ].Checked then
+    Screen.Cursor := crHourGlass;
+    iSuccess := 0;
+
+    try
+      for var i := 0 to lvRepos.Items.Count - 1 do
       begin
-        iRepoIndex := Integer( lvRepos.Items[ i ].Data );
-
-        Log( Format( '=== Pushing %s ===', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
-
-        var bPushSuccess := FRepoManager.PushRepository( iRepoIndex, sLog );
-
-        Log( sLog );
-
-        if bPushSuccess then
+        if lvRepos.Items[ i ].Checked then
         begin
-          Inc( iSuccess );
-          // Trigger reindex after successful push
-          TriggerDelphiLookupReindex( FRepoManager.Repos[ iRepoIndex ].Path );
+          iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+
+          Log( Format( '=== Pushing %s ===', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
+
+          var bPushSuccess := FRepoManager.PushRepository( iRepoIndex, sLog );
+
+          Log( sLog );
+
+          if bPushSuccess then
+          begin
+            Inc( iSuccess );
+            // Track directories for reindexing after loop completes
+            var sCategory: string;
+            var sReindexDir := GetReindexDir( FRepoManager.Repos[ iRepoIndex ].Path, sCategory );
+            if not sReindexDir.IsEmpty then
+            begin
+              var sEntry := sCategory + '|' + sReindexDir;
+              if slReindexDirs.IndexOf( sEntry ) = -1 then
+                slReindexDirs.Add( sEntry );
+            end;
+          end;
+
+          FRepoManager.RefreshStatus( iRepoIndex );
+          UpdateListItem( iRepoIndex );
+          Application.ProcessMessages;
         end;
-
-        FRepoManager.RefreshStatus( iRepoIndex );
-        UpdateListItem( iRepoIndex );
-        Application.ProcessMessages;
       end;
+    finally
+      Screen.Cursor := crDefault;
     end;
-  finally
-    Screen.Cursor := crDefault;
-  end;
 
-  Log( Format( 'Push completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+    Log( Format( 'Push completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+
+    // Trigger all pending reindexes once after all operations complete
+    RunPendingReindexes( slReindexDirs );
+
+  finally
+    slReindexDirs.Free;
+  end;
   ScrollLogToEnd;
 
 end;
@@ -2722,39 +2782,55 @@ begin
     mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
-  Screen.Cursor := crHourGlass;
-  iSuccess := 0;
-
+  var slReindexDirs := TStringList.Create;
   try
-    for var i := 0 to lvRepos.Items.Count - 1 do
-    begin
-      if lvRepos.Items[ i ].Checked then
+    Screen.Cursor := crHourGlass;
+    iSuccess := 0;
+
+    try
+      for var i := 0 to lvRepos.Items.Count - 1 do
       begin
-        iRepoIndex := Integer( lvRepos.Items[ i ].Data );
-
-        Log( Format( '=== Force Pushing %s ===', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
-
-        var bPushSuccess := FRepoManager.ForcePushRepository( iRepoIndex, sLog );
-
-        Log( sLog );
-
-        if bPushSuccess then
+        if lvRepos.Items[ i ].Checked then
         begin
-          Inc( iSuccess );
-          // Trigger reindex after successful force push
-          TriggerDelphiLookupReindex( FRepoManager.Repos[ iRepoIndex ].Path );
+          iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+
+          Log( Format( '=== Force Pushing %s ===', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
+
+          var bPushSuccess := FRepoManager.ForcePushRepository( iRepoIndex, sLog );
+
+          Log( sLog );
+
+          if bPushSuccess then
+          begin
+            Inc( iSuccess );
+            // Track directories for reindexing after loop completes
+            var sCategory: string;
+            var sReindexDir := GetReindexDir( FRepoManager.Repos[ iRepoIndex ].Path, sCategory );
+            if not sReindexDir.IsEmpty then
+            begin
+              var sEntry := sCategory + '|' + sReindexDir;
+              if slReindexDirs.IndexOf( sEntry ) = -1 then
+                slReindexDirs.Add( sEntry );
+            end;
+          end;
+
+          FRepoManager.RefreshStatus( iRepoIndex );
+          UpdateListItem( iRepoIndex );
+          Application.ProcessMessages;
         end;
-
-        FRepoManager.RefreshStatus( iRepoIndex );
-        UpdateListItem( iRepoIndex );
-        Application.ProcessMessages;
       end;
+    finally
+      Screen.Cursor := crDefault;
     end;
-  finally
-    Screen.Cursor := crDefault;
-  end;
 
-  Log( Format( 'Force push completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+    Log( Format( 'Force push completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+
+    // Trigger all pending reindexes once after all operations complete
+    RunPendingReindexes( slReindexDirs );
+
+  finally
+    slReindexDirs.Free;
+  end;
   ScrollLogToEnd;
 
 end;
@@ -2877,16 +2953,14 @@ end;
 /// <param name="ARepoPath">
 ///   Full path to the repository that was committed.
 /// </param>
-/// <remarks>
-///   Captures output and logs success/failure with details.
-///   Only reindexes if the path matches one of the indexed directories.
-///   Incremental indexing is fast (~100ms when nothing changed).
-/// </remarks>
-procedure TMainForm.TriggerDelphiLookupReindex( const ARepoPath: string );
+/// <summary>
+///   Checks if a repository path matches an indexed directory.
+/// </summary>
+/// <param name="ARepoPath">Repository path to check</param>
+/// <param name="ACategory">Output: 'user' or 'stdlib' if matched</param>
+/// <returns>Matched indexed directory path, or empty string if no match</returns>
+function TMainForm.GetReindexDir( const ARepoPath: string; out ACategory: string ): string;
 const
-  DELPHI_INDEXER_EXE = 'delphi-indexer.exe';
-  DEFAULT_INSTALL_PATH = 'D:\delphi-lookup\delphi-indexer.exe';
-
   // User-owned directories indexed by delphi-lookup
   INDEXED_DIRS_USER: array[ 0..6 ] of string = (
     'E:\DBiWorkflow Development',
@@ -2904,12 +2978,77 @@ const
 var
   sIndexedDir       : string;
   sNormalizedRepo   : string;
-  sParams           : string;
+begin
+  Result := '';
+  ACategory := '';
+
+  // Normalize the repository path (remove trailing backslash, uppercase for comparison)
+  sNormalizedRepo := ExcludeTrailingPathDelimiter( ARepoPath ).ToUpper;
+
+  // Check user directories (exact match or subdirectory)
+  for var i := Low( INDEXED_DIRS_USER ) to High( INDEXED_DIRS_USER ) do
+  begin
+    sIndexedDir := ExcludeTrailingPathDelimiter( INDEXED_DIRS_USER[ i ] ).ToUpper;
+
+    // Match if: exact match OR repo is subdirectory of indexed dir
+    if ( sNormalizedRepo = sIndexedDir ) or
+       ( sNormalizedRepo.StartsWith( sIndexedDir + '\' ) ) then
+    begin
+      Result := INDEXED_DIRS_USER[ i ];
+      ACategory := 'user';
+      Exit;
+    end;
+  end;
+
+  // Check stdlib directories (exact match or subdirectory)
+  for var i := Low( INDEXED_DIRS_STDLIB ) to High( INDEXED_DIRS_STDLIB ) do
+  begin
+    sIndexedDir := ExcludeTrailingPathDelimiter( INDEXED_DIRS_STDLIB[ i ] ).ToUpper;
+
+    // Match if: exact match OR repo is subdirectory of indexed dir
+    if ( sNormalizedRepo = sIndexedDir ) or
+       ( sNormalizedRepo.StartsWith( sIndexedDir + '\' ) ) then
+    begin
+      Result := INDEXED_DIRS_STDLIB[ i ];
+      ACategory := 'stdlib';
+      Exit;
+    end;
+  end;
+
+  // Repository not in indexed list - return empty string
+end;
+
+/// <summary>
+///   Runs delphi-indexer for all unique directories in the list.
+/// </summary>
+/// <param name="ADirs">StringList with entries in format 'category|path'</param>
+/// <remarks>
+///   Captures output and logs success/failure with details.
+///   Incremental indexing is fast (~100ms when nothing changed).
+/// </remarks>
+procedure TMainForm.RunPendingReindexes( const ADirs: TStringList );
+const
+  DELPHI_INDEXER_EXE = 'delphi-indexer.exe';
+  DEFAULT_INSTALL_PATH = 'D:\delphi-lookup\delphi-indexer.exe';
+var
   sIndexerPath      : string;
-  sOutput           : string;
   Buffer            : array[ 0..MAX_PATH ] of Char;
   FilePart          : PChar;
+  sEntry            : string;
+  sCategory         : string;
+  sPath             : string;
+  sParams           : string;
+  sOutput           : string;
+  iDelimPos         : Integer;
 begin
+  // Nothing to reindex
+  if ( ADirs = nil ) or ( ADirs.Count = 0 ) then
+  begin
+    Log( 'Reindex: No directories to reindex' );
+    Exit;
+  end;
+
+  Log( Format( 'Reindex: Processing %d unique director(ies)', [ ADirs.Count ] ) );
 
   // Find delphi-indexer.exe location
   sIndexerPath := '';
@@ -2948,65 +3087,35 @@ begin
 
   // 4. Not found - skip reindexing
   if sIndexerPath.IsEmpty then
+  begin
+    Log( 'Reindex: delphi-indexer.exe not found - skipping reindex' );
     Exit;
-
-  // Normalize the repository path (remove trailing backslash, uppercase for comparison)
-  sNormalizedRepo := ExcludeTrailingPathDelimiter( ARepoPath ).ToUpper;
-
-  // Check user directories (exact match or subdirectory)
-  for var i := Low( INDEXED_DIRS_USER ) to High( INDEXED_DIRS_USER ) do
-  begin
-    sIndexedDir := ExcludeTrailingPathDelimiter( INDEXED_DIRS_USER[ i ] ).ToUpper;
-
-    // Match if: exact match OR repo is subdirectory of indexed dir
-    if ( sNormalizedRepo = sIndexedDir ) or
-       ( sNormalizedRepo.StartsWith( sIndexedDir + '\' ) ) then
-    begin
-      // Found a match - trigger incremental reindex for parent indexed directory
-      Log( Format( 'Triggering delphi-lookup reindex: %s', [ INDEXED_DIRS_USER[ i ] ] ) );
-      sParams := Format( '"%s" "%s" --category user', [ sIndexerPath, INDEXED_DIRS_USER[ i ] ] );
-
-      if ExecuteCommand( sParams, sOutput ) then
-        Log( 'delphi-lookup reindex completed successfully' )
-      else
-      begin
-        Log( 'delphi-lookup reindex FAILED' );
-        if not sOutput.Trim.IsEmpty then
-          Log( 'Error: ' + sOutput.Trim );
-      end;
-
-      Exit;
-    end;
   end;
 
-  // Check stdlib directories (exact match or subdirectory)
-  for var i := Low( INDEXED_DIRS_STDLIB ) to High( INDEXED_DIRS_STDLIB ) do
+  // Process each unique directory
+  for sEntry in ADirs do
   begin
-    sIndexedDir := ExcludeTrailingPathDelimiter( INDEXED_DIRS_STDLIB[ i ] ).ToUpper;
+    // Parse entry: 'category|path'
+    iDelimPos := Pos( '|', sEntry );
+    if iDelimPos = 0 then
+      Continue;
 
-    // Match if: exact match OR repo is subdirectory of indexed dir
-    if ( sNormalizedRepo = sIndexedDir ) or
-       ( sNormalizedRepo.StartsWith( sIndexedDir + '\' ) ) then
+    sCategory := Copy( sEntry, 1, iDelimPos - 1 );
+    sPath := Copy( sEntry, iDelimPos + 1, Length( sEntry ) );
+
+    // Trigger incremental reindex for this directory
+    Log( Format( 'Triggering delphi-lookup reindex: %s', [ sPath ] ) );
+    sParams := Format( '"%s" "%s" --category %s', [ sIndexerPath, sPath, sCategory ] );
+
+    if ExecuteCommand( sParams, sOutput ) then
+      Log( 'delphi-lookup reindex completed successfully' )
+    else
     begin
-      // Found a match - trigger incremental reindex for parent indexed directory
-      Log( Format( 'Triggering delphi-lookup reindex: %s', [ INDEXED_DIRS_STDLIB[ i ] ] ) );
-      sParams := Format( '"%s" "%s" --category stdlib', [ sIndexerPath, INDEXED_DIRS_STDLIB[ i ] ] );
-
-      if ExecuteCommand( sParams, sOutput ) then
-        Log( 'delphi-lookup reindex completed successfully' )
-      else
-      begin
-        Log( 'delphi-lookup reindex FAILED' );
-        if not sOutput.Trim.IsEmpty then
-          Log( 'Error: ' + sOutput.Trim );
-      end;
-
-      Exit;
+      Log( 'delphi-lookup reindex FAILED' );
+      if not sOutput.Trim.IsEmpty then
+        Log( 'Error: ' + sOutput.Trim );
     end;
   end;
-
-  // Repository not in indexed list - skip reindexing
-
 end;
 
 procedure TMainForm.mmoLogKeyDown( Sender: TObject; var Key: Word; Shift: TShiftState );
