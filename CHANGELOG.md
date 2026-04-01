@@ -5,15 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Drag-and-drop initialisation: dropping a non-git folder offers to initialise it, create a remote repo (Codeberg or GitHub), and push — all in one step (2026-04-02) — `MainFrm.pas`
+- Project type selection when initialising new repos; generates appropriate `.gitignore` for Delphi, C/C++, C#, Java, Python, JavaScript, TypeScript, Go, Rust, or HTML (2026-04-02) — `MainFrm.pas`, `uCodebergDialog.pas`, `uCodebergDialog.dfm`
 - Ctrl+Enter keyboard shortcut for Commit & Push (2026-04-02) — `MainFrm.pas`
+- Users Guide.md — narrative user documentation (2026-04-02) — `Users Guide.md`
+- CHANGELOG.md — project change log in Keep a Changelog format (2026-04-02) — `CHANGELOG.md`
 
 ### Changed
 - Commit and push operations now run in a background thread; UI remains responsive during batch commits (2026-04-02) — `MainFrm.pas`
 - delphi-lookup reindexing simplified: every committed repo is reindexed automatically if delphi-indexer.exe is available; removed hardcoded directory lists (2026-04-02) — `MainFrm.pas`, `uGitRepoManager.pas`
 - Deduplicated four near-identical HTTP API methods into a single `ExecuteApiRequest` core method (2026-04-02) — `uGitRepoManager.pas`
 - Status colour values extracted to named constants (`clStatusClean`, `clStatusModified`, etc.) (2026-04-02) — `MainFrm.pas`
-- Help menu now opens `Help.md` instead of `README.md` (2026-04-02) — `MainFrm.pas`
+- Help menu now opens Users Guide instead of README.md (2026-04-02) — `MainFrm.pas`
 - `.gitignore` cleaned up: removed ~280 duplicate backup-file patterns (365 lines reduced to ~70) (2026-04-02) — `.gitignore`
+- SaveConfig guard prevents overwriting config file with empty repo list (2026-04-02) — `uGitRepoManager.pas`
 
 ### Fixed
 - `.res` files incorrectly classified as build artefacts, hiding `.res`-only changes from the user (2026-04-02) — `uGitRepoManager.pas`

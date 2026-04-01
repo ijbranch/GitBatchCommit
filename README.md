@@ -9,7 +9,8 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 ## Features
 
 - **Repository Management** - Add and remove Git repositories from a persistent list
-- **Drag and Drop** - Drag repository folders from Windows Explorer directly onto the application
+- **Drag and Drop** - Drag repository folders from Windows Explorer directly onto the application. Dropping a non-Git folder offers to initialise it, create a remote repo, and push in one step
+- **New Repository Initialisation** - Automatic project type detection with `.gitignore` generation for Delphi, C/C++, C#, Java, Python, JavaScript, TypeScript, Go, Rust, and HTML
 - **Codeberg Integration** - Create new Codeberg repositories and push directly from the application
 - **GitHub Integration** - Create new GitHub repositories and push directly from the application
 - **Visibility Management** - Change repository visibility (public/private) via right-click context menu

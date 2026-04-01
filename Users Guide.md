@@ -25,9 +25,22 @@ When you first start the application, the repository list will be empty. You nee
 3. Drag them onto the GitBatchCommit window
 4. They appear in the list and their status is checked automatically
 
+You can drag multiple folders at once.
+
 You can also use **File > Add Repository** to browse for a single folder.
 
 Repositories are saved automatically — they persist between sessions.
+
+### Initialising a New Repository
+
+If you drop a folder that is **not** already a Git repository, the app offers to set it up for you:
+
+1. A dialog asks which remote provider: **Codeberg**, **GitHub**, or **Cancel** to skip
+2. You enter the repository name, description, and choose public or private
+3. You select the **project type** (Delphi, Python, C#, etc.) — this generates an appropriate `.gitignore`
+4. The app initialises Git, creates the remote repository, commits all files, and pushes
+
+This is the quickest way to get a new project under version control and hosted remotely.
 
 ### Removing Repositories
 

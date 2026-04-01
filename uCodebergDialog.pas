@@ -67,6 +67,8 @@ type
     edtRepoName: TEdit;
     edtDescription: TEdit;
     chkPrivate: TCheckBox;
+    lblProjectType: TLabel;
+    cboProjectType: TComboBox;
     btnOK: TButton;
     btnCancel: TButton;
   private
@@ -78,7 +80,13 @@ type
     /// <param name="sDescription">Returned repository description.</param>
     /// <param name="lPrivate">Returned private flag.</param>
     /// <returns>True if user clicked OK, False if cancelled.</returns>
-    class function Execute( var sRepoName, sDescription: string; var lPrivate: Boolean ): Boolean;
+    class function Execute( var sRepoName, sDescription: string; var lPrivate: Boolean ): Boolean; overload;
+
+    /// <summary>
+    ///   Shows the dialog with project type selection and returns the entered values.
+    /// </summary>
+    class function Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
+      var sProjectType: string ): Boolean; overload;
   end;
 
 var
@@ -101,11 +109,75 @@ begin
     Dlg.edtDescription.Text := sDescription;
     Dlg.chkPrivate.Checked := lPrivate;
 
+    // Shrink form — project type hidden by default in DFM
+    Dlg.ClientHeight := 180;
+
     if Dlg.ShowModal = mrOK then
     begin
       sRepoName := Trim( Dlg.edtRepoName.Text );
       sDescription := Trim( Dlg.edtDescription.Text );
       lPrivate := Dlg.chkPrivate.Checked;
+
+      if sRepoName.IsEmpty then
+      begin
+        MessageDlg( 'Repository name is required.', mtWarning, [ mbOK ], 0 );
+        Exit;
+      end;
+
+      Result := True;
+    end;
+  finally
+    Dlg.Free;
+  end;
+
+end;
+
+class function TCodebergDialog.Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
+  var sProjectType: string ): Boolean;
+var
+  Dlg               : TCodebergDialog;
+begin
+
+  Result := False;
+  Dlg := TCodebergDialog.Create( nil );
+
+  try
+    Dlg.edtRepoName.Text := sRepoName;
+    Dlg.edtDescription.Text := sDescription;
+    Dlg.chkPrivate.Checked := lPrivate;
+
+    // Populate project types
+    Dlg.cboProjectType.Items.Add( '(None)' );
+    Dlg.cboProjectType.Items.Add( 'Delphi / Pascal' );
+    Dlg.cboProjectType.Items.Add( 'C / C++' );
+    Dlg.cboProjectType.Items.Add( 'C#' );
+    Dlg.cboProjectType.Items.Add( 'Java' );
+    Dlg.cboProjectType.Items.Add( 'Python' );
+    Dlg.cboProjectType.Items.Add( 'JavaScript / Node' );
+    Dlg.cboProjectType.Items.Add( 'TypeScript' );
+    Dlg.cboProjectType.Items.Add( 'Go' );
+    Dlg.cboProjectType.Items.Add( 'Rust' );
+    Dlg.cboProjectType.Items.Add( 'HTML / Web' );
+
+    // Default to Delphi
+    if sProjectType.IsEmpty then
+      Dlg.cboProjectType.ItemIndex := 1
+    else
+      Dlg.cboProjectType.ItemIndex := Dlg.cboProjectType.Items.IndexOf( sProjectType );
+
+    if Dlg.cboProjectType.ItemIndex < 0 then
+      Dlg.cboProjectType.ItemIndex := 0;
+
+    // Show/hide project type based on whether caller provided the param
+    Dlg.lblProjectType.Visible := True;
+    Dlg.cboProjectType.Visible := True;
+
+    if Dlg.ShowModal = mrOK then
+    begin
+      sRepoName := Trim( Dlg.edtRepoName.Text );
+      sDescription := Trim( Dlg.edtDescription.Text );
+      lPrivate := Dlg.chkPrivate.Checked;
+      sProjectType := Dlg.cboProjectType.Text;
 
       if sRepoName.IsEmpty then
       begin

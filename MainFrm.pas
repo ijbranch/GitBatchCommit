@@ -63,7 +63,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.FileCtrl, Vcl.Menus,
 
   System.SysUtils, System.StrUtils, System.Variants, System.Classes, System.Types, System.UITypes,
-  System.Generics.Collections, System.Generics.Defaults, System.Threading, System.SyncObjs,
+  System.Generics.Collections, System.Generics.Defaults, System.Threading, System.SyncObjs, System.IOUtils,
 
   uGitRepoManager, uCodebergDialog, uCodebergSettings, uGitHubSettings, uTemplateSettings;
 
@@ -319,6 +319,18 @@ type
     ///   Incremental indexing is fast (~100ms when nothing changed).
     /// </remarks>
     procedure RunPendingReindexes( const ADirs: TStringList );
+
+    /// <summary>
+    ///   Prompts the user to initialise a non-Git folder and push to a remote provider.
+    /// </summary>
+    /// <param name="sFolder">Path to the dropped folder.</param>
+    /// <returns>True if the folder was initialised and added.</returns>
+    function InitializeDroppedFolder( const sFolder: string ): Boolean;
+
+    /// <summary>
+    ///   Writes a .gitignore file appropriate for the given project type.
+    /// </summary>
+    procedure WriteGitIgnoreForProjectType( const sFolder, sProjectType: string );
 
     /// <summary>
     ///   Handles form-level key events for keyboard shortcuts.
@@ -873,8 +885,12 @@ begin
       // Check if it's a valid Git repository
       if ( not System.SysUtils.DirectoryExists( sPath + '\.git' ) ) then
       begin
-        Log( Format( 'Skipped (not a Git repository): %s', [ sPath ] ) );
-        Inc( iSkipped );
+        // Offer to initialise as a new Git repo
+        if InitializeDroppedFolder( sPath ) then
+          Inc( iAdded )
+        else
+          Inc( iSkipped );
+
         Continue;
       end;
 
@@ -3014,6 +3030,262 @@ end;
 ///   Captures output and logs success/failure with details.
 ///   Incremental indexing is fast (~100ms when nothing changed).
 /// </remarks>
+
+procedure TMainForm.WriteGitIgnoreForProjectType( const sFolder, sProjectType: string );
+var
+  sGitIgnorePath    : string;
+  sContent          : string;
+begin
+
+  sGitIgnorePath := TPath.Combine( sFolder, '.gitignore' );
+
+  // Don't overwrite an existing .gitignore
+  if TFile.Exists( sGitIgnorePath ) then
+    Exit;
+
+  if sProjectType = 'Delphi / Pascal' then
+    sContent :=
+      '# Delphi compiler-generated binaries' + sLineBreak +
+      '*.exe' + sLineBreak +
+      '*.dll' + sLineBreak +
+      '*.bpl' + sLineBreak +
+      '*.bpi' + sLineBreak +
+      '*.dcp' + sLineBreak +
+      '*.dcu' + sLineBreak +
+      '*.drc' + sLineBreak +
+      '*.map' + sLineBreak +
+      '*.dres' + sLineBreak +
+      '*.rsm' + sLineBreak +
+      '*.tds' + sLineBreak +
+      '*.lib' + sLineBreak +
+      '*.a' + sLineBreak +
+      '*.o' + sLineBreak +
+      '*.ocx' + sLineBreak +
+      '*.hpp' + sLineBreak +
+      '*Resource.rc' + sLineBreak +
+      sLineBreak +
+      '# Delphi backup files' + sLineBreak +
+      '*.~*' + sLineBreak +
+      '*.bak' + sLineBreak +
+      sLineBreak +
+      '# Delphi local/user-specific files' + sLineBreak +
+      '*.local' + sLineBreak +
+      '*.identcache' + sLineBreak +
+      '*.projdata' + sLineBreak +
+      '*.tvsconfig' + sLineBreak +
+      '*.cfg' + sLineBreak +
+      '*.dsk' + sLineBreak +
+      '*.stat' + sLineBreak +
+      sLineBreak +
+      '# Delphi history and recovery' + sLineBreak +
+      '__history/' + sLineBreak +
+      '__recovery/' + sLineBreak
+  else if sProjectType = 'C / C++' then
+    sContent :=
+      '*.o' + sLineBreak +
+      '*.obj' + sLineBreak +
+      '*.exe' + sLineBreak +
+      '*.dll' + sLineBreak +
+      '*.so' + sLineBreak +
+      '*.a' + sLineBreak +
+      '*.lib' + sLineBreak +
+      '*.pdb' + sLineBreak +
+      'build/' + sLineBreak +
+      'cmake-build-*/' + sLineBreak
+  else if sProjectType = 'C#' then
+    sContent :=
+      'bin/' + sLineBreak +
+      'obj/' + sLineBreak +
+      '*.user' + sLineBreak +
+      '*.suo' + sLineBreak +
+      '.vs/' + sLineBreak +
+      'packages/' + sLineBreak
+  else if sProjectType = 'Java' then
+    sContent :=
+      '*.class' + sLineBreak +
+      '*.jar' + sLineBreak +
+      '*.war' + sLineBreak +
+      'target/' + sLineBreak +
+      'build/' + sLineBreak +
+      '.gradle/' + sLineBreak +
+      '.idea/' + sLineBreak
+  else if sProjectType = 'Python' then
+    sContent :=
+      '__pycache__/' + sLineBreak +
+      '*.pyc' + sLineBreak +
+      '*.pyo' + sLineBreak +
+      '*.egg-info/' + sLineBreak +
+      'dist/' + sLineBreak +
+      'build/' + sLineBreak +
+      '.venv/' + sLineBreak +
+      'venv/' + sLineBreak
+  else if ( sProjectType = 'JavaScript / Node' ) or ( sProjectType = 'TypeScript' ) then
+    sContent :=
+      'node_modules/' + sLineBreak +
+      'dist/' + sLineBreak +
+      'build/' + sLineBreak +
+      '.env' + sLineBreak +
+      '*.log' + sLineBreak
+  else if sProjectType = 'Go' then
+    sContent :=
+      'bin/' + sLineBreak +
+      'vendor/' + sLineBreak +
+      '*.exe' + sLineBreak
+  else if sProjectType = 'Rust' then
+    sContent :=
+      'target/' + sLineBreak +
+      'Cargo.lock' + sLineBreak
+  else if sProjectType = 'HTML / Web' then
+    sContent :=
+      'node_modules/' + sLineBreak +
+      '.env' + sLineBreak +
+      'dist/' + sLineBreak
+  else
+    Exit; // (None) — no .gitignore
+
+  try
+    TFile.WriteAllText( sGitIgnorePath, sContent, TEncoding.UTF8 );
+    Log( Format( 'Created .gitignore for %s project', [ sProjectType ] ) );
+  except
+    on E: Exception do
+      Log( 'Warning: Failed to create .gitignore: ' + E.Message );
+  end;
+
+end;
+
+function TMainForm.InitializeDroppedFolder( const sFolder: string ): Boolean;
+var
+  sRepoName         : string;
+  sDescription      : string;
+  lPrivate          : Boolean;
+  sProjectType      : string;
+  sRemoteURL        : string;
+  sError            : string;
+  sLog              : string;
+  iChoice           : Integer;
+begin
+
+  Result := False;
+  sRepoName := ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) );
+
+  // Ask the user what to do
+  iChoice := MessageDlg(
+    Format( '"%s" is not a Git repository.', [ sRepoName ] ) + sLineBreak + sLineBreak +
+    'Would you like to initialise it and push to a remote?' + sLineBreak + sLineBreak +
+    'Yes = Codeberg' + sLineBreak +
+    'No = GitHub' + sLineBreak +
+    'Cancel = Skip',
+    mtConfirmation, [ mbYes, mbNo, mbCancel ], 0 );
+
+  if iChoice = mrCancel then
+    Exit;
+
+  // Check credentials for chosen provider
+  if iChoice = mrYes then
+  begin
+    if not FRepoManager.HasCodebergCredentials then
+    begin
+      MessageDlg( 'Please configure Codeberg credentials first.', mtWarning, [ mbOK ], 0 );
+      mnuCodebergSettingsClick( nil );
+
+      if not FRepoManager.HasCodebergCredentials then
+        Exit;
+    end;
+  end
+  else
+  begin
+    if not FRepoManager.HasGitHubCredentials then
+    begin
+      MessageDlg( 'Please configure GitHub credentials first.', mtWarning, [ mbOK ], 0 );
+      mnuGitHubSettingsClick( nil );
+
+      if not FRepoManager.HasGitHubCredentials then
+        Exit;
+    end;
+  end;
+
+  // Get repository details with project type
+  sDescription := '';
+  lPrivate := True;
+  sProjectType := 'Delphi / Pascal';
+
+  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate, sProjectType ) ) then
+    Exit;
+
+  // Write .gitignore based on project type before init
+  WriteGitIgnoreForProjectType( sFolder, sProjectType );
+
+  Screen.Cursor := crHourGlass;
+
+  try
+    // Step 1: Initialise local repository
+    Log( Format( '=== Initialising %s ===', [ sRepoName ] ) );
+
+    if not FRepoManager.InitializeRepository( sFolder, sLog ) then
+    begin
+      Log( 'Error: ' + sLog );
+      MessageDlg( 'Failed to initialise repository: ' + sLog, mtError, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    Log( sLog );
+
+    // Step 2: Create remote repository
+    if iChoice = mrYes then
+    begin
+      Log( '=== Creating Codeberg Repository ===' );
+
+      if not FRepoManager.CreateCodebergRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) then
+      begin
+        Log( 'Error: ' + sError );
+        MessageDlg( 'Failed to create Codeberg repository: ' + sError, mtError, [ mbOK ], 0 );
+        Exit;
+      end;
+    end
+    else
+    begin
+      Log( '=== Creating GitHub Repository ===' );
+
+      if not FRepoManager.CreateGitHubRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) then
+      begin
+        Log( 'Error: ' + sError );
+        MessageDlg( 'Failed to create GitHub repository: ' + sError, mtError, [ mbOK ], 0 );
+        Exit;
+      end;
+    end;
+
+    Log( 'Created repository: ' + sRemoteURL );
+
+    // Step 3: Add remote origin
+    if not FRepoManager.AddRemoteOrigin( sFolder, sRemoteURL, sLog ) then
+    begin
+      Log( 'Error: ' + sLog );
+      MessageDlg( 'Failed to add remote origin: ' + sLog, mtError, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    Log( sLog );
+
+    // Step 4: Initial commit and push
+    if not FRepoManager.InitialCommitAndPush( sFolder, 'Initial commit', sLog ) then
+    begin
+      Log( 'Error: ' + sLog );
+      MessageDlg( 'Failed to commit and push: ' + sLog, mtError, [ mbOK ], 0 );
+      Exit;
+    end;
+
+    Log( sLog );
+
+    // Add to repository list
+    FRepoManager.AddRepository( sFolder );
+    Log( Format( '=== %s initialised and pushed ===', [ sRepoName ] ) );
+    Result := True;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+
+end;
+
 procedure TMainForm.RunPendingReindexes( const ADirs: TStringList );
 const
   DELPHI_INDEXER_EXE = 'delphi-indexer.exe';

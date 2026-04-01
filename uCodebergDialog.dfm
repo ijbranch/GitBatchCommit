@@ -3,7 +3,7 @@ object CodebergDialog: TCodebergDialog
   Top = 0
   BorderStyle = bsDialog
   Caption = 'Create Codeberg Repository'
-  ClientHeight = 180
+  ClientHeight = 212
   ClientWidth = 400
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -49,24 +49,41 @@ object CodebergDialog: TCodebergDialog
     Caption = 'Private Repository'
     TabOrder = 2
   end
+  object lblProjectType: TLabel
+    Left = 16
+    Top = 124
+    Width = 71
+    Height = 15
+    Caption = 'Project Type:'
+    Visible = False
+  end
+  object cboProjectType: TComboBox
+    Left = 130
+    Top = 121
+    Width = 250
+    Height = 23
+    Style = csDropDownList
+    TabOrder = 3
+    Visible = False
+  end
   object btnOK: TButton
     Left = 216
-    Top = 140
+    Top = 172
     Width = 75
     Height = 25
     Caption = 'OK'
     Default = True
     ModalResult = 1
-    TabOrder = 3
+    TabOrder = 4
   end
   object btnCancel: TButton
     Left = 305
-    Top = 140
+    Top = 172
     Width = 75
     Height = 25
     Cancel = True
     Caption = 'Cancel'
     ModalResult = 2
-    TabOrder = 4
+    TabOrder = 5
   end
 end
