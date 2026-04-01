@@ -17,7 +17,7 @@
   ***************************************************************************
 
   This code Unit is part of the GitBatchCommit Application/project.
-  This project was developed jointly by the Author and Clode Code.
+  This project was developed jointly by the Author and Claude Code.
 
   ***************************************************************************
 
@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.0.0
+  Version: 1.5.0
 
   Description:
     A Delphi VCL application for committing and pushing changes to multiple
@@ -50,14 +50,30 @@ program GitBatchCommit;
 
 uses
   FastMM5,
+  {$IFDEF EurekaLog}
+  EMemLeaks,
+  EResLeaks,
+  EFastMM5Support,
+  EResourceStrings,
+  EMapWin32,
+  EAppVCL,
+  EDialogWinAPIMSClassic,
+  EDialogWinAPIEurekaLogDetailed,
+  EDialogWinAPIStepsToReproduce,
+  EBase,
+  EExtraExceptionInfo,
+  ExceptionLog7,
+  {$ENDIF EurekaLog}
+  ELExtraPlugIns in 'E:\DBiWorkflow Development\DBiCommonFiles\ELExtraPlugIns.pas',
   Vcl.Forms,
+  Vcl.Themes,
+  Vcl.Styles,
   MainFrm in 'MainFrm.pas' {MainForm},
   uGitRepoManager in 'uGitRepoManager.pas',
   uCodebergDialog in 'uCodebergDialog.pas' {CodebergDialog},
   uCodebergSettings in 'uCodebergSettings.pas' {CodebergSettingsDialog},
   uGitHubSettings in 'uGitHubSettings.pas' {GitHubSettingsDialog},
-  Vcl.Themes,
-  Vcl.Styles;
+  uTemplateSettings in 'uTemplateSettings.pas' {TemplateSettingsDialog};
 
 {$R *.res}
 
@@ -66,8 +82,10 @@ begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
   TStyleManager.TrySetStyle( 'Aqua Light Slate' );
-  Application.Title := 'Git Batch Commit';
-  Application.CreateForm( TMainForm, MainForm );
+  Application.Title := 'Git Batch Processor';
+  Application.CreateForm(TMainForm, MainForm);
   Application.Run;
 
 end.
+
+

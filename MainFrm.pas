@@ -17,7 +17,7 @@
   ***************************************************************************
 
   This code Unit is part of the GitBatchCommit Application/project.
-  This project was developed jointly by the Author and Clode Code.
+  This project was developed jointly by the Author and Claude Code.
 
   ***************************************************************************
 
@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.4.0
+  Version: 1.5.0
 
   Part of GitBatchCommit Application
 
@@ -63,7 +63,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.FileCtrl, Vcl.Menus,
 
   System.SysUtils, System.StrUtils, System.Variants, System.Classes, System.Types, System.UITypes,
-  System.Generics.Collections, System.Generics.Defaults, System.Threading,
+  System.Generics.Collections, System.Generics.Defaults, System.Threading, System.SyncObjs,
 
   uGitRepoManager, uCodebergDialog, uCodebergSettings, uGitHubSettings, uTemplateSettings;
 
@@ -189,7 +189,11 @@ type
     procedure mmoLogKeyDown( Sender: TObject; var Key: Word; Shift: TShiftState );
   private
     const
-      WM_LOAD_REPOS = WM_USER + 100;
+      WM_LOAD_REPOS       = WM_USER + 100;
+      clStatusClean        = $E0FFE0;     // Light green
+      clStatusModified     = $FFFFC0;     // Light yellow
+      clStatusPullRequired = $FFE0C0;     // Light orange
+      clStatusError        = $C0C0FF;     // Light red
     var
       FRepoManager  : TGitRepoManager;
       FUpdatingList : Boolean;
@@ -200,6 +204,8 @@ type
       FInitialLoadDone: Boolean;
       FLastClickedIndex: Integer;
       FRefreshing   : Boolean;
+      FCancelRefresh: Boolean;
+      FRefreshThread: TThread;
       FGroupFilter  : string;
 
       /// <summary>
@@ -305,20 +311,6 @@ type
       const ATimeout: Cardinal = 30000 ): Boolean;
 
     /// <summary>
-    ///   Triggers delphi-lookup reindex for a specific repository path.
-    /// </summary>
-    /// <param name="ARepoPath">
-    ///   Full path to the repository that was committed.
-    /// </param>
-    /// <summary>
-    ///   Checks if a repository path matches an indexed directory.
-    /// </summary>
-    /// <param name="ARepoPath">Repository path to check</param>
-    /// <param name="ACategory">Output: 'user' or 'stdlib' if matched</param>
-    /// <returns>Matched indexed directory path, or empty string if no match</returns>
-    function GetReindexDir( const ARepoPath: string; out ACategory: string ): string;
-
-    /// <summary>
     ///   Runs delphi-indexer for all unique directories in the list.
     /// </summary>
     /// <param name="ADirs">StringList with entries in format 'category|path'</param>
@@ -327,6 +319,11 @@ type
     ///   Incremental indexing is fast (~100ms when nothing changed).
     /// </remarks>
     procedure RunPendingReindexes( const ADirs: TStringList );
+
+    /// <summary>
+    ///   Handles form-level key events for keyboard shortcuts.
+    /// </summary>
+    procedure FormKeyDown( Sender: TObject; var Key: Word; Shift: TShiftState );
   public
   end;
 
@@ -350,11 +347,17 @@ begin
   FGroupFilter := '';
   FInitialLoadDone := False;
   FLastClickedIndex := -1;
+  FCancelRefresh := False;
+  FRefreshThread := nil;
   FFilteredIndices := TList<Integer>.Create;
   FRepoManager := TGitRepoManager.Create;
 
   // Enable drag-and-drop support
   DragAcceptFiles( Handle, True );
+
+  // Enable Ctrl+Enter shortcut for Commit & Push
+  KeyPreview := True;
+  OnKeyDown := FormKeyDown;
 
   // Wire up column click event
   lvRepos.OnColumnClick := lvReposColumnClick;
@@ -444,36 +447,60 @@ begin
     Exit;
 
   FRefreshing := True;
+  FCancelRefresh := False;
   Screen.Cursor := crHourGlass;
 
-  TThread.CreateAnonymousThread(
+  FRefreshThread := TThread.CreateAnonymousThread(
     procedure
     begin
+
       TParallel.For( 0, iCount - 1,
         procedure( AIndex: Integer )
         var
           sName: string;
         begin
+
+          if FCancelRefresh then
+            Exit;
+
           FRepoManager.RefreshStatus( AIndex );
           sName := FRepoManager.Repos[ AIndex ].Name;
+
+          if FCancelRefresh then
+            Exit;
 
           TThread.Queue( nil,
             procedure
             begin
+
+              if FCancelRefresh then
+                Exit;
+
               UpdateListItem( AIndex );
               mmoLog.Lines.Add( Format( 'Checked %s', [ sName ] ) );
               ScrollLogToEnd;
+
             end );
         end );
 
       TThread.Synchronize( nil,
         procedure
         begin
+
           FRefreshing := False;
-          Screen.Cursor := crDefault;
-          Log( 'Refresh complete.' );
+          FRefreshThread := nil;
+
+          if not FCancelRefresh then
+          begin
+            Screen.Cursor := crDefault;
+            Log( 'Refresh complete.' );
+          end;
+
         end );
-    end ).Start;
+
+    end );
+  FRefreshThread.FreeOnTerminate := True;
+  FRefreshThread.Start;
 
 end;
 
@@ -482,6 +509,15 @@ end;
 /// </summary>
 procedure TMainForm.FormDestroy( Sender: TObject );
 begin
+
+  // Cancel any running async refresh and wait for it to finish
+  if FRefreshing then
+  begin
+    FCancelRefresh := True;
+
+    while FRefreshing do
+      Application.ProcessMessages;
+  end;
 
   // Save selection state before closing
   FRepoManager.SaveConfig;
@@ -811,7 +847,7 @@ var
   iFileCount        : Integer;
   iAdded            : Integer;
   iSkipped          : Integer;
-  Buffer            : array[ 0..MAX_PATH ] of Char;
+  iLen              : Integer;
   sPath             : string;
 begin
 
@@ -823,8 +859,9 @@ begin
 
     for var i := 0 to iFileCount - 1 do
     begin
-      DragQueryFile( Msg.Drop, i, Buffer, MAX_PATH );
-      sPath := Buffer;
+      iLen := DragQueryFile( Msg.Drop, i, nil, 0 );
+      SetLength( sPath, iLen );
+      DragQueryFile( Msg.Drop, i, PChar( sPath ), iLen + 1 );
 
       // Only process directories
       if ( not System.SysUtils.DirectoryExists( sPath ) ) then
@@ -1048,7 +1085,6 @@ end;
 /// </summary>
 procedure TMainForm.btnCommitPushClick( Sender: TObject );
 var
-  sLog              : string;
   iRepoIndex        : Integer;
   sSummary          : string;
   sDetails          : string;
@@ -1093,62 +1129,100 @@ begin
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
-  var iSuccess := 0;
-  var slReindexDirs := TStringList.Create;
-  try
-    Screen.Cursor := crHourGlass;
+  // Collect indices to commit (must read UI on main thread)
+  var RepoIndices: TArray<Integer>;
+  SetLength( RepoIndices, iCount );
+  var iIdx := 0;
 
-    try
-      for var i := 0 to lvRepos.Items.Count - 1 do
-      begin
-        iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+  for var i := 0 to lvRepos.Items.Count - 1 do
+  begin
+    iRepoIndex := Integer( lvRepos.Items[ i ].Data );
 
-        if lvRepos.Items[ i ].Checked and ( FRepoManager.Repos[ iRepoIndex ].Status = rsModified ) then
+    if lvRepos.Items[ i ].Checked and ( FRepoManager.Repos[ iRepoIndex ].Status = rsModified ) then
+    begin
+      RepoIndices[ iIdx ] := iRepoIndex;
+      Inc( iIdx );
+    end;
+  end;
+
+  Screen.Cursor := crHourGlass;
+  btnCommitPush.Enabled := False;
+
+  TThread.CreateAnonymousThread(
+    procedure
+    var
+      iSuccess      : Integer;
+      slReindexDirs : TStringList;
+    begin
+
+      iSuccess := 0;
+      slReindexDirs := TStringList.Create;
+
+      try
+        for var j := 0 to High( RepoIndices ) do
         begin
-          var bCommitSuccess := FRepoManager.CommitAndPush( iRepoIndex, sMessage, sLog );
+          var iRI := RepoIndices[ j ];
+          var sCommitLog: string;
+          var bCommitSuccess := FRepoManager.CommitAndPush( iRI, sMessage, sCommitLog );
 
           if bCommitSuccess then
             Inc( iSuccess );
 
-          Log( sLog );
-
-          // Track directories for reindexing after loop completes (only if commit succeeded)
+          // Track repo path for reindexing (only if commit succeeded)
           if bCommitSuccess then
           begin
-            var sCategory: string;
-            var sReindexDir := GetReindexDir( FRepoManager.Repos[ iRepoIndex ].Path, sCategory );
-            if not sReindexDir.IsEmpty then
-            begin
-              var sEntry := sCategory + '|' + sReindexDir;
-              if slReindexDirs.IndexOf( sEntry ) = -1 then
-                slReindexDirs.Add( sEntry );
-            end;
+            var sRepoPath := FRepoManager.Repos[ iRI ].Path;
+
+            if slReindexDirs.IndexOf( sRepoPath ) = -1 then
+              slReindexDirs.Add( sRepoPath );
           end;
 
-          UpdateListItem( iRepoIndex );
+          TThread.Queue( nil,
+            procedure
+            begin
+              Log( sCommitLog );
+              UpdateListItem( iRI );
+            end );
+        end;
+
+        TThread.Synchronize( nil,
+          procedure
+          begin
+
+            Screen.Cursor := crDefault;
+            btnCommitPush.Enabled := True;
+            Log( Format( 'Completed: %d of %d successful.', [ iSuccess, iCount ] ) );
+
+            // Trigger all pending reindexes once after all commits complete
+            RunPendingReindexes( slReindexDirs );
+            slReindexDirs.Free;
+
+            // Clear details after successful commit
+            if iSuccess > 0 then
+            begin
+              mmoDetails.Clear;
+              pnlDetails.Visible := False;
+            end;
+
+            MessageDlg( Format( 'Completed: %d of %d successful.', [ iSuccess, iCount ] ), mtInformation, [ mbOK ], 0 );
+
+          end );
+      except
+        on E: Exception do
+        begin
+          slReindexDirs.Free;
+
+          TThread.Synchronize( nil,
+            procedure
+            begin
+              Screen.Cursor := crDefault;
+              btnCommitPush.Enabled := True;
+              Log( 'Error during commit: ' + E.Message );
+            end );
         end;
       end;
-    finally
-      Screen.Cursor := crDefault;
-    end;
 
-    Log( Format( 'Completed: %d of %d successful.', [ iSuccess, iCount ] ) );
-
-    // Trigger all pending reindexes once after all commits complete
-    RunPendingReindexes( slReindexDirs );
-
-  finally
-    slReindexDirs.Free;
-  end;
-
-  // Clear details after successful commit
-  if iSuccess > 0 then
-  begin
-    mmoDetails.Clear;
-    pnlDetails.Visible := False;
-  end;
-
-  MessageDlg( Format( 'Completed: %d of %d successful.', [ iSuccess, iCount ] ), mtInformation, [ mbOK ], 0 );
+    end ).Start;
 
 end;
 
@@ -1898,11 +1972,11 @@ var
   sReadmePath       : string;
 begin
 
-  sReadmePath := ExtractFilePath( Application.ExeName ) + 'README.md';
+  sReadmePath := ExtractFilePath( Application.ExeName ) + 'Users Guide.md';
 
   if ( not FileExists( sReadmePath ) ) then
   begin
-    MessageDlg( 'README.md not found in application folder.', mtWarning, [ mbOK ], 0 );
+    MessageDlg( 'Users Guide.md not found in application folder.', mtWarning, [ mbOK ], 0 );
     Exit;
   end;
 
@@ -1915,7 +1989,7 @@ end;
 /// </summary>
 procedure TMainForm.mnuAboutClick( Sender: TObject );
 const
-  APP_VERSION       = '1.4.0';
+  APP_VERSION       = '1.5.0';
 begin
 
   MessageDlg(
@@ -1962,13 +2036,13 @@ begin
   // Set background colour based on status
   case Status of
     rsClean:
-      Sender.Canvas.Brush.Color := $E0FFE0; // Light green
+      Sender.Canvas.Brush.Color := clStatusClean;
     rsModified:
-      Sender.Canvas.Brush.Color := $FFFFC0; // Light yellow
+      Sender.Canvas.Brush.Color := clStatusModified;
     rsPullRequired:
-      Sender.Canvas.Brush.Color := $FFE0C0; // Light orange
+      Sender.Canvas.Brush.Color := clStatusPullRequired;
     rsError:
-      Sender.Canvas.Brush.Color := $C0C0FF; // Light red
+      Sender.Canvas.Brush.Color := clStatusError;
     rsUnknown:
       Sender.Canvas.Brush.Color := clWindow;
   end;
@@ -2625,15 +2699,10 @@ begin
           if bResolveSuccess then
           begin
             Inc( iSuccess );
-            // Track directories for reindexing after loop completes
-            var sCategory: string;
-            var sReindexDir := GetReindexDir( FRepoManager.Repos[ iRepoIndex ].Path, sCategory );
-            if not sReindexDir.IsEmpty then
-            begin
-              var sEntry := sCategory + '|' + sReindexDir;
-              if slReindexDirs.IndexOf( sEntry ) = -1 then
-                slReindexDirs.Add( sEntry );
-            end;
+            // Track repo path for reindexing after loop completes
+            var sRepoPath := FRepoManager.Repos[ iRepoIndex ].Path;
+            if slReindexDirs.IndexOf( sRepoPath ) = -1 then
+              slReindexDirs.Add( sRepoPath );
           end;
 
           FRepoManager.RefreshStatus( iRepoIndex );
@@ -2708,15 +2777,10 @@ begin
           if bPushSuccess then
           begin
             Inc( iSuccess );
-            // Track directories for reindexing after loop completes
-            var sCategory: string;
-            var sReindexDir := GetReindexDir( FRepoManager.Repos[ iRepoIndex ].Path, sCategory );
-            if not sReindexDir.IsEmpty then
-            begin
-              var sEntry := sCategory + '|' + sReindexDir;
-              if slReindexDirs.IndexOf( sEntry ) = -1 then
-                slReindexDirs.Add( sEntry );
-            end;
+            // Track repo path for reindexing after loop completes
+            var sRepoPath := FRepoManager.Repos[ iRepoIndex ].Path;
+            if slReindexDirs.IndexOf( sRepoPath ) = -1 then
+              slReindexDirs.Add( sRepoPath );
           end;
 
           FRepoManager.RefreshStatus( iRepoIndex );
@@ -2803,15 +2867,10 @@ begin
           if bPushSuccess then
           begin
             Inc( iSuccess );
-            // Track directories for reindexing after loop completes
-            var sCategory: string;
-            var sReindexDir := GetReindexDir( FRepoManager.Repos[ iRepoIndex ].Path, sCategory );
-            if not sReindexDir.IsEmpty then
-            begin
-              var sEntry := sCategory + '|' + sReindexDir;
-              if slReindexDirs.IndexOf( sEntry ) = -1 then
-                slReindexDirs.Add( sEntry );
-            end;
+            // Track repo path for reindexing after loop completes
+            var sRepoPath := FRepoManager.Repos[ iRepoIndex ].Path;
+            if slReindexDirs.IndexOf( sRepoPath ) = -1 then
+              slReindexDirs.Add( sRepoPath );
           end;
 
           FRepoManager.RefreshStatus( iRepoIndex );
@@ -2948,77 +3007,6 @@ begin
 end;
 
 /// <summary>
-///   Triggers delphi-lookup reindex for a specific repository path.
-/// </summary>
-/// <param name="ARepoPath">
-///   Full path to the repository that was committed.
-/// </param>
-/// <summary>
-///   Checks if a repository path matches an indexed directory.
-/// </summary>
-/// <param name="ARepoPath">Repository path to check</param>
-/// <param name="ACategory">Output: 'user' or 'stdlib' if matched</param>
-/// <returns>Matched indexed directory path, or empty string if no match</returns>
-function TMainForm.GetReindexDir( const ARepoPath: string; out ACategory: string ): string;
-const
-  // User-owned directories indexed by delphi-lookup
-  INDEXED_DIRS_USER: array[ 0..6 ] of string = (
-    'E:\DBiWorkflow Development',
-    'D:\GITLAKLib',
-    'D:\Delphi Tools\nlhTable',
-    'D:\Delphi Tools\EDBImage',
-    'D:\Delphi Tools\nlhImage',
-    'D:\Delphi Tools\utilcomps',
-    'D:\Rapid.Generics.v3'
-  );
-  // Standard library directories indexed by delphi-lookup
-  INDEXED_DIRS_STDLIB: array[ 0..0 ] of string = (
-    'D:\ElevateDB 2 VCL-CS-SRC\RAD Studio 13 (Delphi Win32)\code\source'
-  );
-var
-  sIndexedDir       : string;
-  sNormalizedRepo   : string;
-begin
-  Result := '';
-  ACategory := '';
-
-  // Normalize the repository path (remove trailing backslash, uppercase for comparison)
-  sNormalizedRepo := ExcludeTrailingPathDelimiter( ARepoPath ).ToUpper;
-
-  // Check user directories (exact match or subdirectory)
-  for var i := Low( INDEXED_DIRS_USER ) to High( INDEXED_DIRS_USER ) do
-  begin
-    sIndexedDir := ExcludeTrailingPathDelimiter( INDEXED_DIRS_USER[ i ] ).ToUpper;
-
-    // Match if: exact match OR repo is subdirectory of indexed dir
-    if ( sNormalizedRepo = sIndexedDir ) or
-       ( sNormalizedRepo.StartsWith( sIndexedDir + '\' ) ) then
-    begin
-      Result := INDEXED_DIRS_USER[ i ];
-      ACategory := 'user';
-      Exit;
-    end;
-  end;
-
-  // Check stdlib directories (exact match or subdirectory)
-  for var i := Low( INDEXED_DIRS_STDLIB ) to High( INDEXED_DIRS_STDLIB ) do
-  begin
-    sIndexedDir := ExcludeTrailingPathDelimiter( INDEXED_DIRS_STDLIB[ i ] ).ToUpper;
-
-    // Match if: exact match OR repo is subdirectory of indexed dir
-    if ( sNormalizedRepo = sIndexedDir ) or
-       ( sNormalizedRepo.StartsWith( sIndexedDir + '\' ) ) then
-    begin
-      Result := INDEXED_DIRS_STDLIB[ i ];
-      ACategory := 'stdlib';
-      Exit;
-    end;
-  end;
-
-  // Repository not in indexed list - return empty string
-end;
-
-/// <summary>
 ///   Runs delphi-indexer for all unique directories in the list.
 /// </summary>
 /// <param name="ADirs">StringList with entries in format 'category|path'</param>
@@ -3032,23 +3020,16 @@ const
   DEFAULT_INSTALL_PATH = 'D:\delphi-lookup\delphi-indexer.exe';
 var
   sIndexerPath      : string;
-  Buffer            : array[ 0..MAX_PATH ] of Char;
+  SearchBuffer      : array[ 0..MAX_PATH ] of Char;
   FilePart          : PChar;
-  sEntry            : string;
-  sCategory         : string;
   sPath             : string;
   sParams           : string;
   sOutput           : string;
-  iDelimPos         : Integer;
 begin
+
   // Nothing to reindex
   if ( ADirs = nil ) or ( ADirs.Count = 0 ) then
-  begin
-    Log( 'Reindex: No directories to reindex' );
     Exit;
-  end;
-
-  Log( Format( 'Reindex: Processing %d unique director(ies)', [ ADirs.Count ] ) );
 
   // Find delphi-indexer.exe location
   sIndexerPath := '';
@@ -3060,72 +3041,80 @@ begin
       sIndexerPath := FRepoManager.DelphiIndexerPath
     else
     begin
-      // Configured path no longer valid - clear it and try auto-detection
       FRepoManager.DelphiIndexerPath := '';
       FRepoManager.SaveConfig;
     end;
   end;
 
-  // 2. If not found yet, check PATH environment variable
+  // 2. Check PATH environment variable
   FilePart := nil;
-  if sIndexerPath.IsEmpty and ( SearchPath( nil, PChar( DELPHI_INDEXER_EXE ), nil, MAX_PATH, Buffer, FilePart ) <> 0 ) then
+
+  if sIndexerPath.IsEmpty and ( SearchPath( nil, PChar( DELPHI_INDEXER_EXE ), nil, MAX_PATH, SearchBuffer, FilePart ) <> 0 ) then
   begin
-    sIndexerPath := Buffer;
-    // Save auto-detected path to config for faster future lookups
+    sIndexerPath := SearchBuffer;
     FRepoManager.DelphiIndexerPath := sIndexerPath;
     FRepoManager.SaveConfig;
   end;
 
-  // 3. If not found yet, check default installation location
+  // 3. Check default installation location
   if sIndexerPath.IsEmpty and FileExists( DEFAULT_INSTALL_PATH ) then
   begin
     sIndexerPath := DEFAULT_INSTALL_PATH;
-    // Save auto-detected path to config for faster future lookups
     FRepoManager.DelphiIndexerPath := sIndexerPath;
     FRepoManager.SaveConfig;
   end;
 
-  // 4. Not found - skip reindexing
+  // 4. Not found - skip reindexing silently
   if sIndexerPath.IsEmpty then
-  begin
-    Log( 'Reindex: delphi-indexer.exe not found - skipping reindex' );
     Exit;
-  end;
 
-  // Process each unique directory
-  for sEntry in ADirs do
+  Log( Format( 'Reindex: Processing %d repo(s)', [ ADirs.Count ] ) );
+
+  // Reindex each committed repository
+  for sPath in ADirs do
   begin
-    // Parse entry: 'category|path'
-    iDelimPos := Pos( '|', sEntry );
-    if iDelimPos = 0 then
-      Continue;
-
-    sCategory := Copy( sEntry, 1, iDelimPos - 1 );
-    sPath := Copy( sEntry, iDelimPos + 1, Length( sEntry ) );
-
-    // Trigger incremental reindex for this directory
     Log( Format( 'Triggering delphi-lookup reindex: %s', [ sPath ] ) );
-    sParams := Format( '"%s" "%s" --category %s', [ sIndexerPath, sPath, sCategory ] );
+    sParams := Format( '"%s" "%s" --category user', [ sIndexerPath, sPath ] );
 
     if ExecuteCommand( sParams, sOutput ) then
       Log( 'delphi-lookup reindex completed successfully' )
     else
     begin
       Log( 'delphi-lookup reindex FAILED' );
+
       if not sOutput.Trim.IsEmpty then
         Log( 'Error: ' + sOutput.Trim );
     end;
   end;
+
 end;
 
 procedure TMainForm.mmoLogKeyDown( Sender: TObject; var Key: Word; Shift: TShiftState );
 begin
+
   // Handle Ctrl+A to select all text in the log memo
   if ( ssCtrl in Shift ) and ( Key = Ord( 'A' ) ) then
   begin
     mmoLog.SelectAll;
     Key := 0;
   end;
+
+end;
+
+procedure TMainForm.FormKeyDown( Sender: TObject; var Key: Word; Shift: TShiftState );
+begin
+
+  // Ctrl+Enter triggers Commit & Push
+  if ( ssCtrl in Shift ) and ( Key = VK_RETURN ) then
+  begin
+
+    if btnCommitPush.Enabled then
+      btnCommitPushClick( btnCommitPush );
+
+    Key := 0;
+
+  end;
+
 end;
 
 end.

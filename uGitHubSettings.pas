@@ -17,7 +17,7 @@
   ***************************************************************************
 
   This code Unit is part of the GitBatchCommit Application/project.
-  This project was developed jointly by the Author and Clode Code.
+  This project was developed jointly by the Author and Claude Code.
 
   ***************************************************************************
 

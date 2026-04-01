@@ -17,7 +17,7 @@
   ***************************************************************************
 
   This code Unit is part of the GitBatchCommit Application/project.
-  This project was developed jointly by the Author and Clode Code.
+  This project was developed jointly by the Author and Claude Code.
 
   ***************************************************************************
 
@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.4.0
+  Version: 1.5.0
 
   Part of GitBatchCommit Application
 
@@ -178,6 +178,20 @@ type
     /// <param name="sTempFile">Returns the path to the temp file created.</param>
     /// <returns>True if temp file was created successfully.</returns>
     function CreateCommitMessageFile( const sMessage: string; out sTempFile: string ): Boolean;
+
+    /// <summary>
+    ///   Makes an HTTP request to a remote API.
+    /// </summary>
+    /// <param name="sVerb">HTTP verb: 'POST' or 'PATCH'.</param>
+    /// <param name="sBaseURL">API base URL (e.g. CODEBERG_API_URL or GITHUB_API_URL).</param>
+    /// <param name="sEndpoint">API endpoint path.</param>
+    /// <param name="sBody">JSON request body.</param>
+    /// <param name="aHeaders">HTTP headers array.</param>
+    /// <param name="sResponse">Response body.</param>
+    /// <param name="iStatusCode">HTTP status code.</param>
+    function ExecuteApiRequest( const sVerb, sBaseURL, sEndpoint, sBody: string;
+      const aHeaders: TArray<TNameValuePair>; out sResponse: string;
+      out iStatusCode: Integer ): Boolean;
 
     /// <summary>
     ///   Makes an HTTP POST request to the Codeberg API.
@@ -657,7 +671,7 @@ begin
   Result := False;
 
   try
-    sTempFile := TPath.Combine( TPath.GetTempPath, Format( 'gitcommit_%d.txt', [ GetTickCount ] ) );
+    sTempFile := TPath.Combine( TPath.GetTempPath, Format( 'gitcommit_%s.txt', [ TPath.GetGUIDFileName( False ) ] ) );
     TFile.WriteAllText( sTempFile, sMessage, TEncoding.UTF8 );
     Result := True;
   except
@@ -929,6 +943,15 @@ var
 begin
 
   Result := False;
+
+  // Guard: never overwrite a config file with an empty repo list
+  // unless the file doesn't exist yet (fresh install)
+  if ( Length( FRepos ) = 0 ) and TFile.Exists( FConfigPath ) then
+  begin
+    Result := True;
+    Exit;
+  end;
+
   JSONRoot := TJSONObject.Create;
 
   try
@@ -1233,13 +1256,12 @@ begin
 
 end;
 
-function TGitRepoManager.ExecuteCodebergApiPost( const sEndpoint, sBody: string; out sResponse: string;
-  out iStatusCode: Integer ): Boolean;
+function TGitRepoManager.ExecuteApiRequest( const sVerb, sBaseURL, sEndpoint, sBody: string;
+  const aHeaders: TArray<TNameValuePair>; out sResponse: string; out iStatusCode: Integer ): Boolean;
 var
   HttpClient        : TNetHTTPClient;
   Response          : IHTTPResponse;
   RequestStream     : TStringStream;
-  Headers           : TArray<TNameValuePair>;
 begin
 
   Result := False;
@@ -1252,12 +1274,16 @@ begin
   try
     HttpClient.ContentType := 'application/json';
 
-    SetLength( Headers, 2 );
-    Headers[ 0 ] := TNameValuePair.Create( 'Authorization', 'token ' + FCodebergToken );
-    Headers[ 1 ] := TNameValuePair.Create( 'Content-Type', 'application/json' );
-
     try
-      Response := HttpClient.Post( CODEBERG_API_URL + sEndpoint, RequestStream, nil, Headers );
+      if SameText( sVerb, 'POST' ) then
+        Response := HttpClient.Post( sBaseURL + sEndpoint, RequestStream, nil, aHeaders )
+      else if SameText( sVerb, 'PATCH' ) then
+        Response := HttpClient.Patch( sBaseURL + sEndpoint, RequestStream, nil, aHeaders )
+      else
+      begin
+        sResponse := 'Unsupported HTTP verb: ' + sVerb;
+        Exit;
+      end;
 
       iStatusCode := Response.StatusCode;
       sResponse := Response.ContentAsString;
@@ -1270,128 +1296,52 @@ begin
     RequestStream.Free;
     HttpClient.Free;
   end;
+
+end;
+
+function TGitRepoManager.ExecuteCodebergApiPost( const sEndpoint, sBody: string; out sResponse: string;
+  out iStatusCode: Integer ): Boolean;
+begin
+
+  Result := ExecuteApiRequest( 'POST', CODEBERG_API_URL, sEndpoint, sBody,
+    [ TNameValuePair.Create( 'Authorization', 'token ' + FCodebergToken ),
+      TNameValuePair.Create( 'Content-Type', 'application/json' ) ],
+    sResponse, iStatusCode );
 
 end;
 
 function TGitRepoManager.ExecuteGitHubApiPost( const sEndpoint, sBody: string; out sResponse: string;
   out iStatusCode: Integer ): Boolean;
-var
-  HttpClient        : TNetHTTPClient;
-  Response          : IHTTPResponse;
-  RequestStream     : TStringStream;
-  Headers           : TArray<TNameValuePair>;
 begin
 
-  Result := False;
-  sResponse := '';
-  iStatusCode := 0;
-
-  HttpClient := TNetHTTPClient.Create( nil );
-  RequestStream := TStringStream.Create( sBody, TEncoding.UTF8 );
-
-  try
-    HttpClient.ContentType := 'application/json';
-
-    SetLength( Headers, 3 );
-    Headers[ 0 ] := TNameValuePair.Create( 'Authorization', 'Bearer ' + FGitHubToken );
-    Headers[ 1 ] := TNameValuePair.Create( 'Content-Type', 'application/json' );
-    Headers[ 2 ] := TNameValuePair.Create( 'Accept', 'application/vnd.github+json' );
-
-    try
-      Response := HttpClient.Post( GITHUB_API_URL + sEndpoint, RequestStream, nil, Headers );
-
-      iStatusCode := Response.StatusCode;
-      sResponse := Response.ContentAsString;
-      Result := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
-    except
-      on E: Exception do
-        sResponse := 'HTTP Error: ' + E.Message;
-    end;
-  finally
-    RequestStream.Free;
-    HttpClient.Free;
-  end;
+  Result := ExecuteApiRequest( 'POST', GITHUB_API_URL, sEndpoint, sBody,
+    [ TNameValuePair.Create( 'Authorization', 'Bearer ' + FGitHubToken ),
+      TNameValuePair.Create( 'Content-Type', 'application/json' ),
+      TNameValuePair.Create( 'Accept', 'application/vnd.github+json' ) ],
+    sResponse, iStatusCode );
 
 end;
 
 function TGitRepoManager.ExecuteCodebergApiPatch( const sEndpoint, sBody: string; out sResponse: string;
   out iStatusCode: Integer ): Boolean;
-var
-  HttpClient        : TNetHTTPClient;
-  Response          : IHTTPResponse;
-  RequestStream     : TStringStream;
-  Headers           : TArray<TNameValuePair>;
 begin
 
-  Result := False;
-  sResponse := '';
-  iStatusCode := 0;
-
-  HttpClient := TNetHTTPClient.Create( nil );
-  RequestStream := TStringStream.Create( sBody, TEncoding.UTF8 );
-
-  try
-    HttpClient.ContentType := 'application/json';
-
-    SetLength( Headers, 2 );
-    Headers[ 0 ] := TNameValuePair.Create( 'Authorization', 'token ' + FCodebergToken );
-    Headers[ 1 ] := TNameValuePair.Create( 'Content-Type', 'application/json' );
-
-    try
-      Response := HttpClient.Patch( CODEBERG_API_URL + sEndpoint, RequestStream, nil, Headers );
-
-      iStatusCode := Response.StatusCode;
-      sResponse := Response.ContentAsString;
-      Result := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
-    except
-      on E: Exception do
-        sResponse := 'HTTP Error: ' + E.Message;
-    end;
-  finally
-    RequestStream.Free;
-    HttpClient.Free;
-  end;
+  Result := ExecuteApiRequest( 'PATCH', CODEBERG_API_URL, sEndpoint, sBody,
+    [ TNameValuePair.Create( 'Authorization', 'token ' + FCodebergToken ),
+      TNameValuePair.Create( 'Content-Type', 'application/json' ) ],
+    sResponse, iStatusCode );
 
 end;
 
 function TGitRepoManager.ExecuteGitHubApiPatch( const sEndpoint, sBody: string; out sResponse: string;
   out iStatusCode: Integer ): Boolean;
-var
-  HttpClient        : TNetHTTPClient;
-  Response          : IHTTPResponse;
-  RequestStream     : TStringStream;
-  Headers           : TArray<TNameValuePair>;
 begin
 
-  Result := False;
-  sResponse := '';
-  iStatusCode := 0;
-
-  HttpClient := TNetHTTPClient.Create( nil );
-  RequestStream := TStringStream.Create( sBody, TEncoding.UTF8 );
-
-  try
-    HttpClient.ContentType := 'application/json';
-
-    SetLength( Headers, 3 );
-    Headers[ 0 ] := TNameValuePair.Create( 'Authorization', 'Bearer ' + FGitHubToken );
-    Headers[ 1 ] := TNameValuePair.Create( 'Content-Type', 'application/json' );
-    Headers[ 2 ] := TNameValuePair.Create( 'Accept', 'application/vnd.github+json' );
-
-    try
-      Response := HttpClient.Patch( GITHUB_API_URL + sEndpoint, RequestStream, nil, Headers );
-
-      iStatusCode := Response.StatusCode;
-      sResponse := Response.ContentAsString;
-      Result := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
-    except
-      on E: Exception do
-        sResponse := 'HTTP Error: ' + E.Message;
-    end;
-  finally
-    RequestStream.Free;
-    HttpClient.Free;
-  end;
+  Result := ExecuteApiRequest( 'PATCH', GITHUB_API_URL, sEndpoint, sBody,
+    [ TNameValuePair.Create( 'Authorization', 'Bearer ' + FGitHubToken ),
+      TNameValuePair.Create( 'Content-Type', 'application/json' ),
+      TNameValuePair.Create( 'Accept', 'application/vnd.github+json' ) ],
+    sResponse, iStatusCode );
 
 end;
 
@@ -1546,19 +1496,28 @@ begin
               sBestVersion := sVersion
             else
             begin
-              // Compare version numbers
+              // Compare version numbers (handle different-length strings e.g. "1.5.0" vs "1.5.0.38")
               VersionParts := sVersion.Split( [ '.' ] );
               BestParts := sBestVersion.Split( [ '.' ] );
               lIsBetter := False;
 
-              for var i := 0 to Min( High( VersionParts ), High( BestParts ) ) do
+              for var i := 0 to Max( High( VersionParts ), High( BestParts ) ) do
               begin
-                if StrToIntDef( VersionParts[ i ], 0 ) > StrToIntDef( BestParts[ i ], 0 ) then
+                var iNew := 0;
+                var iOld := 0;
+
+                if i <= High( VersionParts ) then
+                  iNew := StrToIntDef( VersionParts[ i ], 0 );
+
+                if i <= High( BestParts ) then
+                  iOld := StrToIntDef( BestParts[ i ], 0 );
+
+                if iNew > iOld then
                 begin
                   lIsBetter := True;
                   Break;
                 end
-                else if StrToIntDef( VersionParts[ i ], 0 ) < StrToIntDef( BestParts[ i ], 0 ) then
+                else if iNew < iOld then
                   Break;
               end;
 
@@ -1589,7 +1548,7 @@ begin
 
   if ( sExt = '.dcu' ) or ( sExt = '.exe' ) or ( sExt = '.dll' ) or
      ( sExt = '.bpl' ) or ( sExt = '.dcp' ) or ( sExt = '.dres' ) or
-     ( sExt = '.res' ) or ( sExt = '.local' ) or ( sExt = '.identcache' ) or
+     ( sExt = '.local' ) or ( sExt = '.identcache' ) or
      ( sExt = '.dsk' ) or ( sExt = '.tds' ) or ( sExt = '.map' ) or
      ( sExt = '.drc' ) or ( sExt = '.rsm' ) or ( sExt = '.obj' ) or
      ( sExt = '.o' ) or ( sExt = '.hpp' ) or ( sExt = '.projdata' ) or
