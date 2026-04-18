@@ -428,6 +428,31 @@ type
     function GetIncomingChanges( const iIndex: Integer; out sChanges: string; out sLog: string ): Boolean;
 
     /// <summary>
+    ///   Migrates a repository's remote from its current host (Codeberg or GitHub)
+    ///   to the specified target provider. Creates the new repository on the target,
+    ///   re-points <c>origin</c> to the new URL (the previous origin is kept under
+    ///   a provider-named alias for safety) and pushes all branches and tags.
+    /// </summary>
+    /// <param name="iIndex">Index of the repository to migrate.</param>
+    /// <param name="TargetProvider">Destination provider ( rpCodeberg or rpGitHub ).</param>
+    /// <param name="sNewRepoName">Name of the repository to create on the target.</param>
+    /// <param name="sDescription">Description for the new repository.</param>
+    /// <param name="lPrivate">True to create the target repository as private.</param>
+    /// <param name="sNewRemoteURL">Output: clone URL of the newly created remote.</param>
+    /// <param name="sError">Output: error message if the operation failed.</param>
+    /// <param name="sLog">Output: detailed log of each migration step.</param>
+    /// <returns>True if the migration succeeded end-to-end.</returns>
+    /// <remarks>
+    ///   The old remote repository is NOT deleted — it must be removed manually via
+    ///   the web interface once the migration has been verified. The previous origin
+    ///   URL is preserved locally as a remote named after its provider (e.g. "codeberg"
+    ///   or "github") so it can be restored if needed.
+    /// </remarks>
+    function MigrateRepository( const iIndex: Integer; const TargetProvider: TRemoteProvider;
+      const sNewRepoName, sDescription: string; const lPrivate: Boolean;
+      out sNewRemoteURL, sError, sLog: string ): Boolean;
+
+    /// <summary>
     ///   Adds a commit message to the history.
     /// </summary>
     procedure AddToCommitHistory( const sMessage: string );
@@ -2220,6 +2245,151 @@ begin
 
   sChanges := Trim( sOutput );
   sLog := 'Fetched successfully';
+  Result := True;
+
+end;
+
+function TGitRepoManager.MigrateRepository( const iIndex: Integer; const TargetProvider: TRemoteProvider;
+  const sNewRepoName, sDescription: string; const lPrivate: Boolean;
+  out sNewRemoteURL, sError, sLog: string ): Boolean;
+var
+  sRepoPath         : string;
+  sCurrentOrigin    : string;
+  CurrentProvider   : TRemoteProvider;
+  sOutput           : string;
+  sTargetName       : string;
+  sOldRemoteName    : string;
+  lOriginExisted    : Boolean;
+begin
+
+  Result := False;
+  sNewRemoteURL := '';
+  sError := '';
+  sLog := '';
+
+  if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
+  begin
+    sError := 'Invalid repository index';
+    Exit;
+  end;
+
+  if ( not ( TargetProvider in [ rpCodeberg, rpGitHub ] ) ) then
+  begin
+    sError := 'Target provider must be Codeberg or GitHub';
+    Exit;
+  end;
+
+  sRepoPath := FRepos[ iIndex ].Path;
+
+  // Step 1: Detect current remote
+  sCurrentOrigin := GetRemoteOriginURL( sRepoPath );
+  CurrentProvider := DetectRemoteProvider( sCurrentOrigin );
+  lOriginExisted := ( not sCurrentOrigin.IsEmpty );
+
+  if CurrentProvider = TargetProvider then
+  begin
+    sError := 'Repository is already hosted on the target provider';
+    Exit;
+  end;
+
+  // Verify target-provider credentials
+  case TargetProvider of
+    rpCodeberg:
+      begin
+        sTargetName := 'Codeberg';
+
+        if ( not HasCodebergCredentials ) then
+        begin
+          sError := 'Codeberg credentials not configured';
+          Exit;
+        end;
+      end;
+
+    rpGitHub:
+      begin
+        sTargetName := 'GitHub';
+
+        if ( not HasGitHubCredentials ) then
+        begin
+          sError := 'GitHub credentials not configured';
+          Exit;
+        end;
+      end;
+  end;
+
+  // Step 2: Create the repository on the target provider
+  sLog := sLog + Format( 'Creating %s repository "%s"...', [ sTargetName, sNewRepoName ] ) + sLineBreak;
+
+  case TargetProvider of
+    rpCodeberg:
+      if ( not CreateCodebergRepository( sNewRepoName, sDescription, lPrivate, sNewRemoteURL, sError ) ) then
+      begin
+        sLog := sLog + 'Failed: ' + sError + sLineBreak;
+        Exit;
+      end;
+
+    rpGitHub:
+      if ( not CreateGitHubRepository( sNewRepoName, sDescription, lPrivate, sNewRemoteURL, sError ) ) then
+      begin
+        sLog := sLog + 'Failed: ' + sError + sLineBreak;
+        Exit;
+      end;
+  end;
+
+  sLog := sLog + 'Created target repository: ' + sNewRemoteURL + sLineBreak;
+
+  // Step 3: Preserve the old origin under a provider-named alias, then swap
+  if lOriginExisted then
+  begin
+    case CurrentProvider of
+      rpCodeberg: sOldRemoteName := 'codeberg';
+      rpGitHub:   sOldRemoteName := 'github';
+    else
+      sOldRemoteName := 'old-origin';
+    end;
+
+    // Drop any stale remote using that alias (ignore failure — remote may not exist)
+    ExecuteGitCommand( sRepoPath, Format( 'remote remove %s', [ sOldRemoteName ] ), sOutput );
+
+    if ( not ExecuteGitCommand( sRepoPath, Format( 'remote rename origin %s', [ sOldRemoteName ] ), sOutput ) ) then
+    begin
+      sError := 'Failed to rename existing origin: ' + Trim( sOutput );
+      sLog := sLog + sError + sLineBreak;
+      Exit;
+    end;
+
+    sLog := sLog + Format( 'Preserved previous origin as "%s": %s', [ sOldRemoteName, sCurrentOrigin ] ) + sLineBreak;
+  end;
+
+  // Step 4: Point origin at the new remote
+  if ( not ExecuteGitCommand( sRepoPath, Format( 'remote add origin "%s"', [ sNewRemoteURL ] ), sOutput ) ) then
+  begin
+    sError := 'Failed to add new origin: ' + Trim( sOutput );
+    sLog := sLog + sError + sLineBreak;
+    Exit;
+  end;
+
+  sLog := sLog + 'Added new origin: ' + sNewRemoteURL + sLineBreak;
+
+  // Step 5: Push all branches (sets upstream tracking to the new origin)
+  if ( not ExecuteGitCommand( sRepoPath, 'push -u origin --all', sOutput ) ) then
+  begin
+    sError := 'Failed to push branches: ' + Trim( sOutput );
+    sLog := sLog + sError + sLineBreak;
+    Exit;
+  end;
+
+  sLog := sLog + 'Pushed all branches to new origin' + sLineBreak;
+
+  // Step 6: Push all tags — not fatal if it fails
+  if ExecuteGitCommand( sRepoPath, 'push origin --tags', sOutput ) then
+    sLog := sLog + 'Pushed all tags to new origin' + sLineBreak
+  else
+    sLog := sLog + 'Warning: tag push reported: ' + Trim( sOutput ) + sLineBreak;
+
+  // Update cached provider on the repo record
+  FRepos[ iIndex ].Provider := TargetProvider;
+
   Result := True;
 
 end;

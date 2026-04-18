@@ -337,6 +337,10 @@ object MainForm: TMainForm
         Caption = '&Initialize && Push to Codeberg...'
         OnClick = mnuInitPushCodebergClick
       end
+      object mnuMigrateToCodeberg: TMenuItem
+        Caption = '&Migrate Selected Repository to Codeberg...'
+        OnClick = mnuMigrateToCodebergClick
+      end
       object mnuCodebergSep1: TMenuItem
         Caption = '-'
       end
@@ -350,6 +354,10 @@ object MainForm: TMainForm
       object mnuInitPushGitHub: TMenuItem
         Caption = '&Initialize && Push to GitHub...'
         OnClick = mnuInitPushGitHubClick
+      end
+      object mnuMigrateToGitHub: TMenuItem
+        Caption = '&Migrate Selected Repository to GitHub...'
+        OnClick = mnuMigrateToGitHubClick
       end
       object mnuGitHubSep1: TMenuItem
         Caption = '-'

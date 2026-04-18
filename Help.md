@@ -401,6 +401,18 @@ git push
 | **Caveats** | Only works for GitHub and Codeberg repos. Requires valid credentials. Must have permission to modify settings |
 | **Linkages** | Uses stored credentials from respective Settings |
 
+### Migrate Between Codeberg and GitHub
+
+| Aspect | Details |
+|--------|---------|
+| **What** | Move a repository's remote from Codeberg to GitHub, or GitHub to Codeberg |
+| **Where** | Codeberg menu > Migrate Selected Repository to Codeberg... / GitHub menu > Migrate Selected Repository to GitHub... |
+| **When** | When you want to change which host a repository lives on — works in both directions |
+| **Why** | One-click migration instead of creating the remote, renaming, and re-pushing manually |
+| **How** | Select repo > choose destination menu > confirm name/description/visibility > confirm summary. The target repo is created; the previous origin is preserved locally as a `codeberg` / `github` secondary remote; `origin` is swapped; all branches (`git push -u origin --all`) and tags (`git push origin --tags`) are pushed |
+| **Caveats** | The old remote repository is NOT deleted — remove it manually via the web UI once you have verified the migration. Target host credentials must be configured first (settings dialog opens automatically if missing). An existing local remote named `codeberg` or `github` is removed first so the rename can proceed |
+| **Linkages** | Uses stored credentials from Codeberg/GitHub Settings. Provider column updates after migration |
+
 ---
 
 ## Status and Display

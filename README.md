@@ -13,6 +13,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **New Repository Initialisation** - Automatic project type detection with `.gitignore` generation for Delphi, C/C++, C#, Java, Python, JavaScript, TypeScript, Go, Rust, and HTML
 - **Codeberg Integration** - Create new Codeberg repositories and push directly from the application
 - **GitHub Integration** - Create new GitHub repositories and push directly from the application
+- **Migrate Between Hosts** - Move a repository's remote from Codeberg to GitHub (or back) via the Codeberg/GitHub menus. Creates the new repo on the target host, preserves the previous origin as a secondary remote for safety, swaps `origin`, and pushes all branches and tags
 - **Visibility Management** - Change repository visibility (public/private) via right-click context menu
 - **Parallel Status Refresh** - Repository status checks run in parallel on background threads, keeping the UI responsive
 - **Status Detection** - Automatically detects repository status:
@@ -269,6 +270,31 @@ GitBatchCommit can also initialize a local folder and push to GitHub.
 6. Confirm the operation
 
 The process is identical to Codeberg - the application initializes the repository, creates it on GitHub, and pushes the initial commit.
+
+### Migrating a Repository Between Codeberg and GitHub
+
+GitBatchCommit can move a repository's remote from one host to the other in a single operation. This works in both directions (Codeberg → GitHub and GitHub → Codeberg).
+
+**Steps:**
+
+1. Select the repository in the list
+2. Choose **Codeberg > Migrate Selected Repository to Codeberg...** or **GitHub > Migrate Selected Repository to GitHub...** depending on the destination
+3. Confirm/adjust the target repository name, description, and visibility in the dialog
+4. Review the confirmation summary and click **Yes**
+
+**What happens:**
+
+- The target repository is created on the destination host using your configured credentials
+- The existing `origin` remote is renamed to a provider-named alias (`codeberg` or `github`) so the old URL is preserved locally and can be restored if needed
+- `origin` is repointed to the new host
+- `git push -u origin --all` pushes every branch to the new host and sets upstream tracking
+- `git push origin --tags` pushes every tag
+
+**Important:**
+
+- The old remote repository is **not** deleted. Once you have confirmed the migration succeeded, remove it manually via the web interface on the source host.
+- Target-host credentials must be configured first (File > Settings for Codeberg/GitHub). If missing, the settings dialog opens automatically.
+- If a remote named `codeberg` or `github` already exists locally, it is removed first so the rename can proceed.
 
 ### Changing Repository Visibility
 

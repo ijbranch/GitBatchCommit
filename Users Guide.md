@@ -169,11 +169,17 @@ For complex merges requiring manual review, use an external Git client instead.
 
 - **Codeberg > Settings** — enter your username and API token (generate at codeberg.org/user/settings/applications)
 - **Codeberg > Initialize & Push** — creates a new Codeberg repo and pushes your local code to it
+- **Codeberg > Migrate Selected Repository to Codeberg** — moves the selected repository from GitHub (or another host) onto Codeberg
 
 ### GitHub
 
 - **GitHub > Settings** — enter your username and personal access token (generate at github.com/settings/tokens, needs `repo` scope)
 - **GitHub > Initialize & Push** — creates a new GitHub repo and pushes your local code to it
+- **GitHub > Migrate Selected Repository to GitHub** — moves the selected repository from Codeberg (or another host) onto GitHub
+
+### Migrating Between Hosts
+
+Select a repository, then pick **Migrate Selected Repository to Codeberg** (under the Codeberg menu) or **Migrate Selected Repository to GitHub** (under the GitHub menu). The target repo is created, `origin` is repointed to it, and all branches and tags are pushed. The previous origin URL is kept as a secondary remote (named `codeberg` or `github`) so it can be restored. The old remote repository is not deleted — remove it via the web UI once you are satisfied with the migration.
 
 ### Changing Visibility
 

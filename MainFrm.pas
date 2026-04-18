@@ -98,10 +98,12 @@ type
     mnuExit: TMenuItem;
     mnuCodeberg: TMenuItem;
     mnuInitPushCodeberg: TMenuItem;
+    mnuMigrateToCodeberg: TMenuItem;
     mnuCodebergSep1: TMenuItem;
     mnuCodebergSettings: TMenuItem;
     mnuGitHub: TMenuItem;
     mnuInitPushGitHub: TMenuItem;
+    mnuMigrateToGitHub: TMenuItem;
     mnuGitHubSep1: TMenuItem;
     mnuGitHubSettings: TMenuItem;
     mnuView: TMenuItem;
@@ -161,6 +163,8 @@ type
     procedure mnuCodebergSettingsClick( Sender: TObject );
     procedure mnuInitPushGitHubClick( Sender: TObject );
     procedure mnuGitHubSettingsClick( Sender: TObject );
+    procedure mnuMigrateToCodebergClick( Sender: TObject );
+    procedure mnuMigrateToGitHubClick( Sender: TObject );
     procedure mnuFilterClick( Sender: TObject );
     procedure pmSetPublicClick( Sender: TObject );
     procedure pmSetPrivateClick( Sender: TObject );
@@ -336,6 +340,11 @@ type
     ///   Handles form-level key events for keyboard shortcuts.
     /// </summary>
     procedure FormKeyDown( Sender: TObject; var Key: Word; Shift: TShiftState );
+
+    /// <summary>
+    ///   Migrates the currently selected repository's remote to the given provider.
+    /// </summary>
+    procedure MigrateSelectedTo( const TargetProvider: TRemoteProvider );
   public
   end;
 
@@ -1611,6 +1620,173 @@ begin
   finally
     Screen.Cursor := crDefault;
   end;
+
+end;
+
+/// <summary>
+///   Migrates the currently selected repository's remote to the specified provider.
+///   Prompts the user for target-side repo name / description / visibility, then
+///   creates the target repo, renames the old origin to its provider name, swaps
+///   in the new origin and pushes all branches and tags.
+/// </summary>
+procedure TMainForm.MigrateSelectedTo( const TargetProvider: TRemoteProvider );
+var
+  iIndex            : Integer;
+  Repo              : TRepoInfo;
+  sTargetName       : string;
+  sSourceName       : string;
+  sHost             : string;
+  lTargetHasCreds   : Boolean;
+  sRepoName         : string;
+  sDescription      : string;
+  lPrivate          : Boolean;
+  sNewRemoteURL     : string;
+  sError            : string;
+  sLog              : string;
+begin
+
+  if lvRepos.Selected = nil then
+  begin
+    MessageDlg( 'Please select a repository to migrate.', mtInformation, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  iIndex := Integer( lvRepos.Selected.Data );
+
+  if ( iIndex < 0 ) or ( iIndex > High( FRepoManager.Repos ) ) then
+    Exit;
+
+  Repo := FRepoManager.Repos[ iIndex ];
+
+  case TargetProvider of
+    rpCodeberg:
+      begin
+        sTargetName := 'Codeberg';
+        sHost := 'codeberg.org';
+        lTargetHasCreds := FRepoManager.HasCodebergCredentials;
+      end;
+
+    rpGitHub:
+      begin
+        sTargetName := 'GitHub';
+        sHost := 'github.com';
+        lTargetHasCreds := FRepoManager.HasGitHubCredentials;
+      end;
+  else
+    Exit;
+  end;
+
+  // Prompt for credentials if not yet configured
+  if ( not lTargetHasCreds ) then
+  begin
+    MessageDlg( 'Please configure ' + sTargetName + ' credentials first.', mtWarning, [ mbOK ], 0 );
+
+    if TargetProvider = rpCodeberg then
+      mnuCodebergSettingsClick( nil )
+    else
+      mnuGitHubSettingsClick( nil );
+
+    if TargetProvider = rpCodeberg then
+      lTargetHasCreds := FRepoManager.HasCodebergCredentials
+    else
+      lTargetHasCreds := FRepoManager.HasGitHubCredentials;
+
+    if ( not lTargetHasCreds ) then
+      Exit;
+  end;
+
+  case Repo.Provider of
+    rpCodeberg: sSourceName := 'Codeberg';
+    rpGitHub:   sSourceName := 'GitHub';
+    rpOther:    sSourceName := 'a third-party host';
+    rpNone:     sSourceName := '(no remote)';
+  else
+    sSourceName := 'unknown';
+  end;
+
+  if Repo.Provider = TargetProvider then
+  begin
+    MessageDlg( Format( 'Repository "%s" is already hosted on %s.',
+      [ Repo.Name, sTargetName ] ), mtInformation, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  // Collect details for the new repository (reuse Codeberg dialog — fields match)
+  sRepoName := Repo.Name;
+  sDescription := '';
+  lPrivate := False;
+
+  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate ) ) then
+    Exit;
+
+  if MessageDlg( Format(
+    'Migrate repository "%s" from %s to %s?%s%s' +
+    'This will:%s' +
+    '1. Create %s repository "%s" on %s%s' +
+    '2. Preserve the existing origin as a secondary remote%s' +
+    '3. Repoint origin to the new %s URL%s' +
+    '4. Push all branches and tags to %s%s%s' +
+    'The old remote repository is NOT deleted — remove it manually after verifying the migration.',
+    [ Repo.Name, sSourceName, sTargetName, sLineBreak, sLineBreak,
+      sLineBreak,
+      IfThen( lPrivate, 'private', 'public' ), sRepoName, sTargetName, sLineBreak,
+      sLineBreak,
+      sTargetName, sLineBreak,
+      sTargetName, sLineBreak, sLineBreak ] ),
+    mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
+    Exit;
+
+  Screen.Cursor := crHourGlass;
+
+  try
+    Log( Format( '=== Migrating %s from %s to %s ===', [ Repo.Name, sSourceName, sTargetName ] ) );
+
+    if FRepoManager.MigrateRepository( iIndex, TargetProvider, sRepoName, sDescription, lPrivate,
+      sNewRemoteURL, sError, sLog ) then
+    begin
+      Log( sLog );
+      Log( '=== Migration Complete ===' );
+      Log( 'New URL: https://' + sHost + '/' +
+        IfThen( TargetProvider = rpCodeberg, FRepoManager.CodebergUsername, FRepoManager.GitHubUsername ) +
+        '/' + sRepoName );
+
+      FRepoManager.RefreshStatus( iIndex );
+      PopulateListView;
+
+      MessageDlg( Format( 'Repository migrated to %s successfully.%s%sNew URL: %s%s%s' +
+        'The old remote still exists on %s — delete it via the web interface once you are satisfied.',
+        [ sTargetName, sLineBreak, sLineBreak, sNewRemoteURL, sLineBreak, sLineBreak, sSourceName ] ),
+        mtInformation, [ mbOK ], 0 );
+    end
+    else
+    begin
+      Log( sLog );
+      Log( 'Error: ' + sError );
+      MessageDlg( 'Migration failed: ' + sError, mtError, [ mbOK ], 0 );
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+
+end;
+
+/// <summary>
+///   Handles the Codeberg > Migrate Selected Repository menu click.
+/// </summary>
+procedure TMainForm.mnuMigrateToCodebergClick( Sender: TObject );
+begin
+
+  MigrateSelectedTo( rpCodeberg );
+
+end;
+
+/// <summary>
+///   Handles the GitHub > Migrate Selected Repository menu click.
+/// </summary>
+procedure TMainForm.mnuMigrateToGitHubClick( Sender: TObject );
+begin
+
+  MigrateSelectedTo( rpGitHub );
 
 end;
 

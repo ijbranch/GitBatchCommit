@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Migrate Selected Repository to Codeberg / GitHub — moves a repository's remote between the two hosts (and back again) in a single operation. Creates the target repo, preserves the previous origin as a provider-named secondary remote (`codeberg` / `github`), swaps `origin`, and pushes all branches and tags. **Why:** avoids the manual sequence of creating the remote, renaming remotes by hand, and running `git push --all` / `--tags` separately (2026-04-18) — `uGitRepoManager.pas`, `MainFrm.pas`, `MainFrm.dfm`
 - Drag-and-drop initialisation: dropping a non-git folder offers to initialise it, create a remote repo (Codeberg or GitHub), and push — all in one step (2026-04-02) — `MainFrm.pas`
 - Project type selection when initialising new repos; generates appropriate `.gitignore` for Delphi, C/C++, C#, Java, Python, JavaScript, TypeScript, Go, Rust, or HTML (2026-04-02) — `MainFrm.pas`, `uCodebergDialog.pas`, `uCodebergDialog.dfm`
 - Ctrl+Enter keyboard shortcut for Commit & Push (2026-04-02) — `MainFrm.pas`
