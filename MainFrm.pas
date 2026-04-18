@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.5.0
+  Version: 1.6.0
 
   Part of GitBatchCommit Application
 
@@ -345,6 +345,12 @@ type
     ///   Migrates the currently selected repository's remote to the given provider.
     /// </summary>
     procedure MigrateSelectedTo( const TargetProvider: TRemoteProvider );
+
+    /// <summary>
+    ///   Updates main-menu items whose enabled state depends on whether a
+    ///   repository is currently selected in the list view.
+    /// </summary>
+    procedure UpdateMenuSelectionState;
   public
   end;
 
@@ -648,6 +654,8 @@ begin
     // Always update last clicked index (only when not shift-clicking)
     FLastClickedIndex := iCurrentIndex;
   end;
+
+  UpdateMenuSelectionState;
 
 end;
 
@@ -960,6 +968,7 @@ begin
     end;
 
     UpdateCommitButtonState;
+    UpdateMenuSelectionState;
   finally
     FUpdatingList := False;
   end;
@@ -1635,14 +1644,10 @@ var
   Repo              : TRepoInfo;
   sTargetName       : string;
   sSourceName       : string;
-  sHost             : string;
   lTargetHasCreds   : Boolean;
   sRepoName         : string;
   sDescription      : string;
   lPrivate          : Boolean;
-  sNewRemoteURL     : string;
-  sError            : string;
-  sLog              : string;
 begin
 
   if lvRepos.Selected = nil then
@@ -1662,14 +1667,12 @@ begin
     rpCodeberg:
       begin
         sTargetName := 'Codeberg';
-        sHost := 'codeberg.org';
         lTargetHasCreds := FRepoManager.HasCodebergCredentials;
       end;
 
     rpGitHub:
       begin
         sTargetName := 'GitHub';
-        sHost := 'github.com';
         lTargetHasCreds := FRepoManager.HasGitHubCredentials;
       end;
   else
@@ -1737,36 +1740,52 @@ begin
     Exit;
 
   Screen.Cursor := crHourGlass;
+  Log( Format( '=== Migrating %s from %s to %s ===', [ Repo.Name, sSourceName, sTargetName ] ) );
 
-  try
-    Log( Format( '=== Migrating %s from %s to %s ===', [ Repo.Name, sSourceName, sTargetName ] ) );
-
-    if FRepoManager.MigrateRepository( iIndex, TargetProvider, sRepoName, sDescription, lPrivate,
-      sNewRemoteURL, sError, sLog ) then
+  // Run the long-running network + push work off the UI thread so the app
+  // stays responsive. Final UI updates are queued back to the main thread.
+  TThread.CreateAnonymousThread(
+    procedure
+    var
+      lThreadOK         : Boolean;
+      sThreadURL        : string;
+      sThreadError      : string;
+      sThreadLog        : string;
     begin
-      Log( sLog );
-      Log( '=== Migration Complete ===' );
-      Log( 'New URL: https://' + sHost + '/' +
-        IfThen( TargetProvider = rpCodeberg, FRepoManager.CodebergUsername, FRepoManager.GitHubUsername ) +
-        '/' + sRepoName );
 
-      FRepoManager.RefreshStatus( iIndex );
-      PopulateListView;
+      lThreadOK := FRepoManager.MigrateRepository( iIndex, TargetProvider,
+        sRepoName, sDescription, lPrivate, sThreadURL, sThreadError, sThreadLog );
 
-      MessageDlg( Format( 'Repository migrated to %s successfully.%s%sNew URL: %s%s%s' +
-        'The old remote still exists on %s — delete it via the web interface once you are satisfied.',
-        [ sTargetName, sLineBreak, sLineBreak, sNewRemoteURL, sLineBreak, sLineBreak, sSourceName ] ),
-        mtInformation, [ mbOK ], 0 );
-    end
-    else
-    begin
-      Log( sLog );
-      Log( 'Error: ' + sError );
-      MessageDlg( 'Migration failed: ' + sError, mtError, [ mbOK ], 0 );
-    end;
-  finally
-    Screen.Cursor := crDefault;
-  end;
+      TThread.Queue( nil,
+        procedure
+        begin
+
+          Screen.Cursor := crDefault;
+
+          if lThreadOK then
+          begin
+            Log( sThreadLog );
+            Log( '=== Migration Complete ===' );
+            Log( 'New URL: ' + sThreadURL );
+
+            FRepoManager.RefreshStatus( iIndex );
+            PopulateListView;
+
+            MessageDlg( Format( 'Repository migrated to %s successfully.%s%sNew URL: %s%s%s' +
+              'The old remote still exists on %s — delete it via the web interface once you are satisfied.',
+              [ sTargetName, sLineBreak, sLineBreak, sThreadURL, sLineBreak, sLineBreak, sSourceName ] ),
+              mtInformation, [ mbOK ], 0 );
+          end
+          else
+          begin
+            Log( sThreadLog );
+            Log( 'Error: ' + sThreadError );
+            MessageDlg( 'Migration failed: ' + sThreadError, mtError, [ mbOK ], 0 );
+          end;
+
+        end );
+
+    end ).Start;
 
 end;
 
@@ -1917,16 +1936,38 @@ end;
 /// <summary>
 ///   Handles the popup menu opening to enable/disable items.
 /// </summary>
+procedure TMainForm.UpdateMenuSelectionState;
+var
+  lHasSelection     : Boolean;
+begin
+
+  lHasSelection := ( lvRepos.Selected <> nil );
+
+  mnuRemoveSelected.Enabled := lHasSelection;
+  mnuMigrateToCodeberg.Enabled := lHasSelection;
+  mnuMigrateToGitHub.Enabled := lHasSelection;
+
+end;
+
 procedure TMainForm.pmReposPopup( Sender: TObject );
 var
   Groups            : TArray<string>;
   MenuItem          : TMenuItem;
   SubMenu           : TMenuItem;
+  lHasSelection     : Boolean;
 begin
 
-  // Enable .gitignore options only when a single repository is selected
-  pmEditGitignore.Enabled := ( lvRepos.Selected <> nil );
-  pmFixGitignore.Enabled := ( lvRepos.Selected <> nil );
+  lHasSelection := ( lvRepos.Selected <> nil );
+
+  // Enable per-repo items only when a single repository is selected
+  pmEditGitignore.Enabled := lHasSelection;
+  pmFixGitignore.Enabled := lHasSelection;
+  pmSetPublic.Enabled := lHasSelection;
+  pmSetPrivate.Enabled := lHasSelection;
+  pmOpenInExplorer.Enabled := lHasSelection;
+  pmOpenInGitClient.Enabled := lHasSelection;
+  pmPull.Enabled := lHasSelection;
+  pmSetGroup.Enabled := lHasSelection;
 
   // Build the Set Group submenu
   pmSetGroup.Clear;
@@ -2180,8 +2221,6 @@ end;
 ///   Handles the Help > About menu click.
 /// </summary>
 procedure TMainForm.mnuAboutClick( Sender: TObject );
-const
-  APP_VERSION       = '1.5.0';
 begin
 
   MessageDlg(
@@ -2460,6 +2499,16 @@ begin
   begin
     if InputQuery( 'Settings', 'File Pattern (e.g., *.pas or empty for all):', sFilePattern ) then
     begin
+      // Reject shell metacharacters — the pattern is passed to git via cmd.exe,
+      // so anything outside a glob whitelist could inject commands.
+      if ( not TGitRepoManager.IsSafeFilePattern( sFilePattern ) ) then
+      begin
+        MessageDlg( 'File pattern contains characters that are not allowed.' + sLineBreak + sLineBreak +
+          'Use only letters, digits, glob characters ( * ? [ ] ), dots, dashes, underscores, slashes, commas, and spaces.',
+          mtError, [ mbOK ], 0 );
+        Exit;
+      end;
+
       // Ask if user wants to configure delphi-indexer path
       if MessageDlg( 'Configure delphi-indexer.exe path?' + sLineBreak + sLineBreak +
         'Current: ' + IfThen( sIndexerPath.IsEmpty, '(Auto-detect)', sIndexerPath ),

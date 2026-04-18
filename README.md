@@ -39,7 +39,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Colour-Coded Status** - Repository rows are colour-coded by status (green=Clean, yellow=Modified, orange=Pull Required, red=Error)
 - **Open in Git Client** - Right-click to open repository in configured external Git client (e.g., Fork)
 - **Open in Explorer** - Right-click to open repository folder in Windows Explorer
-- **Pull Operation** - Right-click to pull changes from remote for a single repository
+- **Pull Operation** - Right-click to pull changes from remote for a single repository (fast-forward only — refuses to create a merge commit on diverged history)
 - **Commit Message History** - Click the dropdown button next to the commit message to select from recent messages (up to 20 stored)
 - **Commit Message Templates** - Define reusable commit message templates via File > Templates; select from the templates dropdown (▽) next to the commit message
 - **Commit Details** - Click the "..." button to add a detailed description below the summary line (standard Git commit format)
@@ -331,7 +331,7 @@ To quickly check or uncheck multiple consecutive repositories:
 Select **File > Settings** to configure:
 
 - **Git Client Path** - Full path to your external Git client executable (e.g., `C:\Program Files\Fork\Fork.exe`)
-- **File Pattern** - Optional pattern for staging files (e.g., `*.pas`). Leave empty to stage all files.
+- **File Pattern** - Optional pattern for staging files (e.g., `*.pas`). Leave empty to stage all files. Shell metacharacters are rejected for safety.
 - **delphi-indexer.exe Path** - Optional path to delphi-indexer.exe for automatic symbol reindexing after commits (auto-detected if not configured)
 
 These settings are saved to the configuration file and persist between sessions.

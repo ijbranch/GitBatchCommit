@@ -62,6 +62,12 @@ uses
 
 const
   /// <summary>
+  ///   Canonical application version. Update here and only here; surface
+  ///   everywhere else ( About dialog, User-Agent header, docs ) by referencing.
+  /// </summary>
+  APP_VERSION         = '1.6.0';
+
+  /// <summary>
   ///   Default timeout for Git operations in milliseconds (60 seconds).
   /// </summary>
   GIT_COMMAND_TIMEOUT = 60000;
@@ -127,6 +133,9 @@ type
     FDelphiIndexerPath: string;
     FCommitHistory: TArray<string>;
     FCommitTemplates: TArray<string>;
+    FReposLock: TCriticalSection;
+    FVersionCache: TDictionary<string, string>;
+    FVersionCacheStamp: TDictionary<string, TDateTime>;
     const
       MAX_HISTORY_ITEMS = 20;
 
@@ -252,6 +261,35 @@ type
     /// <param name="sPorcelainOutput">Output from 'git status --porcelain'.</param>
     /// <returns>True if all changed files are build artifacts.</returns>
     function AllChangesAreBuildArtifacts( const sPorcelainOutput: string ): Boolean;
+
+    /// <summary>
+    ///   Returns the current branch of a repository ( e.g. "main", "master" ),
+    ///   or empty string if the repo has no commits yet / is not a repo.
+    /// </summary>
+    function GetCurrentBranch( const sRepoPath: string ): string;
+
+    /// <summary>
+    ///   Returns True if the repository has at least one commit ( HEAD resolves ).
+    /// </summary>
+    function HasAnyCommit( const sRepoPath: string ): Boolean;
+
+    /// <summary>
+    ///   Returns True if the working tree is clean ( git status --porcelain is empty ).
+    /// </summary>
+    function IsWorkingTreeClean( const sRepoPath: string ): Boolean;
+
+    /// <summary>
+    ///   Configures a TNetHTTPClient with User-Agent and timeouts.
+    /// </summary>
+    procedure ConfigureHttpClient( const AClient: TNetHTTPClient );
+
+    /// <summary>
+    ///   Creates a repository on the given provider ( rpCodeberg or rpGitHub ).
+    ///   Body is built with TJSONObject so name/description are safely escaped.
+    /// </summary>
+    function CreateRemoteRepository( const Provider: TRemoteProvider;
+      const sName, sDescription: string; const lPrivate: Boolean;
+      out sRemoteURL, sError: string ): Boolean;
   public
     constructor Create;
     destructor Destroy; override;
@@ -487,6 +525,22 @@ type
     /// </summary>
     procedure RefreshAllStatusParallel;
 
+    /// <summary>
+    ///   Returns True if sPattern is a safe file-add pattern ( no shell metacharacters ).
+    ///   Accepts comma- or space-separated globs like "*.pas" or "src/*.pas docs/*.md".
+    /// </summary>
+    class function IsSafeFilePattern( const sPattern: string ): Boolean; static;
+
+    /// <summary>
+    ///   Returns a snapshot count of the repos array under the repos lock.
+    /// </summary>
+    function ReposCount: Integer;
+
+    /// <summary>
+    ///   Returns a snapshot copy of a repo by index, or a default TRepoInfo if out of range.
+    /// </summary>
+    function GetRepoSnapshot( const iIndex: Integer; out ARepo: TRepoInfo ): Boolean;
+
     property Repos: TRepoInfoArray read FRepos;
     property ConfigPath: string read FConfigPath;
     property CodebergUsername: string read FCodebergUsername write FCodebergUsername;
@@ -546,6 +600,9 @@ begin
 
   inherited Create;
   FConfigPath := GetConfigFilePath;
+  FReposLock := TCriticalSection.Create;
+  FVersionCache := TDictionary<string, string>.Create;
+  FVersionCacheStamp := TDictionary<string, TDateTime>.Create;
   SetLength( FRepos, 0 );
 
 end;
@@ -554,7 +611,122 @@ destructor TGitRepoManager.Destroy;
 begin
 
   SetLength( FRepos, 0 );
+  FVersionCacheStamp.Free;
+  FVersionCache.Free;
+  FReposLock.Free;
   inherited;
+
+end;
+
+class function TGitRepoManager.IsSafeFilePattern( const sPattern: string ): Boolean;
+var
+  sTrim             : string;
+  Ch                : Char;
+begin
+
+  sTrim := Trim( sPattern );
+
+  if sTrim.IsEmpty then
+    Exit( True );
+
+  // Disallow any shell metacharacter or control character. Globs (* ? [ ] . _ - / \),
+  // digits, letters, and separators (space, comma, semicolon-as-separator) are fine.
+  for Ch in sTrim do
+  begin
+    case Ch of
+      'A'..'Z', 'a'..'z', '0'..'9',
+      '*', '?', '[', ']', '.', '-', '_', '/', '\', ' ', ',', ':':
+        ; // allowed
+    else
+      Exit( False );
+    end;
+  end;
+
+  Result := True;
+
+end;
+
+function TGitRepoManager.ReposCount: Integer;
+begin
+
+  FReposLock.Enter;
+
+  try
+    Result := Length( FRepos );
+  finally
+    FReposLock.Leave;
+  end;
+
+end;
+
+function TGitRepoManager.GetRepoSnapshot( const iIndex: Integer; out ARepo: TRepoInfo ): Boolean;
+begin
+
+  FReposLock.Enter;
+
+  try
+    if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
+      Exit( False );
+
+    ARepo := FRepos[ iIndex ];
+    Result := True;
+  finally
+    FReposLock.Leave;
+  end;
+
+end;
+
+function TGitRepoManager.GetCurrentBranch( const sRepoPath: string ): string;
+var
+  sOutput           : string;
+begin
+
+  Result := '';
+
+  if ExecuteGitCommand( sRepoPath, 'rev-parse --abbrev-ref HEAD', sOutput ) then
+  begin
+    Result := Trim( sOutput );
+
+    // "HEAD" means detached — no usable branch
+    if SameText( Result, 'HEAD' ) then
+      Result := '';
+  end;
+
+  // Fall back to symbolic-ref for a fresh repo (no commits yet)
+  if Result.IsEmpty then
+  begin
+    if ExecuteGitCommand( sRepoPath, 'symbolic-ref --short HEAD', sOutput ) then
+      Result := Trim( sOutput );
+  end;
+
+end;
+
+function TGitRepoManager.HasAnyCommit( const sRepoPath: string ): Boolean;
+var
+  sOutput           : string;
+begin
+
+  Result := ExecuteGitCommand( sRepoPath, 'rev-parse --verify HEAD', sOutput );
+
+end;
+
+function TGitRepoManager.IsWorkingTreeClean( const sRepoPath: string ): Boolean;
+var
+  sOutput           : string;
+begin
+
+  Result := ExecuteGitCommand( sRepoPath, 'status --porcelain', sOutput ) and
+    Trim( sOutput ).IsEmpty;
+
+end;
+
+procedure TGitRepoManager.ConfigureHttpClient( const AClient: TNetHTTPClient );
+begin
+
+  AClient.ContentType := 'application/json';
+  AClient.UserAgent := Format( 'GitBatchCommit/%s (+https://codeberg.org/GITLAK/GitBatchCommit)', [ APP_VERSION ] );
+  AClient.ConnectionTimeout := 15000;
+  AClient.ResponseTimeout := 30000;
 
 end;
 
@@ -619,7 +791,10 @@ begin
 
     ZeroMemory( @ProcessInfo, SizeOf( TProcessInformation ) );
 
-    sFullCommand := Format( 'cmd.exe /c cd /d "%s" && git %s', [ sRepoPath, sCommand ] );
+    // Invoke git.exe directly via lpCommandLine, and set the working directory
+    // via lpCurrentDirectory — avoids routing through cmd.exe, which means
+    // shell metacharacters in sCommand or sRepoPath cannot be interpreted.
+    sFullCommand := 'git ' + sCommand;
 
     lSuccess := CreateProcess(
       nil,
@@ -629,7 +804,7 @@ begin
       True,
       CREATE_NO_WINDOW,
       nil,
-      nil,
+      PChar( sRepoPath ),               // lpCurrentDirectory — no cmd.exe needed
       StartupInfo,
       ProcessInfo
       );
@@ -892,6 +1067,11 @@ begin
       FFilePattern := JSONRoot.GetValue<string>( 'file_pattern', '' );
       FDelphiIndexerPath := JSONRoot.GetValue<string>( 'delphi_indexer_path', '' );
 
+      // Drop any file pattern that contains shell metacharacters — config
+      // files can be hand-edited, so never trust them blindly.
+      if ( not IsSafeFilePattern( FFilePattern ) ) then
+        FFilePattern := '';
+
       // Load commit history
       if JSONRoot.GetValue( 'commit_history' ) is TJSONArray then
       begin
@@ -1027,7 +1207,12 @@ begin
       Result := True;
     except
       on E: Exception do
-        ;                               // Silently fail, Result remains False
+      begin
+        // A read-only filesystem, locked file, or missing directory makes config
+        // unsaveable — surface that to the debugger so the user can find out why.
+        OutputDebugString( PChar( Format( 'GitBatchCommit: SaveConfig failed for "%s": %s',
+          [ FConfigPath, E.Message ] ) ) );
+      end;
     end;
   finally
     JSONRoot.Free;
@@ -1040,27 +1225,33 @@ var
   iLen              : Integer;
 begin
 
-  // Check if already exists
-  for var i := 0 to High( FRepos ) do
-  begin
-    if SameText( FRepos[ i ].Path, sPath ) then
-      Exit;
+  FReposLock.Enter;
+
+  try
+    // Check if already exists
+    for var i := 0 to High( FRepos ) do
+    begin
+      if SameText( FRepos[ i ].Path, sPath ) then
+        Exit;
+    end;
+
+    iLen := Length( FRepos );
+    SetLength( FRepos, iLen + 1 );
+
+    FRepos[ iLen ].Path := sPath;
+    FRepos[ iLen ].Name := ExtractFileName( ExcludeTrailingPathDelimiter( sPath ) );
+    FRepos[ iLen ].Branch := '';
+    FRepos[ iLen ].Status := rsUnknown;
+    FRepos[ iLen ].StatusText := '';
+    FRepos[ iLen ].Selected := False;
+    FRepos[ iLen ].TrackedFileCount := 0;
+    FRepos[ iLen ].ModifiedFileCount := 0;
+    FRepos[ iLen ].Provider := rpNone;
+    FRepos[ iLen ].Group := '';
+    FRepos[ iLen ].Version := '';
+  finally
+    FReposLock.Leave;
   end;
-
-  iLen := Length( FRepos );
-  SetLength( FRepos, iLen + 1 );
-
-  FRepos[ iLen ].Path := sPath;
-  FRepos[ iLen ].Name := ExtractFileName( ExcludeTrailingPathDelimiter( sPath ) );
-  FRepos[ iLen ].Branch := '';
-  FRepos[ iLen ].Status := rsUnknown;
-  FRepos[ iLen ].StatusText := '';
-  FRepos[ iLen ].Selected := False;
-  FRepos[ iLen ].TrackedFileCount := 0;
-  FRepos[ iLen ].ModifiedFileCount := 0;
-  FRepos[ iLen ].Provider := rpNone;
-  FRepos[ iLen ].Group := '';
-  FRepos[ iLen ].Version := '';
 
   RefreshStatus( iLen );
   SaveConfig;
@@ -1070,13 +1261,20 @@ end;
 procedure TGitRepoManager.RemoveRepository( const iIndex: Integer );
 begin
 
-  if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
-    Exit;
+  FReposLock.Enter;
 
-  for var i := iIndex to High( FRepos ) - 1 do
-    FRepos[ i ] := FRepos[ i + 1 ];
+  try
+    if ( iIndex < 0 ) or ( iIndex > High( FRepos ) ) then
+      Exit;
 
-  SetLength( FRepos, Length( FRepos ) - 1 );
+    for var i := iIndex to High( FRepos ) - 1 do
+      FRepos[ i ] := FRepos[ i + 1 ];
+
+    SetLength( FRepos, Length( FRepos ) - 1 );
+  finally
+    FReposLock.Leave;
+  end;
+
   SaveConfig;
 
 end;
@@ -1189,6 +1387,15 @@ begin
   end
   else
   begin
+    // Refuse to execute a file pattern that contains shell metacharacters.
+    // Belt-and-braces: the settings dialog already validates, but config files
+    // can be hand-edited, so we re-check here.
+    if ( not IsSafeFilePattern( FFilePattern ) ) then
+    begin
+      sLog := sLog + 'Refused to stage — file pattern contains unsafe characters: ' + FFilePattern + sLineBreak;
+      Exit;
+    end;
+
     if ( not ExecuteGitCommand( FRepos[ iIndex ].Path, 'add ' + FFilePattern, sOutput ) ) then
     begin
       sLog := sLog + 'Failed to stage changes: ' + Trim( sOutput ) + sLineBreak;
@@ -1297,7 +1504,7 @@ begin
   RequestStream := TStringStream.Create( sBody, TEncoding.UTF8 );
 
   try
-    HttpClient.ContentType := 'application/json';
+    ConfigureHttpClient( HttpClient );
 
     try
       if SameText( sVerb, 'POST' ) then
@@ -1469,10 +1676,16 @@ var
   VersionParts      : TArray<string>;
   BestParts         : TArray<string>;
   lIsBetter         : Boolean;
+  sKey              : string;
+  CachedStamp       : TDateTime;
+  CachedVersion     : string;
+  NewestDprojWrite  : TDateTime;
+  dt                : TDateTime;
 begin
 
   Result := '';
   sBestVersion := '';
+  sKey := sRepoPath.ToLower;
 
   // Find .dproj files in repository and subdirectories
   try
@@ -1483,6 +1696,34 @@ begin
 
   if Length( DprojFiles ) = 0 then
     Exit;
+
+  // Cache hit: if every .dproj's mtime is <= the stamp we recorded last time,
+  // nothing has changed, so return the cached version. Touching any .dproj
+  // invalidates the cache for that path.
+  NewestDprojWrite := 0;
+
+  for sDprojPath in DprojFiles do
+  begin
+    try
+      dt := TFile.GetLastWriteTime( sDprojPath );
+    except
+      dt := 0;
+    end;
+
+    if dt > NewestDprojWrite then
+      NewestDprojWrite := dt;
+  end;
+
+  FReposLock.Enter;
+
+  try
+    if FVersionCacheStamp.TryGetValue( sKey, CachedStamp ) and
+       ( CachedStamp >= NewestDprojWrite ) and
+       FVersionCache.TryGetValue( sKey, CachedVersion ) then
+      Exit( CachedVersion );
+  finally
+    FReposLock.Leave;
+  end;
 
   // Process each .dproj file found
   for sDprojPath in DprojFiles do
@@ -1556,6 +1797,17 @@ begin
   end;
 
   Result := sBestVersion;
+
+  // Remember this result, keyed by path, stamped with the newest .dproj mtime
+  // we just saw. Next call can skip the scan unless a .dproj gets touched.
+  FReposLock.Enter;
+
+  try
+    FVersionCache.AddOrSetValue( sKey, sBestVersion );
+    FVersionCacheStamp.AddOrSetValue( sKey, NewestDprojWrite );
+  finally
+    FReposLock.Leave;
+  end;
 
 end;
 
@@ -1710,7 +1962,15 @@ begin
     Exit;
   end;
 
-  sRequestBody := Format( '{"private": %s}', [ IfThen( lPrivate, 'true', 'false' ) ] );
+  // Build JSON via TJSONObject so values are safely escaped.
+  var JSONBody: TJSONObject := TJSONObject.Create;
+
+  try
+    JSONBody.AddPair( 'private', TJSONBool.Create( lPrivate ) );
+    sRequestBody := JSONBody.ToJSON;
+  finally
+    JSONBody.Free;
+  end;
 
   case Provider of
     rpCodeberg:
@@ -1771,72 +2031,117 @@ end;
 
 function TGitRepoManager.CreateGitHubRepository( const sName, sDescription: string; const lPrivate: Boolean;
   out sRemoteURL, sError: string ): Boolean;
+begin
+
+  Result := CreateRemoteRepository( rpGitHub, sName, sDescription, lPrivate, sRemoteURL, sError );
+
+end;
+
+function TGitRepoManager.CreateRemoteRepository( const Provider: TRemoteProvider;
+  const sName, sDescription: string; const lPrivate: Boolean;
+  out sRemoteURL, sError: string ): Boolean;
 var
+  JSONBody          : TJSONObject;
   sRequestBody      : string;
   sResponse         : string;
   iStatusCode       : Integer;
   JSONResponse      : TJSONObject;
+  sHost             : string;
+  sUser             : string;
+  sProviderName     : string;
+  lOK               : Boolean;
+  iConflictCode     : Integer;
 begin
 
   Result := False;
   sRemoteURL := '';
   sError := '';
 
-  if ( not HasGitHubCredentials ) then
-  begin
-    sError := 'GitHub credentials not configured';
+  case Provider of
+    rpCodeberg:
+      begin
+        sProviderName := 'Codeberg';
+        sHost := 'codeberg.org';
+        sUser := FCodebergUsername;
+        iConflictCode := 409;
+
+        if ( not HasCodebergCredentials ) then
+        begin
+          sError := 'Codeberg credentials not configured';
+          Exit;
+        end;
+      end;
+
+    rpGitHub:
+      begin
+        sProviderName := 'GitHub';
+        sHost := 'github.com';
+        sUser := FGitHubUsername;
+        iConflictCode := 422;
+
+        if ( not HasGitHubCredentials ) then
+        begin
+          sError := 'GitHub credentials not configured';
+          Exit;
+        end;
+      end;
+  else
+    sError := 'Unsupported provider';
     Exit;
   end;
 
-  // Build request JSON
-  sRequestBody := Format(
-    '{"name": "%s", "description": "%s", "private": %s, "auto_init": false}',
-    [ sName, sDescription, IfThen( lPrivate, 'true', 'false' ) ]
-    );
+  // Build request JSON via TJSONObject — safely escapes quotes/newlines in name/description.
+  JSONBody := TJSONObject.Create;
 
-  if ( not ExecuteGitHubApiPost( '/user/repos', sRequestBody, sResponse, iStatusCode ) ) then
+  try
+    JSONBody.AddPair( 'name', sName );
+    JSONBody.AddPair( 'description', sDescription );
+    JSONBody.AddPair( 'private', TJSONBool.Create( lPrivate ) );
+    JSONBody.AddPair( 'auto_init', TJSONBool.Create( False ) );
+    sRequestBody := JSONBody.ToJSON;
+  finally
+    JSONBody.Free;
+  end;
+
+  if Provider = rpCodeberg then
+    lOK := ExecuteCodebergApiPost( '/user/repos', sRequestBody, sResponse, iStatusCode )
+  else
+    lOK := ExecuteGitHubApiPost( '/user/repos', sRequestBody, sResponse, iStatusCode );
+
+  if ( not lOK ) then
   begin
-    if iStatusCode = 422 then
-      sError := 'Repository already exists on GitHub'
+    if iStatusCode = iConflictCode then
+      sError := Format( 'Repository already exists on %s', [ sProviderName ] )
     else if iStatusCode = 401 then
-      sError := 'Invalid GitHub credentials'
+      sError := Format( 'Invalid %s credentials', [ sProviderName ] )
     else
-      sError := Format( 'GitHub API error (%d): %s', [ iStatusCode, sResponse ] );
+      sError := Format( '%s API error (%d): %s', [ sProviderName, iStatusCode, sResponse ] );
 
     Exit;
   end;
 
-  // Parse response to get clone URL
+  // Parse clone_url from the response. If anything goes wrong, fall back to a
+  // constructed URL so that the caller has *something* — the actual repo was
+  // created successfully on the server side.
   try
     JSONResponse := TJSONObject.ParseJSONValue( sResponse ) as TJSONObject;
-
-    if JSONResponse <> nil then
-    begin
-      try
-        sRemoteURL := JSONResponse.GetValue<string>( 'clone_url', '' );
-
-        if sRemoteURL.IsEmpty then
-          sRemoteURL := Format( 'https://github.com/%s/%s.git', [ FGitHubUsername, sName ] );
-
-        Result := True;
-      finally
-        JSONResponse.Free;
-      end;
-    end
-    else
-    begin
-      // Fallback URL construction
-      sRemoteURL := Format( 'https://github.com/%s/%s.git', [ FGitHubUsername, sName ] );
-      Result := True;
-    end;
   except
-    on E: Exception do
-    begin
-      // Fallback URL construction
-      sRemoteURL := Format( 'https://github.com/%s/%s.git', [ FGitHubUsername, sName ] );
-      Result := True;
+    JSONResponse := nil;
+  end;
+
+  if JSONResponse <> nil then
+  begin
+    try
+      sRemoteURL := JSONResponse.GetValue<string>( 'clone_url', '' );
+    finally
+      JSONResponse.Free;
     end;
   end;
+
+  if sRemoteURL.IsEmpty then
+    sRemoteURL := Format( 'https://%s/%s/%s.git', [ sHost, sUser, sName ] );
+
+  Result := True;
 
 end;
 
@@ -1871,11 +2176,12 @@ begin
 
   sLog := 'Initialized Git repository' + sLineBreak;
 
-  // Rename default branch to main
+  // Rename default branch to main for consistency with modern Git defaults.
+  // Older Git initialises to master — if the rename succeeds we log it, if it
+  // fails we leave the branch name as-is (git 2.28+ already defaults to main
+  // when init.defaultBranch is set).
   if ExecuteGitCommand( sPath, 'branch -M main', sOutput ) then
-    sLog := sLog + 'Set default branch to main' + sLineBreak
-  else
-    sLog := sLog + 'Warning: Could not rename branch to main' + sLineBreak;
+    sLog := sLog + 'Set default branch to main' + sLineBreak;
 
   Result := True;
 
@@ -1883,72 +2189,9 @@ end;
 
 function TGitRepoManager.CreateCodebergRepository( const sName, sDescription: string; const lPrivate: Boolean;
   out sRemoteURL, sError: string ): Boolean;
-var
-  sRequestBody      : string;
-  sResponse         : string;
-  iStatusCode       : Integer;
-  JSONResponse      : TJSONObject;
 begin
 
-  Result := False;
-  sRemoteURL := '';
-  sError := '';
-
-  if ( not HasCodebergCredentials ) then
-  begin
-    sError := 'Codeberg credentials not configured';
-    Exit;
-  end;
-
-  // Build request JSON
-  sRequestBody := Format(
-    '{"name": "%s", "description": "%s", "private": %s, "auto_init": false}',
-    [ sName, sDescription, IfThen( lPrivate, 'true', 'false' ) ]
-    );
-
-  if ( not ExecuteCodebergApiPost( '/user/repos', sRequestBody, sResponse, iStatusCode ) ) then
-  begin
-    if iStatusCode = 409 then
-      sError := 'Repository already exists on Codeberg'
-    else if iStatusCode = 401 then
-      sError := 'Invalid Codeberg credentials'
-    else
-      sError := Format( 'Codeberg API error (%d): %s', [ iStatusCode, sResponse ] );
-
-    Exit;
-  end;
-
-  // Parse response to get clone URL
-  try
-    JSONResponse := TJSONObject.ParseJSONValue( sResponse ) as TJSONObject;
-
-    if JSONResponse <> nil then
-    begin
-      try
-        sRemoteURL := JSONResponse.GetValue<string>( 'clone_url', '' );
-
-        if sRemoteURL.IsEmpty then
-          sRemoteURL := Format( 'https://codeberg.org/%s/%s.git', [ FCodebergUsername, sName ] );
-
-        Result := True;
-      finally
-        JSONResponse.Free;
-      end;
-    end
-    else
-    begin
-      // Fallback URL construction
-      sRemoteURL := Format( 'https://codeberg.org/%s/%s.git', [ FCodebergUsername, sName ] );
-      Result := True;
-    end;
-  except
-    on E: Exception do
-    begin
-      // Fallback URL construction
-      sRemoteURL := Format( 'https://codeberg.org/%s/%s.git', [ FCodebergUsername, sName ] );
-      Result := True;
-    end;
-  end;
+  Result := CreateRemoteRepository( rpCodeberg, sName, sDescription, lPrivate, sRemoteURL, sError );
 
 end;
 
@@ -1975,6 +2218,7 @@ function TGitRepoManager.InitialCommitAndPush( const sRepoPath, sMessage: string
 var
   sOutput           : string;
   sTempFile         : string;
+  sBranch           : string;
 begin
 
   Result := False;
@@ -2016,14 +2260,21 @@ begin
     end;
   end;
 
+  // Detect the current branch name rather than assuming `main` — respects
+  // init.defaultBranch settings and any prior rename.
+  sBranch := GetCurrentBranch( sRepoPath );
+
+  if sBranch.IsEmpty then
+    sBranch := 'main';
+
   // Push with upstream tracking
-  if ( not ExecuteGitCommand( sRepoPath, 'push -u origin main', sOutput ) ) then
+  if ( not ExecuteGitCommand( sRepoPath, Format( 'push -u origin %s', [ sBranch ] ), sOutput ) ) then
   begin
     sLog := sLog + 'Push failed: ' + Trim( sOutput );
     Exit;
   end;
 
-  sLog := sLog + 'Pushed to origin/main' + sLineBreak;
+  sLog := sLog + Format( 'Pushed to origin/%s', [ sBranch ] ) + sLineBreak;
   Result := True;
 
 end;
@@ -2042,7 +2293,9 @@ begin
     Exit;
   end;
 
-  if ( not ExecuteGitCommand( FRepos[ iIndex ].Path, 'pull', sOutput ) ) then
+  // Fast-forward only — refuse to create surprise merge commits when local
+  // history has diverged. If it fails, the user should explicitly reconcile.
+  if ( not ExecuteGitCommand( FRepos[ iIndex ].Path, 'pull --ff-only', sOutput ) ) then
   begin
     sLog := 'Pull failed: ' + Trim( sOutput );
     Exit;
@@ -2191,8 +2444,9 @@ begin
     Exit;
   end;
 
-  // Create a timestamped backup branch name
-  sBranchName := 'backup-' + FormatDateTime( 'yyyy-mm-dd-hhnnss', Now );
+  // Create a timestamped backup branch name — millisecond precision so two
+  // backups within the same second don't collide ( "branch already exists" ).
+  sBranchName := 'backup-' + FormatDateTime( 'yyyy-mm-dd-hhnnss-zzz', Now );
 
   if ( not ExecuteGitCommand( FRepos[ iIndex ].Path, 'branch ' + sBranchName, sOutput ) ) then
   begin
@@ -2280,6 +2534,21 @@ begin
   end;
 
   sRepoPath := FRepos[ iIndex ].Path;
+
+  // Preconditions: repo must have at least one commit, and working tree must
+  // be clean — we're about to push --all, and a partial/dirty repo leaves us
+  // with a newly-created target remote and a half-migrated local state.
+  if ( not HasAnyCommit( sRepoPath ) ) then
+  begin
+    sError := 'Repository has no commits yet — create at least one commit before migrating';
+    Exit;
+  end;
+
+  if ( not IsWorkingTreeClean( sRepoPath ) ) then
+  begin
+    sError := 'Working tree has uncommitted changes — commit or stash before migrating';
+    Exit;
+  end;
 
   // Step 1: Detect current remote
   sCurrentOrigin := GetRemoteOriginURL( sRepoPath );
@@ -2526,23 +2795,69 @@ end;
 procedure TGitRepoManager.RefreshAllStatusParallel;
 var
   iCount            : Integer;
+  Paths             : TArray<string>;
 begin
 
-  iCount := Length( FRepos );
+  // Snapshot the repo paths under the lock so the parallel loop works against
+  // a stable array even if the live FRepos is mutated by add/remove calls.
+  FReposLock.Enter;
 
-  if iCount = 0 then
-    Exit;
+  try
+    iCount := Length( FRepos );
+
+    if iCount = 0 then
+      Exit;
+
+    SetLength( Paths, iCount );
+
+    for var i := 0 to iCount - 1 do
+      Paths[ i ] := FRepos[ i ].Path;
+  finally
+    FReposLock.Leave;
+  end;
 
   TParallel.For( 0, iCount - 1,
     procedure( AIndex: Integer )
+    var
+      sPath             : string;
+      sBranch           : string;
+      Status            : TRepoStatus;
+      iTracked          : Integer;
+      iModified         : Integer;
+      Provider          : TRemoteProvider;
+      sVersion          : string;
     begin
-      FRepos[ AIndex ].Branch := GetRepoBranch( FRepos[ AIndex ].Path );
-      FRepos[ AIndex ].Status := GetRepoStatus( FRepos[ AIndex ].Path );
-      FRepos[ AIndex ].StatusText := RepoStatusToString( FRepos[ AIndex ].Status );
-      FRepos[ AIndex ].TrackedFileCount := GetTrackedFileCount( FRepos[ AIndex ].Path );
-      FRepos[ AIndex ].ModifiedFileCount := GetModifiedFileCount( FRepos[ AIndex ].Path );
-      FRepos[ AIndex ].Provider := DetectRemoteProvider( GetRemoteOriginURL( FRepos[ AIndex ].Path ) );
-      FRepos[ AIndex ].Version := GetProjectVersion( FRepos[ AIndex ].Path );
+      sPath := Paths[ AIndex ];
+
+      sBranch := GetRepoBranch( sPath );
+      Status := GetRepoStatus( sPath );
+      iTracked := GetTrackedFileCount( sPath );
+      iModified := GetModifiedFileCount( sPath );
+      Provider := DetectRemoteProvider( GetRemoteOriginURL( sPath ) );
+      sVersion := GetProjectVersion( sPath );
+
+      // Write back under the lock — and re-locate by path, since the array may
+      // have shifted (remove / reorder) while we worked.
+      FReposLock.Enter;
+
+      try
+        for var j := 0 to High( FRepos ) do
+        begin
+          if SameText( FRepos[ j ].Path, sPath ) then
+          begin
+            FRepos[ j ].Branch := sBranch;
+            FRepos[ j ].Status := Status;
+            FRepos[ j ].StatusText := RepoStatusToString( Status );
+            FRepos[ j ].TrackedFileCount := iTracked;
+            FRepos[ j ].ModifiedFileCount := iModified;
+            FRepos[ j ].Provider := Provider;
+            FRepos[ j ].Version := sVersion;
+            Break;
+          end;
+        end;
+      finally
+        FReposLock.Leave;
+      end;
     end );
 
 end;

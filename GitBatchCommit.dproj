@@ -124,8 +124,8 @@
   <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     <VerInfo_Locale>1033</VerInfo_Locale>
-    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.5.0.63;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.0.0.0</VerInfo_Keys>
-    <VerInfo_Build>63</VerInfo_Build>
+    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.5.0.65;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.0.0.0</VerInfo_Keys>
+    <VerInfo_Build>65</VerInfo_Build>
     <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
     <VerInfo_MinorVer>5</VerInfo_MinorVer>
   </PropertyGroup>

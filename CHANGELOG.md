@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Migrate Selected Repository to Codeberg / GitHub — moves a repository's remote between the two hosts (and back again) in a single operation. Creates the target repo, preserves the previous origin as a provider-named secondary remote (`codeberg` / `github`), swaps `origin`, and pushes all branches and tags. **Why:** avoids the manual sequence of creating the remote, renaming remotes by hand, and running `git push --all` / `--tags` separately (2026-04-18) — `uGitRepoManager.pas`, `MainFrm.pas`, `MainFrm.dfm`
+- Single `APP_VERSION` constant in `uGitRepoManager.pas` — surfaces in About dialog and HTTP User-Agent; replaces scattered literal version strings (2026-04-18) — `uGitRepoManager.pas`, `MainFrm.pas`
+- `IsSafeFilePattern` validator rejecting shell metacharacters in the File Pattern setting; rejected on both Settings dialog input and config-file load (2026-04-18) — `uGitRepoManager.pas`, `MainFrm.pas`
+- `GetCurrentBranch` / `HasAnyCommit` / `IsWorkingTreeClean` helpers for safer Git flow decisions (2026-04-18) — `uGitRepoManager.pas`
+
+### Changed
+- Migration now runs off the UI thread — the app stays responsive during `push --all` (2026-04-18) — `MainFrm.pas`
+- Migration aborts if the working tree is dirty or the repo has no commits, instead of leaving a half-migrated state (2026-04-18) — `uGitRepoManager.pas`
+- `CreateCodebergRepository` / `CreateGitHubRepository` now delegate to a shared `CreateRemoteRepository` that builds request bodies with `TJSONObject` (safe escaping) and surfaces the API-returned clone URL verbatim (2026-04-18) — `uGitRepoManager.pas`
+- `ExecuteGitCommand` runs `git.exe` directly via `CreateProcess` with `lpCurrentDirectory`, dropping the `cmd.exe /c cd /d …` wrapper — removes a command-injection surface and fragile quoting (2026-04-18) — `uGitRepoManager.pas`
+- `FRepos` mutations and parallel-refresh reads are now guarded by a `TCriticalSection`; parallel refresh snapshots paths and writes back under the lock (2026-04-18) — `uGitRepoManager.pas`
+- Initial push no longer hard-codes `main`; detects the current branch via `rev-parse --abbrev-ref HEAD` and falls back to `symbolic-ref` (2026-04-18) — `uGitRepoManager.pas`
+- HTTP client sets explicit `UserAgent`, `ConnectionTimeout` (15 s), `ResponseTimeout` (30 s); GitHub no longer sporadically returns 403 for missing User-Agent (2026-04-18) — `uGitRepoManager.pas`
+- `PullRepository` uses `pull --ff-only` to avoid surprise merge commits on diverged branches (2026-04-18) — `uGitRepoManager.pas`
+- `GetProjectVersion` caches per-path results keyed on the newest `.dproj` mtime — subsequent refreshes skip the recursive scan if nothing changed (2026-04-18) — `uGitRepoManager.pas`
+- Backup-branch names now include millisecond precision; two backups inside the same second no longer collide (2026-04-18) — `uGitRepoManager.pas`
+- Popup and main menu items that act on a selection (Migrate, Remove Selected, Pull, Set Public/Private, Open in …) are disabled when no repository is selected (2026-04-18) — `MainFrm.pas`
+- `MigrateSelectedTo` displays the authoritative clone URL returned by the API instead of reconstructing one from name + host (2026-04-18) — `MainFrm.pas`
+
+### Fixed
+- JSON injection risk in repo-creation API calls: name and description were `Format`'d into the request body; now built with `TJSONObject` so quotes/newlines/backslashes are properly escaped (2026-04-18) — `uGitRepoManager.pas`
+- Potential AV when `AddRepository` / `RemoveRepository` ran while `RefreshAllStatusParallel` was indexing `FRepos` — both now hold a critical section (2026-04-18) — `uGitRepoManager.pas`
+- `SaveConfig` failures (read-only filesystem, locked file) previously silently lost configuration; now emit `OutputDebugString` diagnostics (2026-04-18) — `uGitRepoManager.pas`
+
 - Drag-and-drop initialisation: dropping a non-git folder offers to initialise it, create a remote repo (Codeberg or GitHub), and push — all in one step (2026-04-02) — `MainFrm.pas`
 - Project type selection when initialising new repos; generates appropriate `.gitignore` for Delphi, C/C++, C#, Java, Python, JavaScript, TypeScript, Go, Rust, or HTML (2026-04-02) — `MainFrm.pas`, `uCodebergDialog.pas`, `uCodebergDialog.dfm`
 - Ctrl+Enter keyboard shortcut for Commit & Push (2026-04-02) — `MainFrm.pas`
