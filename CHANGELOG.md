@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `MigrateSelectedTo` displays the authoritative clone URL returned by the API instead of reconstructing one from name + host (2026-04-18) — `MainFrm.pas`
 
 ### Fixed
+- Build broke (`F2613: Unit 'LoggerPro' not found`, preceded by an `F2051` version mismatch) after the suite-wide `LoggerPro` → `gllLoggerPro` migration: GitBatchCommit had no unit search path to the replacement library and was only resolving it via a stale shared `.dcu`. Added `D:\gllLoggerPro` to `DCC_UnitSearchPath`. **Why:** the gllLoggerPro replacement was wired into the Win64 global library path but not Win32, so the per-project path makes resolution deterministic for both platforms (2026-05-19) — `GitBatchCommit.dproj`
 - Create Codeberg Repository dialog (no project-type variant) clipped its OK/Cancel buttons: `ClientHeight` was set to 180 but buttons sat at Y=172â€“197. Buttons now move up and `ClientHeight` shrinks to 165 when project type is hidden (2026-05-10) â€” `uCodebergDialog.pas`
 - JSON injection risk in repo-creation API calls: name and description were `Format`'d into the request body; now built with `TJSONObject` so quotes/newlines/backslashes are properly escaped (2026-04-18) — `uGitRepoManager.pas`
 - Potential AV when `AddRepository` / `RemoveRepository` ran while `RefreshAllStatusParallel` was indexing `FRepos` — both now hold a critical section (2026-04-18) — `uGitRepoManager.pas`
