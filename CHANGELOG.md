@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Custom application icon — multi-resolution `.ico` (16/24/32/48/64/128/256 px) depicting a git-branch glyph (white main branch with two commit nodes, git-orange feature branch merging in) on a slate gradient tile, themed to match the app's Aqua Light Slate VCL style. Replaces the stock `delphi_PROJECTICON.ico` across the Base, Win32, and Win64 build configurations; embedded as `MAINICON` in the regenerated project resource (2026-05-19) — `GitBatchCommit.ico`, `GitBatchCommit.dproj`, `GitBatchCommit.res`
 - Migrate Selected Repository to Codeberg / GitHub — moves a repository's remote between the two hosts (and back again) in a single operation. Creates the target repo, preserves the previous origin as a provider-named secondary remote (`codeberg` / `github`), swaps `origin`, and pushes all branches and tags. **Why:** avoids the manual sequence of creating the remote, renaming remotes by hand, and running `git push --all` / `--tags` separately (2026-04-18) — `uGitRepoManager.pas`, `MainFrm.pas`, `MainFrm.dfm`
 - Single `APP_VERSION` constant in `uGitRepoManager.pas` — surfaces in About dialog and HTTP User-Agent; replaces scattered literal version strings (2026-04-18) — `uGitRepoManager.pas`, `MainFrm.pas`
 - `IsSafeFilePattern` validator rejecting shell metacharacters in the File Pattern setting; rejected on both Settings dialog input and config-file load (2026-04-18) — `uGitRepoManager.pas`, `MainFrm.pas`
@@ -25,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `MigrateSelectedTo` displays the authoritative clone URL returned by the API instead of reconstructing one from name + host (2026-04-18) — `MainFrm.pas`
 
 ### Fixed
+- Create Codeberg Repository dialog (no project-type variant) clipped its OK/Cancel buttons: `ClientHeight` was set to 180 but buttons sat at Y=172â€“197. Buttons now move up and `ClientHeight` shrinks to 165 when project type is hidden (2026-05-10) â€” `uCodebergDialog.pas`
 - JSON injection risk in repo-creation API calls: name and description were `Format`'d into the request body; now built with `TJSONObject` so quotes/newlines/backslashes are properly escaped (2026-04-18) — `uGitRepoManager.pas`
 - Potential AV when `AddRepository` / `RemoveRepository` ran while `RefreshAllStatusParallel` was indexing `FRepos` — both now hold a critical section (2026-04-18) — `uGitRepoManager.pas`
 - `SaveConfig` failures (read-only filesystem, locked file) previously silently lost configuration; now emit `OutputDebugString` diagnostics (2026-04-18) — `uGitRepoManager.pas`
