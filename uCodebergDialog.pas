@@ -109,8 +109,10 @@ begin
     Dlg.edtDescription.Text := sDescription;
     Dlg.chkPrivate.Checked := lPrivate;
 
-    // Shrink form — project type hidden by default in DFM
-    Dlg.ClientHeight := 180;
+    // Shrink form — project type hidden by default in DFM. Move buttons up to fill the gap.
+    Dlg.btnOK.Top := 125;
+    Dlg.btnCancel.Top := 125;
+    Dlg.ClientHeight := 165;
 
     if Dlg.ShowModal = mrOK then
     begin
