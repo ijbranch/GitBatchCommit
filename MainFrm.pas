@@ -59,12 +59,10 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, Winapi.ShellAPI, Winapi.CommCtrl,
-
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.FileCtrl, Vcl.Menus,
-
-  System.SysUtils, System.StrUtils, System.Variants, System.Classes, System.Types, System.UITypes,
-  System.Generics.Collections, System.Generics.Defaults, System.Threading, System.SyncObjs, System.IOUtils,
-
+  System.SysUtils, System.StrUtils, System.Variants, System.Classes, System.Types, System.UITypes, System.Generics.Collections, System.Generics.Defaults,
+  System.Threading, System.SyncObjs, System.IOUtils,
+  VCL.StyledTaskDialog,
   uGitRepoManager, uCodebergDialog, uCodebergSettings, uGitHubSettings, uTemplateSettings;
 
 type
@@ -193,11 +191,11 @@ type
     procedure mmoLogKeyDown( Sender: TObject; var Key: Word; Shift: TShiftState );
   private
     const
-      WM_LOAD_REPOS       = WM_USER + 100;
-      clStatusClean        = $E0FFE0;     // Light green
-      clStatusModified     = $FFFFC0;     // Light yellow
-      clStatusPullRequired = $FFE0C0;     // Light orange
-      clStatusError        = $C0C0FF;     // Light red
+      WM_LOAD_REPOS = WM_USER + 100;
+      clStatusClean = $E0FFE0;          // Light green
+      clStatusModified = $FFFFC0;       // Light yellow
+      clStatusPullRequired = $FFE0C0;   // Light orange
+      clStatusError = $C0C0FF;          // Light red
     var
       FRepoManager  : TGitRepoManager;
       FUpdatingList : Boolean;
@@ -367,24 +365,24 @@ implementation
 procedure TMainForm.FormCreate( Sender: TObject );
 begin
 
-  FUpdatingList := False;
-  FSortColumn := 0;
-  FSortAscending := True;
-  FStatusFilter := 0;
-  FGroupFilter := '';
-  FInitialLoadDone := False;
+  FUpdatingList     := False;
+  FSortColumn       := 0;
+  FSortAscending    := True;
+  FStatusFilter     := 0;
+  FGroupFilter      := '';
+  FInitialLoadDone  := False;
   FLastClickedIndex := -1;
-  FCancelRefresh := False;
-  FRefreshThread := nil;
-  FFilteredIndices := TList<Integer>.Create;
-  FRepoManager := TGitRepoManager.Create;
+  FCancelRefresh    := False;
+  FRefreshThread    := nil;
+  FFilteredIndices  := TList<Integer>.Create;
+  FRepoManager      := TGitRepoManager.Create;
 
   // Enable drag-and-drop support
   DragAcceptFiles( Handle, True );
 
   // Enable Ctrl+Enter shortcut for Commit & Push
-  KeyPreview := True;
-  OnKeyDown := FormKeyDown;
+  KeyPreview        := True;
+  OnKeyDown         := FormKeyDown;
 
   // Wire up column click event
   lvRepos.OnColumnClick := lvReposColumnClick;
@@ -406,7 +404,7 @@ begin
   if FInitialLoadDone then
     Exit;
 
-  FInitialLoadDone := True;
+  FInitialLoadDone  := True;
 
   // Post message to load after form is fully painted
   PostMessage( Handle, WM_LOAD_REPOS, 0, 0 );
@@ -421,7 +419,7 @@ var
   iCount            : Integer;
 begin
 
-  Screen.Cursor := crHourGlass;
+  Screen.Cursor     := crHourGlass;
 
   try
     mmoLog.Lines.Add( 'Loading configuration...' );
@@ -431,7 +429,7 @@ begin
     if ( not FRepoManager.LoadConfig ) then
       mmoLog.Lines.Add( 'Warning: Failed to load configuration file' );
 
-    iCount := Length( FRepoManager.Repos );
+    iCount          := Length( FRepoManager.Repos );
     mmoLog.Lines.Add( Format( 'Found %d repositories', [ iCount ] ) );
     ScrollLogToEnd;
 
@@ -450,7 +448,7 @@ begin
     if iCount > 0 then
       RefreshReposAsync;
   finally
-    Screen.Cursor := crDefault;
+    Screen.Cursor   := crDefault;
   end;
 
 end;
@@ -469,29 +467,29 @@ begin
     Exit;
   end;
 
-  iCount := Length( FRepoManager.Repos );
+  iCount            := Length( FRepoManager.Repos );
   if iCount = 0 then
     Exit;
 
-  FRefreshing := True;
-  FCancelRefresh := False;
-  Screen.Cursor := crHourGlass;
+  FRefreshing       := True;
+  FCancelRefresh    := False;
+  Screen.Cursor     := crHourGlass;
 
-  FRefreshThread := TThread.CreateAnonymousThread(
+  FRefreshThread    := TThread.CreateAnonymousThread(
     procedure
     begin
 
       TParallel.For( 0, iCount - 1,
         procedure( AIndex: Integer )
         var
-          sName: string;
+          sName     : string;
         begin
 
           if FCancelRefresh then
             Exit;
 
           FRepoManager.RefreshStatus( AIndex );
-          sName := FRepoManager.Repos[ AIndex ].Name;
+          sName     := FRepoManager.Repos[ AIndex ].Name;
 
           if FCancelRefresh then
             Exit;
@@ -540,7 +538,7 @@ begin
   // Cancel any running async refresh and wait for it to finish
   if FRefreshing then
   begin
-    FCancelRefresh := True;
+    FCancelRefresh  := True;
 
     while FRefreshing do
       Application.ProcessMessages;
@@ -576,18 +574,18 @@ var
   lHasMessage       : Boolean;
 begin
 
-  lHasChecked := False;
+  lHasChecked       := False;
 
   for var i := 0 to lvRepos.Items.Count - 1 do
   begin
     if lvRepos.Items[ i ].Checked then
     begin
-      lHasChecked := True;
+      lHasChecked   := True;
       Break;
     end;
   end;
 
-  lHasMessage := Trim( edtCommitMessage.Text ) <> '';
+  lHasMessage       := Trim( edtCommitMessage.Text ) <> '';
 
   btnCommitPush.Enabled := lHasChecked and lHasMessage;
 
@@ -617,7 +615,7 @@ begin
   if lvRepos.Selected = nil then
     Exit;
 
-  iCurrentIndex := lvRepos.Selected.Index;
+  iCurrentIndex     := lvRepos.Selected.Index;
 
   // Check if Shift is held and we have a previous click
   if ( GetKeyState( VK_SHIFT ) < 0 ) and ( FLastClickedIndex >= 0 ) and
@@ -626,19 +624,19 @@ begin
     // Determine range
     if FLastClickedIndex < iCurrentIndex then
     begin
-      iStartIndex := FLastClickedIndex;
-      iEndIndex := iCurrentIndex;
+      iStartIndex   := FLastClickedIndex;
+      iEndIndex     := iCurrentIndex;
     end
     else
     begin
-      iStartIndex := iCurrentIndex;
-      iEndIndex := FLastClickedIndex;
+      iStartIndex   := iCurrentIndex;
+      iEndIndex     := FLastClickedIndex;
     end;
 
     // Use the opposite of the anchor item's state as the target
-    lNewState := not lvRepos.Items[ FLastClickedIndex ].Checked;
+    lNewState       := not lvRepos.Items[ FLastClickedIndex ].Checked;
 
-    FUpdatingList := True;
+    FUpdatingList   := True;
 
     try
       for var i := iStartIndex to iEndIndex do
@@ -666,15 +664,15 @@ procedure TMainForm.mnuFilterClick( Sender: TObject );
 begin
 
   if Sender = mnuFilterAll then
-    FStatusFilter := 0
+    FStatusFilter   := 0
   else if Sender = mnuFilterClean then
-    FStatusFilter := 1
+    FStatusFilter   := 1
   else if Sender = mnuFilterModified then
-    FStatusFilter := 2
+    FStatusFilter   := 2
   else if Sender = mnuFilterPullRequired then
-    FStatusFilter := 3
+    FStatusFilter   := 3
   else if Sender = mnuFilterError then
-    FStatusFilter := 4;
+    FStatusFilter   := 4;
 
   UpdateFilterMenuChecks;
   PopulateListView;
@@ -688,11 +686,11 @@ procedure TMainForm.lvReposColumnClick( Sender: TObject; Column: TListColumn );
 begin
 
   if FSortColumn = Column.Index then
-    FSortAscending := not FSortAscending
+    FSortAscending  := not FSortAscending
   else
   begin
-    FSortColumn := Column.Index;
-    FSortAscending := True;
+    FSortColumn     := Column.Index;
+    FSortAscending  := True;
   end;
 
   SetColumnSortArrow( FSortColumn, FSortAscending );
@@ -709,15 +707,15 @@ var
   Item              : THDItem;
 begin
 
-  Header := ListView_GetHeader( lvRepos.Handle );
+  Header            := ListView_GetHeader( lvRepos.Handle );
 
   // Clear all arrows first
   for var i := 0 to lvRepos.Columns.Count - 1 do
   begin
     ZeroMemory( @Item, SizeOf( Item ) );
-    Item.Mask := HDI_FORMAT;
+    Item.Mask       := HDI_FORMAT;
     Header_GetItem( Header, i, Item );
-    Item.fmt := Item.fmt and not ( HDF_SORTDOWN or HDF_SORTUP );
+    Item.fmt        := Item.fmt and not ( HDF_SORTDOWN or HDF_SORTUP );
     Header_SetItem( Header, i, Item );
   end;
 
@@ -725,13 +723,13 @@ begin
   if iColumn >= 0 then
   begin
     ZeroMemory( @Item, SizeOf( Item ) );
-    Item.Mask := HDI_FORMAT;
+    Item.Mask       := HDI_FORMAT;
     Header_GetItem( Header, iColumn, Item );
 
     if bAscending then
-      Item.fmt := Item.fmt or HDF_SORTUP
+      Item.fmt      := Item.fmt or HDF_SORTUP
     else
-      Item.fmt := Item.fmt or HDF_SORTDOWN;
+      Item.fmt      := Item.fmt or HDF_SORTDOWN;
 
     Header_SetItem( Header, iColumn, Item );
   end;
@@ -778,80 +776,80 @@ begin
   if FSortColumn >= 0 then
   begin
     FFilteredIndices.Sort( TComparer<Integer>.Construct(
-      function( const A, B: Integer ): Integer
-      var
-        sValA, sValB: string;
-        iValA, iValB: Integer;
-      begin
-        // Handle numeric columns separately
-        if FSortColumn in [ 4, 5 ] then
+        function( const A, B: Integer ): Integer
+        var
+          sValA, sValB: string;
+          iValA, iValB: Integer;
         begin
-          case FSortColumn of
-            4:
-              begin
-                iValA := FRepoManager.Repos[ A ].TrackedFileCount;
-                iValB := FRepoManager.Repos[ B ].TrackedFileCount;
-              end;
-            5:
-              begin
-                iValA := FRepoManager.Repos[ A ].ModifiedFileCount;
-                iValB := FRepoManager.Repos[ B ].ModifiedFileCount;
-              end;
+          // Handle numeric columns separately
+          if FSortColumn in [ 4, 5 ] then
+          begin
+            case FSortColumn of
+              4:
+                begin
+                  iValA := FRepoManager.Repos[ A ].TrackedFileCount;
+                  iValB := FRepoManager.Repos[ B ].TrackedFileCount;
+                end;
+              5:
+                begin
+                  iValA := FRepoManager.Repos[ A ].ModifiedFileCount;
+                  iValB := FRepoManager.Repos[ B ].ModifiedFileCount;
+                end;
+            else
+              iValA := 0;
+              iValB := 0;
+            end;
+
+            Result  := iValA - iValB;
+
+            if ( not FSortAscending ) then
+              Result := -Result;
+          end
           else
-            iValA := 0;
-            iValB := 0;
+          begin
+            case FSortColumn of
+              0:
+                begin
+                  sValA := FRepoManager.Repos[ A ].Name;
+                  sValB := FRepoManager.Repos[ B ].Name;
+                end;
+              1:
+                begin
+                  sValA := FRepoManager.Repos[ A ].Path;
+                  sValB := FRepoManager.Repos[ B ].Path;
+                end;
+              2:
+                begin
+                  sValA := FRepoManager.Repos[ A ].Branch;
+                  sValB := FRepoManager.Repos[ B ].Branch;
+                end;
+              3:
+                begin
+                  sValA := RemoteProviderToString( FRepoManager.Repos[ A ].Provider );
+                  sValB := RemoteProviderToString( FRepoManager.Repos[ B ].Provider );
+                end;
+              6:
+                begin
+                  sValA := FRepoManager.Repos[ A ].StatusText;
+                  sValB := FRepoManager.Repos[ B ].StatusText;
+                end;
+              7:
+                begin
+                  sValA := FRepoManager.Repos[ A ].Version;
+                  sValB := FRepoManager.Repos[ B ].Version;
+                end;
+            else
+              sValA := '';
+              sValB := '';
+            end;
+
+            Result  := CompareText( sValA, sValB );
+
+            if ( not FSortAscending ) then
+              Result := -Result;
           end;
-
-          Result := iValA - iValB;
-
-          if ( not FSortAscending ) then
-            Result := -Result;
         end
-        else
-        begin
-          case FSortColumn of
-            0:
-              begin
-                sValA := FRepoManager.Repos[ A ].Name;
-                sValB := FRepoManager.Repos[ B ].Name;
-              end;
-            1:
-              begin
-                sValA := FRepoManager.Repos[ A ].Path;
-                sValB := FRepoManager.Repos[ B ].Path;
-              end;
-            2:
-              begin
-                sValA := FRepoManager.Repos[ A ].Branch;
-                sValB := FRepoManager.Repos[ B ].Branch;
-              end;
-            3:
-              begin
-                sValA := RemoteProviderToString( FRepoManager.Repos[ A ].Provider );
-                sValB := RemoteProviderToString( FRepoManager.Repos[ B ].Provider );
-              end;
-            6:
-              begin
-                sValA := FRepoManager.Repos[ A ].StatusText;
-                sValB := FRepoManager.Repos[ B ].StatusText;
-              end;
-            7:
-              begin
-                sValA := FRepoManager.Repos[ A ].Version;
-                sValB := FRepoManager.Repos[ B ].Version;
-              end;
-          else
-            sValA := '';
-            sValB := '';
-          end;
-
-          Result := CompareText( sValA, sValB );
-
-          if ( not FSortAscending ) then
-            Result := -Result;
-        end;
-      end
-      ) );
+        ) );
   end;
 
 end;
@@ -862,8 +860,8 @@ end;
 procedure TMainForm.ScrollLogToEnd;
 begin
 
-  mmoLog.SelStart := Length( mmoLog.Text );
-  mmoLog.SelLength := 0;
+  mmoLog.SelStart   := Length( mmoLog.Text );
+  mmoLog.SelLength  := 0;
   mmoLog.Perform( EM_SCROLLCARET, 0, 0 );
 
 end;
@@ -880,15 +878,15 @@ var
   sPath             : string;
 begin
 
-  iAdded := 0;
-  iSkipped := 0;
+  iAdded            := 0;
+  iSkipped          := 0;
 
   try
-    iFileCount := DragQueryFile( Msg.Drop, $FFFFFFFF, nil, 0 );
+    iFileCount      := DragQueryFile( Msg.Drop, $FFFFFFFF, nil, 0 );
 
     for var i := 0 to iFileCount - 1 do
     begin
-      iLen := DragQueryFile( Msg.Drop, i, nil, 0 );
+      iLen          := DragQueryFile( Msg.Drop, i, nil, 0 );
       SetLength( sPath, iLen );
       DragQueryFile( Msg.Drop, i, PChar( sPath ), iLen + 1 );
 
@@ -926,7 +924,7 @@ begin
     DragFinish( Msg.Drop );
   end;
 
-  Msg.Result := 0;
+  Msg.Result        := 0;
 
 end;
 
@@ -938,7 +936,7 @@ var
   iRepoIndex        : Integer;
 begin
 
-  FUpdatingList := True;
+  FUpdatingList     := True;
 
   try
     ApplyFilterAndSort;
@@ -950,8 +948,8 @@ begin
 
       for var i := 0 to FFilteredIndices.Count - 1 do
       begin
-        iRepoIndex := FFilteredIndices[ i ];
-        var Item := lvRepos.Items.Add;
+        iRepoIndex  := FFilteredIndices[ i ];
+        var Item    := lvRepos.Items.Add;
         Item.Caption := FRepoManager.Repos[ iRepoIndex ].Name;
         Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].Path );
         Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].Branch );
@@ -961,7 +959,7 @@ begin
         Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].StatusText );
         Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].Version );
         Item.Checked := FRepoManager.Repos[ iRepoIndex ].Selected;
-        Item.Data := Pointer( iRepoIndex );
+        Item.Data   := Pointer( iRepoIndex );
       end;
     finally
       lvRepos.Items.EndUpdate;
@@ -970,7 +968,7 @@ begin
     UpdateCommitButtonState;
     UpdateMenuSelectionState;
   finally
-    FUpdatingList := False;
+    FUpdatingList   := False;
   end;
 
 end;
@@ -989,7 +987,7 @@ begin
       FUpdatingList := True;
 
       try
-        var Item := lvRepos.Items[ i ];
+        var Item    := lvRepos.Items[ i ];
         Item.Caption := FRepoManager.Repos[ iIndex ].Name;
         Item.SubItems[ 0 ] := FRepoManager.Repos[ iIndex ].Path;
         Item.SubItems[ 1 ] := FRepoManager.Repos[ iIndex ].Branch;
@@ -1033,7 +1031,7 @@ begin
   begin
     if ( not System.SysUtils.DirectoryExists( sFolder + '\.git' ) ) then
     begin
-      MessageDlg( 'The selected folder is not a Git repository.', mtWarning, [ mbOK ], 0 );
+      StyledMessageDlg( 'The selected folder is not a Git repository.', mtWarning, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -1054,7 +1052,7 @@ var
 begin
 
   // Build list of checked repository indices
-  IndicesToRemove := TList<Integer>.Create;
+  IndicesToRemove   := TList<Integer>.Create;
 
   try
     for var i := 0 to lvRepos.Items.Count - 1 do
@@ -1065,19 +1063,19 @@ begin
 
     if IndicesToRemove.Count = 0 then
     begin
-      MessageDlg( 'Please check one or more repositories to remove.', mtInformation, [ mbOK ], 0 );
+      StyledMessageDlg( 'Please check one or more repositories to remove.', mtInformation, [ mbOK ], 0 );
       Exit;
     end;
 
-    if MessageDlg( Format( 'Remove %d repository(ies) from the list?', [ IndicesToRemove.Count ] ),
+    if StyledMessageDlg( Format( 'Remove %d repository(ies) from the list?', [ IndicesToRemove.Count ] ),
       mtConfirmation, [ mbYes, mbNo ], 0 ) = mrYes then
     begin
       // Sort descending so we remove from highest index first (avoids index shifting issues)
       IndicesToRemove.Sort( TComparer<Integer>.Construct(
-        function( const A, B: Integer ): Integer
-        begin
-          Result := B - A;
-        end ) );
+          function( const A, B: Integer ): Integer
+          begin
+            Result  := B - A;
+          end ) );
 
       for iRepoIndex in IndicesToRemove do
       begin
@@ -1125,29 +1123,29 @@ var
   sMessage          : string;
 begin
 
-  sSummary := Trim( edtCommitMessage.Text );
+  sSummary          := Trim( edtCommitMessage.Text );
 
   if sSummary.IsEmpty then
   begin
-    MessageDlg( 'Please enter a commit message.', mtWarning, [ mbOK ], 0 );
+    StyledMessageDlg(  'Please enter a commit message.', mtWarning, [ mbOK ], 0 );
     edtCommitMessage.SetFocus;
     Exit;
   end;
 
   // Build full commit message with optional details
-  sDetails := Trim( mmoDetails.Text );
+  sDetails          := Trim( mmoDetails.Text );
 
   if sDetails.IsEmpty then
-    sMessage := sSummary
+    sMessage        := sSummary
   else
-    sMessage := sSummary + sLineBreak + sLineBreak + sDetails;
+    sMessage        := sSummary + sLineBreak + sLineBreak + sDetails;
 
   // Count selected repositories with modifications
-  var iCount := 0;
+  var iCount        := 0;
 
   for var i := 0 to lvRepos.Items.Count - 1 do
   begin
-    iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+    iRepoIndex      := Integer( lvRepos.Items[ i ].Data );
 
     if lvRepos.Items[ i ].Checked and ( FRepoManager.Repos[ iRepoIndex ].Status = rsModified ) then
       Inc( iCount );
@@ -1155,22 +1153,22 @@ begin
 
   if iCount = 0 then
   begin
-    MessageDlg( 'No modified repositories selected.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg( 'No modified repositories selected.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
-  if MessageDlg( Format( 'Commit and push %d repository(ies)?', [ iCount ] ),
+  if StyledMessageDlg( Format( 'Commit and push %d repository(ies)?', [ iCount ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
   // Collect indices to commit (must read UI on main thread)
   var RepoIndices: TArray<Integer>;
   SetLength( RepoIndices, iCount );
-  var iIdx := 0;
+  var iIdx          := 0;
 
   for var i := 0 to lvRepos.Items.Count - 1 do
   begin
-    iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+    iRepoIndex      := Integer( lvRepos.Items[ i ].Data );
 
     if lvRepos.Items[ i ].Checked and ( FRepoManager.Repos[ iRepoIndex ].Status = rsModified ) then
     begin
@@ -1179,7 +1177,7 @@ begin
     end;
   end;
 
-  Screen.Cursor := crHourGlass;
+  Screen.Cursor     := crHourGlass;
   btnCommitPush.Enabled := False;
 
   TThread.CreateAnonymousThread(
@@ -1189,13 +1187,13 @@ begin
       slReindexDirs : TStringList;
     begin
 
-      iSuccess := 0;
+      iSuccess      := 0;
       slReindexDirs := TStringList.Create;
 
       try
         for var j := 0 to High( RepoIndices ) do
         begin
-          var iRI := RepoIndices[ j ];
+          var iRI   := RepoIndices[ j ];
           var sCommitLog: string;
           var bCommitSuccess := FRepoManager.CommitAndPush( iRI, sMessage, sCommitLog );
 
@@ -1238,7 +1236,7 @@ begin
               pnlDetails.Visible := False;
             end;
 
-            MessageDlg( Format( 'Completed: %d of %d successful.', [ iSuccess, iCount ] ), mtInformation, [ mbOK ], 0 );
+            StyledMessageDlg( Format( 'Completed: %d of %d successful.', [ iSuccess, iCount ] ), mtInformation, [ mbOK ], 0 );
 
           end );
       except
@@ -1268,16 +1266,16 @@ var
   iRepoIndex        : Integer;
 begin
 
-  FUpdatingList := True;
+  FUpdatingList     := True;
 
   try
     for var i := 0 to lvRepos.Items.Count - 1 do
     begin
-      iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+      iRepoIndex    := Integer( lvRepos.Items[ i ].Data );
       lvRepos.Items[ i ].Checked := ( FRepoManager.Repos[ iRepoIndex ].Status = rsModified );
     end;
   finally
-    FUpdatingList := False;
+    FUpdatingList   := False;
   end;
 
   UpdateCommitButtonState;
@@ -1290,13 +1288,13 @@ end;
 procedure TMainForm.btnSelectAllClick( Sender: TObject );
 begin
 
-  FUpdatingList := True;
+  FUpdatingList     := True;
 
   try
     for var i := 0 to lvRepos.Items.Count - 1 do
       lvRepos.Items[ i ].Checked := True;
   finally
-    FUpdatingList := False;
+    FUpdatingList   := False;
   end;
 
   UpdateCommitButtonState;
@@ -1309,13 +1307,13 @@ end;
 procedure TMainForm.btnSelectNoneClick( Sender: TObject );
 begin
 
-  FUpdatingList := True;
+  FUpdatingList     := True;
 
   try
     for var i := 0 to lvRepos.Items.Count - 1 do
       lvRepos.Items[ i ].Checked := False;
   finally
-    FUpdatingList := False;
+    FUpdatingList   := False;
   end;
 
   UpdateCommitButtonState;
@@ -1333,7 +1331,7 @@ begin
   if FUpdatingList then
     Exit;
 
-  iIndex := Integer( Item.Data );
+  iIndex            := Integer( Item.Data );
 
   if ( iIndex >= 0 ) and ( iIndex <= High( FRepoManager.Repos ) ) then
     FRepoManager.Repos[ iIndex ].Selected := Item.Checked;
@@ -1350,8 +1348,8 @@ var
   sUsername, sToken : string;
 begin
 
-  sUsername := FRepoManager.CodebergUsername;
-  sToken := FRepoManager.CodebergToken;
+  sUsername         := FRepoManager.CodebergUsername;
+  sToken            := FRepoManager.CodebergToken;
 
   if TCodebergSettingsDialog.Execute( sUsername, sToken ) then
   begin
@@ -1380,7 +1378,7 @@ begin
   // Check credentials first
   if ( not FRepoManager.HasCodebergCredentials ) then
   begin
-    MessageDlg( 'Please configure Codeberg credentials first.', mtWarning, [ mbOK ], 0 );
+    StyledMessageDlg( 'Please configure Codeberg credentials first.', mtWarning, [ mbOK ], 0 );
     mnuCodebergSettingsClick( nil );
 
     if ( not FRepoManager.HasCodebergCredentials ) then
@@ -1394,33 +1392,30 @@ begin
   // Check if already a Git repository
   if System.SysUtils.DirectoryExists( sFolder + '\.git' ) then
   begin
-    MessageDlg( 'The selected folder is already a Git repository.' + sLineBreak +
+    StyledMessageDlg( 'The selected folder is already a Git repository.' + sLineBreak +
       'Use File > Add Repository instead.', mtWarning, [ mbOK ], 0 );
     Exit;
   end;
 
   // Get repository details
-  sRepoName := ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) );
-  sDescription := '';
-  lPrivate := False;
+  sRepoName         := ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) );
+  sDescription      := '';
+  lPrivate          := False;
 
   if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate ) ) then
     Exit;
 
   // Confirm operation
-  if MessageDlg( Format( 'This will:%s%s' +
-    '1. Initialize Git repository in: %s%s' +
-    '2. Create %s repository "%s" on Codeberg%s' +
-    '3. Commit all files and push%s%s' +
-    'Continue?',
-    [ sLineBreak, sLineBreak,
-      sFolder, sLineBreak,
-      IfThen( lPrivate, 'private', 'public' ), sRepoName, sLineBreak,
-      sLineBreak, sLineBreak ] ),
+  if StyledMessageDlg( Format( 'This will:%s%s' +
+      '1. Initialize Git repository in: %s%s' +
+      '2. Create %s repository "%s" on Codeberg%s' +
+      '3. Commit all files and push%s%s' +
+      'Continue?',
+      [ sLineBreak, sLineBreak, sFolder, sLineBreak, IfThen( lPrivate, 'private', 'public' ), sRepoName, sLineBreak, sLineBreak, sLineBreak ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
-  Screen.Cursor := crHourGlass;
+  Screen.Cursor     := crHourGlass;
 
   try
     // Step 1: Initialize local repository
@@ -1429,7 +1424,7 @@ begin
     if ( not FRepoManager.InitializeRepository( sFolder, sLog ) ) then
     begin
       Log( 'Error: ' + sLog );
-      MessageDlg( 'Failed to initialize repository: ' + sLog, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to initialize repository: ' + sLog, mtError, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -1441,7 +1436,7 @@ begin
     if ( not FRepoManager.CreateCodebergRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) ) then
     begin
       Log( 'Error: ' + sError );
-      MessageDlg( 'Failed to create Codeberg repository: ' + sError, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to create Codeberg repository: ' + sError, mtError, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -1453,7 +1448,7 @@ begin
     if ( not FRepoManager.AddRemoteOrigin( sFolder, sRemoteURL, sLog ) ) then
     begin
       Log( 'Error: ' + sLog );
-      MessageDlg( 'Failed to add remote origin: ' + sLog, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to add remote origin: ' + sLog, mtError, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -1465,7 +1460,7 @@ begin
     if ( not FRepoManager.InitialCommitAndPush( sFolder, 'Initial commit', sLog ) ) then
     begin
       Log( 'Error: ' + sLog );
-      MessageDlg( 'Failed to commit and push: ' + sLog, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to commit and push: ' + sLog, mtError, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -1478,11 +1473,11 @@ begin
     Log( '=== Complete ===' );
     Log( 'Repository URL: https://codeberg.org/' + FRepoManager.CodebergUsername + '/' + sRepoName );
 
-    MessageDlg( 'Repository created and pushed successfully!' + sLineBreak + sLineBreak +
+    StyledMessageDlg(  'Repository created and pushed successfully!' + sLineBreak + sLineBreak +
       'URL: https://codeberg.org/' + FRepoManager.CodebergUsername + '/' + sRepoName,
       mtInformation, [ mbOK ], 0 );
   finally
-    Screen.Cursor := crDefault;
+    Screen.Cursor   := crDefault;
   end;
 
 end;
@@ -1495,8 +1490,8 @@ var
   sUsername, sToken : string;
 begin
 
-  sUsername := FRepoManager.GitHubUsername;
-  sToken := FRepoManager.GitHubToken;
+  sUsername         := FRepoManager.GitHubUsername;
+  sToken            := FRepoManager.GitHubToken;
 
   if TGitHubSettingsDialog.Execute( sUsername, sToken ) then
   begin
@@ -1525,7 +1520,7 @@ begin
   // Check credentials first
   if ( not FRepoManager.HasGitHubCredentials ) then
   begin
-    MessageDlg( 'Please configure GitHub credentials first.', mtWarning, [ mbOK ], 0 );
+    StyledMessageDlg(  'Please configure GitHub credentials first.', mtWarning, [ mbOK ], 0 );
     mnuGitHubSettingsClick( nil );
 
     if ( not FRepoManager.HasGitHubCredentials ) then
@@ -1539,33 +1534,33 @@ begin
   // Check if already a Git repository
   if System.SysUtils.DirectoryExists( sFolder + '\.git' ) then
   begin
-    MessageDlg( 'The selected folder is already a Git repository.' + sLineBreak +
+    StyledMessageDlg(  'The selected folder is already a Git repository.' + sLineBreak +
       'Use File > Add Repository instead.', mtWarning, [ mbOK ], 0 );
     Exit;
   end;
 
   // Get repository details (reuse Codeberg dialog as it has same fields)
-  sRepoName := ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) );
-  sDescription := '';
-  lPrivate := False;
+  sRepoName         := ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) );
+  sDescription      := '';
+  lPrivate          := False;
 
   if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate ) ) then
     Exit;
 
   // Confirm operation
-  if MessageDlg( Format( 'This will:%s%s' +
-    '1. Initialize Git repository in: %s%s' +
-    '2. Create %s repository "%s" on GitHub%s' +
-    '3. Commit all files and push%s%s' +
-    'Continue?',
-    [ sLineBreak, sLineBreak,
-      sFolder, sLineBreak,
-      IfThen( lPrivate, 'private', 'public' ), sRepoName, sLineBreak,
-      sLineBreak, sLineBreak ] ),
+  if StyledMessageDlg(  Format( 'This will:%s%s' +
+      '1. Initialize Git repository in: %s%s' +
+      '2. Create %s repository "%s" on GitHub%s' +
+      '3. Commit all files and push%s%s' +
+      'Continue?',
+      [ sLineBreak, sLineBreak,
+        sFolder, sLineBreak,
+        IfThen( lPrivate, 'private', 'public' ), sRepoName, sLineBreak,
+        sLineBreak, sLineBreak ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
-  Screen.Cursor := crHourGlass;
+  Screen.Cursor     := crHourGlass;
 
   try
     // Step 1: Initialize local repository
@@ -1574,7 +1569,7 @@ begin
     if ( not FRepoManager.InitializeRepository( sFolder, sLog ) ) then
     begin
       Log( 'Error: ' + sLog );
-      MessageDlg( 'Failed to initialize repository: ' + sLog, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to initialize repository: ' + sLog, mtError, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -1586,7 +1581,7 @@ begin
     if ( not FRepoManager.CreateGitHubRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) ) then
     begin
       Log( 'Error: ' + sError );
-      MessageDlg( 'Failed to create GitHub repository: ' + sError, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to create GitHub repository: ' + sError, mtError, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -1598,7 +1593,7 @@ begin
     if ( not FRepoManager.AddRemoteOrigin( sFolder, sRemoteURL, sLog ) ) then
     begin
       Log( 'Error: ' + sLog );
-      MessageDlg( 'Failed to add remote origin: ' + sLog, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to add remote origin: ' + sLog, mtError, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -1610,7 +1605,7 @@ begin
     if ( not FRepoManager.InitialCommitAndPush( sFolder, 'Initial commit', sLog ) ) then
     begin
       Log( 'Error: ' + sLog );
-      MessageDlg( 'Failed to commit and push: ' + sLog, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to commit and push: ' + sLog, mtError, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -1623,11 +1618,11 @@ begin
     Log( '=== Complete ===' );
     Log( 'Repository URL: https://github.com/' + FRepoManager.GitHubUsername + '/' + sRepoName );
 
-    MessageDlg( 'Repository created and pushed successfully!' + sLineBreak + sLineBreak +
+    StyledMessageDlg(  'Repository created and pushed successfully!' + sLineBreak + sLineBreak +
       'URL: https://github.com/' + FRepoManager.GitHubUsername + '/' + sRepoName,
       mtInformation, [ mbOK ], 0 );
   finally
-    Screen.Cursor := crDefault;
+    Screen.Cursor   := crDefault;
   end;
 
 end;
@@ -1652,16 +1647,16 @@ begin
 
   if lvRepos.Selected = nil then
   begin
-    MessageDlg( 'Please select a repository to migrate.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg(  'Please select a repository to migrate.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
-  iIndex := Integer( lvRepos.Selected.Data );
+  iIndex            := Integer( lvRepos.Selected.Data );
 
   if ( iIndex < 0 ) or ( iIndex > High( FRepoManager.Repos ) ) then
     Exit;
 
-  Repo := FRepoManager.Repos[ iIndex ];
+  Repo              := FRepoManager.Repos[ iIndex ];
 
   case TargetProvider of
     rpCodeberg:
@@ -1682,7 +1677,7 @@ begin
   // Prompt for credentials if not yet configured
   if ( not lTargetHasCreds ) then
   begin
-    MessageDlg( 'Please configure ' + sTargetName + ' credentials first.', mtWarning, [ mbOK ], 0 );
+    StyledMessageDlg(  'Please configure ' + sTargetName + ' credentials first.', mtWarning, [ mbOK ], 0 );
 
     if TargetProvider = rpCodeberg then
       mnuCodebergSettingsClick( nil )
@@ -1700,46 +1695,46 @@ begin
 
   case Repo.Provider of
     rpCodeberg: sSourceName := 'Codeberg';
-    rpGitHub:   sSourceName := 'GitHub';
-    rpOther:    sSourceName := 'a third-party host';
-    rpNone:     sSourceName := '(no remote)';
+    rpGitHub: sSourceName := 'GitHub';
+    rpOther: sSourceName := 'a third-party host';
+    rpNone: sSourceName := '(no remote)';
   else
-    sSourceName := 'unknown';
+    sSourceName     := 'unknown';
   end;
 
   if Repo.Provider = TargetProvider then
   begin
-    MessageDlg( Format( 'Repository "%s" is already hosted on %s.',
-      [ Repo.Name, sTargetName ] ), mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg(  Format( 'Repository "%s" is already hosted on %s.',
+        [ Repo.Name, sTargetName ] ), mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
   // Collect details for the new repository (reuse Codeberg dialog — fields match)
-  sRepoName := Repo.Name;
-  sDescription := '';
-  lPrivate := False;
+  sRepoName         := Repo.Name;
+  sDescription      := '';
+  lPrivate          := False;
 
   if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate ) ) then
     Exit;
 
-  if MessageDlg( Format(
-    'Migrate repository "%s" from %s to %s?%s%s' +
-    'This will:%s' +
-    '1. Create %s repository "%s" on %s%s' +
-    '2. Preserve the existing origin as a secondary remote%s' +
-    '3. Repoint origin to the new %s URL%s' +
-    '4. Push all branches and tags to %s%s%s' +
-    'The old remote repository is NOT deleted — remove it manually after verifying the migration.',
-    [ Repo.Name, sSourceName, sTargetName, sLineBreak, sLineBreak,
-      sLineBreak,
-      IfThen( lPrivate, 'private', 'public' ), sRepoName, sTargetName, sLineBreak,
-      sLineBreak,
-      sTargetName, sLineBreak,
-      sTargetName, sLineBreak, sLineBreak ] ),
+  if StyledMessageDlg(  Format(
+      'Migrate repository "%s" from %s to %s?%s%s' +
+      'This will:%s' +
+      '1. Create %s repository "%s" on %s%s' +
+      '2. Preserve the existing origin as a secondary remote%s' +
+      '3. Repoint origin to the new %s URL%s' +
+      '4. Push all branches and tags to %s%s%s' +
+      'The old remote repository is NOT deleted — remove it manually after verifying the migration.',
+      [ Repo.Name, sSourceName, sTargetName, sLineBreak, sLineBreak,
+        sLineBreak,
+        IfThen( lPrivate, 'private', 'public' ), sRepoName, sTargetName, sLineBreak,
+        sLineBreak,
+        sTargetName, sLineBreak,
+        sTargetName, sLineBreak, sLineBreak ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
-  Screen.Cursor := crHourGlass;
+  Screen.Cursor     := crHourGlass;
   Log( Format( '=== Migrating %s from %s to %s ===', [ Repo.Name, sSourceName, sTargetName ] ) );
 
   // Run the long-running network + push work off the UI thread so the app
@@ -1747,13 +1742,13 @@ begin
   TThread.CreateAnonymousThread(
     procedure
     var
-      lThreadOK         : Boolean;
-      sThreadURL        : string;
-      sThreadError      : string;
-      sThreadLog        : string;
+      lThreadOK     : Boolean;
+      sThreadURL    : string;
+      sThreadError  : string;
+      sThreadLog    : string;
     begin
 
-      lThreadOK := FRepoManager.MigrateRepository( iIndex, TargetProvider,
+      lThreadOK     := FRepoManager.MigrateRepository( iIndex, TargetProvider,
         sRepoName, sDescription, lPrivate, sThreadURL, sThreadError, sThreadLog );
 
       TThread.Queue( nil,
@@ -1771,16 +1766,16 @@ begin
             FRepoManager.RefreshStatus( iIndex );
             PopulateListView;
 
-            MessageDlg( Format( 'Repository migrated to %s successfully.%s%sNew URL: %s%s%s' +
-              'The old remote still exists on %s — delete it via the web interface once you are satisfied.',
-              [ sTargetName, sLineBreak, sLineBreak, sThreadURL, sLineBreak, sLineBreak, sSourceName ] ),
+            StyledMessageDlg(  Format( 'Repository migrated to %s successfully.%s%sNew URL: %s%s%s' +
+                'The old remote still exists on %s — delete it via the web interface once you are satisfied.',
+                [ sTargetName, sLineBreak, sLineBreak, sThreadURL, sLineBreak, sLineBreak, sSourceName ] ),
               mtInformation, [ mbOK ], 0 );
           end
           else
           begin
             Log( sThreadLog );
             Log( 'Error: ' + sThreadError );
-            MessageDlg( 'Migration failed: ' + sThreadError, mtError, [ mbOK ], 0 );
+            StyledMessageDlg(  'Migration failed: ' + sThreadError, mtError, [ mbOK ], 0 );
           end;
 
         end );
@@ -1822,51 +1817,51 @@ begin
 
   if lvRepos.Selected = nil then
   begin
-    MessageDlg( 'Please select a repository.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg(  'Please select a repository.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
-  iIndex := Integer( lvRepos.Selected.Data );
-  Provider := FRepoManager.GetRepoProvider( iIndex );
+  iIndex            := Integer( lvRepos.Selected.Data );
+  Provider          := FRepoManager.GetRepoProvider( iIndex );
 
   case Provider of
     rpCodeberg: sProviderName := 'Codeberg';
     rpGitHub: sProviderName := 'GitHub';
     rpOther:
       begin
-        MessageDlg( 'Visibility change only supported for GitHub and Codeberg repositories.',
+        StyledMessageDlg(  'Visibility change only supported for GitHub and Codeberg repositories.',
           mtWarning, [ mbOK ], 0 );
         Exit;
       end;
     rpNone:
       begin
-        MessageDlg( 'This repository has no remote origin configured.', mtWarning, [ mbOK ], 0 );
+        StyledMessageDlg(  'This repository has no remote origin configured.', mtWarning, [ mbOK ], 0 );
         Exit;
       end;
   end;
 
-  if MessageDlg( Format( 'Make repository "%s" PUBLIC on %s?%s%s' +
-    'This will make the repository visible to everyone.',
-    [ FRepoManager.Repos[ iIndex ].Name, sProviderName, sLineBreak, sLineBreak ] ),
+  if StyledMessageDlg(  Format( 'Make repository "%s" PUBLIC on %s?%s%s' +
+      'This will make the repository visible to everyone.',
+      [ FRepoManager.Repos[ iIndex ].Name, sProviderName, sLineBreak, sLineBreak ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
-  Screen.Cursor := crHourGlass;
+  Screen.Cursor     := crHourGlass;
 
   try
     if FRepoManager.SetRepositoryVisibility( iIndex, False, sError ) then
     begin
       Log( Format( 'Repository "%s" set to PUBLIC on %s',
-        [ FRepoManager.Repos[ iIndex ].Name, sProviderName ] ) );
-      MessageDlg( 'Repository visibility changed to PUBLIC.', mtInformation, [ mbOK ], 0 );
+          [ FRepoManager.Repos[ iIndex ].Name, sProviderName ] ) );
+      StyledMessageDlg(  'Repository visibility changed to PUBLIC.', mtInformation, [ mbOK ], 0 );
     end
     else
     begin
       Log( 'Error: ' + sError );
-      MessageDlg( 'Failed to change visibility: ' + sError, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to change visibility: ' + sError, mtError, [ mbOK ], 0 );
     end;
   finally
-    Screen.Cursor := crDefault;
+    Screen.Cursor   := crDefault;
   end;
 
 end;
@@ -1884,51 +1879,51 @@ begin
 
   if lvRepos.Selected = nil then
   begin
-    MessageDlg( 'Please select a repository.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg(  'Please select a repository.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
-  iIndex := Integer( lvRepos.Selected.Data );
-  Provider := FRepoManager.GetRepoProvider( iIndex );
+  iIndex            := Integer( lvRepos.Selected.Data );
+  Provider          := FRepoManager.GetRepoProvider( iIndex );
 
   case Provider of
     rpCodeberg: sProviderName := 'Codeberg';
     rpGitHub: sProviderName := 'GitHub';
     rpOther:
       begin
-        MessageDlg( 'Visibility change only supported for GitHub and Codeberg repositories.',
+        StyledMessageDlg(  'Visibility change only supported for GitHub and Codeberg repositories.',
           mtWarning, [ mbOK ], 0 );
         Exit;
       end;
     rpNone:
       begin
-        MessageDlg( 'This repository has no remote origin configured.', mtWarning, [ mbOK ], 0 );
+        StyledMessageDlg(  'This repository has no remote origin configured.', mtWarning, [ mbOK ], 0 );
         Exit;
       end;
   end;
 
-  if MessageDlg( Format( 'Make repository "%s" PRIVATE on %s?%s%s' +
-    'This will make the repository visible only to you.',
-    [ FRepoManager.Repos[ iIndex ].Name, sProviderName, sLineBreak, sLineBreak ] ),
+  if StyledMessageDlg(  Format( 'Make repository "%s" PRIVATE on %s?%s%s' +
+      'This will make the repository visible only to you.',
+      [ FRepoManager.Repos[ iIndex ].Name, sProviderName, sLineBreak, sLineBreak ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
-  Screen.Cursor := crHourGlass;
+  Screen.Cursor     := crHourGlass;
 
   try
     if FRepoManager.SetRepositoryVisibility( iIndex, True, sError ) then
     begin
       Log( Format( 'Repository "%s" set to PRIVATE on %s',
-        [ FRepoManager.Repos[ iIndex ].Name, sProviderName ] ) );
-      MessageDlg( 'Repository visibility changed to PRIVATE.', mtInformation, [ mbOK ], 0 );
+          [ FRepoManager.Repos[ iIndex ].Name, sProviderName ] ) );
+      StyledMessageDlg(  'Repository visibility changed to PRIVATE.', mtInformation, [ mbOK ], 0 );
     end
     else
     begin
       Log( 'Error: ' + sError );
-      MessageDlg( 'Failed to change visibility: ' + sError, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to change visibility: ' + sError, mtError, [ mbOK ], 0 );
     end;
   finally
-    Screen.Cursor := crDefault;
+    Screen.Cursor   := crDefault;
   end;
 
 end;
@@ -1941,7 +1936,7 @@ var
   lHasSelection     : Boolean;
 begin
 
-  lHasSelection := ( lvRepos.Selected <> nil );
+  lHasSelection     := ( lvRepos.Selected <> nil );
 
   mnuRemoveSelected.Enabled := lHasSelection;
   mnuMigrateToCodeberg.Enabled := lHasSelection;
@@ -1957,7 +1952,7 @@ var
   lHasSelection     : Boolean;
 begin
 
-  lHasSelection := ( lvRepos.Selected <> nil );
+  lHasSelection     := ( lvRepos.Selected <> nil );
 
   // Enable per-repo items only when a single repository is selected
   pmEditGitignore.Enabled := lHasSelection;
@@ -1966,20 +1961,20 @@ begin
   pmSetPrivate.Enabled := lHasSelection;
   pmOpenInExplorer.Enabled := lHasSelection;
   pmOpenInGitClient.Enabled := lHasSelection;
-  pmPull.Enabled := lHasSelection;
+  pmPull.Enabled    := lHasSelection;
   pmSetGroup.Enabled := lHasSelection;
 
   // Build the Set Group submenu
   pmSetGroup.Clear;
 
-  Groups := FRepoManager.GetAllGroups;
+  Groups            := FRepoManager.GetAllGroups;
 
   // Add existing groups
   for var i := 0 to High( Groups ) do
   begin
-    MenuItem := TMenuItem.Create( pmSetGroup );
+    MenuItem        := TMenuItem.Create( pmSetGroup );
     MenuItem.Caption := Groups[ i ];
-    MenuItem.Tag := i;
+    MenuItem.Tag    := i;
     MenuItem.OnClick := SetGroupMenuItemClick;
     pmSetGroup.Add( MenuItem );
   end;
@@ -1987,23 +1982,23 @@ begin
   // Add separator if there are groups
   if Length( Groups ) > 0 then
   begin
-    SubMenu := TMenuItem.Create( pmSetGroup );
+    SubMenu         := TMenuItem.Create( pmSetGroup );
     SubMenu.Caption := '-';
     pmSetGroup.Add( SubMenu );
   end;
 
   // Add "Clear Group" option
-  MenuItem := TMenuItem.Create( pmSetGroup );
-  MenuItem.Caption := '(Clear Group)';
-  MenuItem.Tag := -1;
-  MenuItem.OnClick := SetGroupMenuItemClick;
+  MenuItem          := TMenuItem.Create( pmSetGroup );
+  MenuItem.Caption  := '(Clear Group)';
+  MenuItem.Tag      := -1;
+  MenuItem.OnClick  := SetGroupMenuItemClick;
   pmSetGroup.Add( MenuItem );
 
   // Add "New Group..." option
-  MenuItem := TMenuItem.Create( pmSetGroup );
-  MenuItem.Caption := 'New Group...';
-  MenuItem.Tag := -2;
-  MenuItem.OnClick := SetGroupMenuItemClick;
+  MenuItem          := TMenuItem.Create( pmSetGroup );
+  MenuItem.Caption  := 'New Group...';
+  MenuItem.Tag      := -2;
+  MenuItem.OnClick  := SetGroupMenuItemClick;
   pmSetGroup.Add( MenuItem );
 
 end;
@@ -2020,24 +2015,24 @@ begin
 
   if lvRepos.Selected = nil then
   begin
-    MessageDlg( 'Please select a repository.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg(  'Please select a repository.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
-  iIndex := Integer( lvRepos.Selected.Data );
-  sGitignorePath := IncludeTrailingPathDelimiter( FRepoManager.Repos[ iIndex ].Path ) + '.gitignore';
+  iIndex            := Integer( lvRepos.Selected.Data );
+  sGitignorePath    := IncludeTrailingPathDelimiter( FRepoManager.Repos[ iIndex ].Path ) + '.gitignore';
 
   // Check if .gitignore exists, offer to create if not
   if ( not FileExists( sGitignorePath ) ) then
   begin
-    if MessageDlg( Format( 'No .gitignore file exists in "%s".%s%sCreate one now?',
-      [ FRepoManager.Repos[ iIndex ].Name, sLineBreak, sLineBreak ] ),
+    if StyledMessageDlg(  Format( 'No .gitignore file exists in "%s".%s%sCreate one now?',
+        [ FRepoManager.Repos[ iIndex ].Name, sLineBreak, sLineBreak ] ),
       mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
       Exit;
 
     // Create empty .gitignore file
     try
-      FileStream := TFileStream.Create( sGitignorePath, fmCreate );
+      FileStream    := TFileStream.Create( sGitignorePath, fmCreate );
       try
         // File created empty
       finally
@@ -2048,7 +2043,7 @@ begin
     except
       on E: Exception do
       begin
-        MessageDlg( 'Failed to create .gitignore: ' + E.Message, mtError, [ mbOK ], 0 );
+        StyledMessageDlg(  'Failed to create .gitignore: ' + E.Message, mtError, [ mbOK ], 0 );
         Exit;
       end;
     end;
@@ -2064,7 +2059,7 @@ end;
 /// </summary>
 procedure TMainForm.pmFixGitignoreClick( Sender: TObject );
 const
-  DELPHI_PATTERNS: array[0..24] of string = (
+  DELPHI_PATTERNS   : array[ 0..24 ] of string = (
     '# Delphi build artifacts',
     '*.dcu',
     '*.exe',
@@ -2090,7 +2085,7 @@ const
     '*.dsk',
     'Win32/',
     'Win64/'
-  );
+    );
 var
   iIndex            : Integer;
   sGitignorePath    : string;
@@ -2103,15 +2098,15 @@ begin
 
   if lvRepos.Selected = nil then
   begin
-    MessageDlg( 'Please select a repository.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg(  'Please select a repository.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
-  iIndex := Integer( lvRepos.Selected.Data );
-  sGitignorePath := IncludeTrailingPathDelimiter( FRepoManager.Repos[ iIndex ].Path ) + '.gitignore';
+  iIndex            := Integer( lvRepos.Selected.Data );
+  sGitignorePath    := IncludeTrailingPathDelimiter( FRepoManager.Repos[ iIndex ].Path ) + '.gitignore';
 
-  slExisting := TStringList.Create;
-  slToAdd := TStringList.Create;
+  slExisting        := TStringList.Create;
+  slToAdd           := TStringList.Create;
 
   try
     // Read existing .gitignore content
@@ -2122,14 +2117,14 @@ begin
       except
         on E: Exception do
         begin
-          MessageDlg( 'Failed to read .gitignore: ' + E.Message, mtError, [ mbOK ], 0 );
+          StyledMessageDlg(  'Failed to read .gitignore: ' + E.Message, mtError, [ mbOK ], 0 );
           Exit;
         end;
       end;
     end;
 
     // Build lowercase version for case-insensitive comparison
-    sLowerContent := slExisting.Text.ToLower;
+    sLowerContent   := slExisting.Text.ToLower;
 
     // Check which patterns are missing
     for sPattern in DELPHI_PATTERNS do
@@ -2145,7 +2140,7 @@ begin
 
     if slToAdd.Count = 0 then
     begin
-      MessageDlg( 'All standard Delphi patterns are already in .gitignore.', mtInformation, [ mbOK ], 0 );
+      StyledMessageDlg(  'All standard Delphi patterns are already in .gitignore.', mtInformation, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -2159,7 +2154,7 @@ begin
       slExisting.Add( '# Delphi build artifacts (added by GitBatchCommit)' );
 
       // Add missing patterns
-      iAddedCount := 0;
+      iAddedCount   := 0;
       for sPattern in DELPHI_PATTERNS do
       begin
         if sPattern.StartsWith( '#' ) then
@@ -2176,7 +2171,7 @@ begin
       slExisting.SaveToFile( sGitignorePath );
 
       Log( Format( 'Added %d Delphi patterns to .gitignore in %s', [ iAddedCount, FRepoManager.Repos[ iIndex ].Name ] ) );
-      MessageDlg( Format( 'Added %d patterns to .gitignore.', [ iAddedCount ] ), mtInformation, [ mbOK ], 0 );
+      StyledMessageDlg(  Format( 'Added %d patterns to .gitignore.', [ iAddedCount ] ), mtInformation, [ mbOK ], 0 );
 
       // Refresh the repository status
       FRepoManager.RefreshStatus( iIndex );
@@ -2185,7 +2180,7 @@ begin
     except
       on E: Exception do
       begin
-        MessageDlg( 'Failed to save .gitignore: ' + E.Message, mtError, [ mbOK ], 0 );
+        StyledMessageDlg(  'Failed to save .gitignore: ' + E.Message, mtError, [ mbOK ], 0 );
         Exit;
       end;
     end;
@@ -2205,11 +2200,11 @@ var
   sReadmePath       : string;
 begin
 
-  sReadmePath := ExtractFilePath( Application.ExeName ) + 'Users Guide.md';
+  sReadmePath       := ExtractFilePath( Application.ExeName ) + 'Users Guide.md';
 
   if ( not FileExists( sReadmePath ) ) then
   begin
-    MessageDlg( 'Users Guide.md not found in application folder.', mtWarning, [ mbOK ], 0 );
+    StyledMessageDlg(  'Users Guide.md not found in application folder.', mtWarning, [ mbOK ], 0 );
     Exit;
   end;
 
@@ -2223,7 +2218,7 @@ end;
 procedure TMainForm.mnuAboutClick( Sender: TObject );
 begin
 
-  MessageDlg(
+  StyledMessageDlg(
     'Git Batch Commit' + sLineBreak +
     sLineBreak +
     'Version ' + APP_VERSION + sLineBreak +
@@ -2257,12 +2252,12 @@ begin
   if Item = nil then
     Exit;
 
-  iIndex := Integer( Item.Data );
+  iIndex            := Integer( Item.Data );
 
   if ( iIndex < 0 ) or ( iIndex > High( FRepoManager.Repos ) ) then
     Exit;
 
-  Status := FRepoManager.Repos[ iIndex ].Status;
+  Status            := FRepoManager.Repos[ iIndex ].Status;
 
   // Set background colour based on status
   case Status of
@@ -2282,7 +2277,7 @@ begin
   if cdsSelected in State then
     Sender.Canvas.Brush.Color := clHighlight;
 
-  DefaultDraw := True;
+  DefaultDraw       := True;
 
 end;
 
@@ -2297,7 +2292,7 @@ begin
   if lvRepos.Selected = nil then
     Exit;
 
-  iIndex := Integer( lvRepos.Selected.Data );
+  iIndex            := Integer( lvRepos.Selected.Data );
   ShellExecute( Handle, 'explore', PChar( FRepoManager.Repos[ iIndex ].Path ), nil, nil, SW_SHOWNORMAL );
 
 end;
@@ -2315,20 +2310,20 @@ begin
   if lvRepos.Selected = nil then
     Exit;
 
-  iIndex := Integer( lvRepos.Selected.Data );
-  sRepoPath := FRepoManager.Repos[ iIndex ].Path;
-  sClientPath := FRepoManager.GitClientPath;
+  iIndex            := Integer( lvRepos.Selected.Data );
+  sRepoPath         := FRepoManager.Repos[ iIndex ].Path;
+  sClientPath       := FRepoManager.GitClientPath;
 
   if sClientPath.IsEmpty then
   begin
-    MessageDlg( 'No Git client configured. Please set the Git client path in File > Settings.',
+    StyledMessageDlg(  'No Git client configured. Please set the Git client path in File > Settings.',
       mtWarning, [ mbOK ], 0 );
     Exit;
   end;
 
   if ( not FileExists( sClientPath ) ) then
   begin
-    MessageDlg( 'Git client not found: ' + sClientPath, mtError, [ mbOK ], 0 );
+    StyledMessageDlg(  'Git client not found: ' + sClientPath, mtError, [ mbOK ], 0 );
     Exit;
   end;
 
@@ -2350,10 +2345,10 @@ begin
   if lvRepos.Selected = nil then
     Exit;
 
-  iIndex := Integer( lvRepos.Selected.Data );
+  iIndex            := Integer( lvRepos.Selected.Data );
 
   // Strong warning about local code being modified
-  if MessageDlg(
+  if StyledMessageDlg(
     'WARNING: Pull will merge remote changes into your LOCAL code.' + sLineBreak + sLineBreak +
     'Your local files for "' + FRepoManager.Repos[ iIndex ].Name + '" MAY BE MODIFIED.' + sLineBreak + sLineBreak +
     'A backup branch will be created before pulling.' + sLineBreak + sLineBreak +
@@ -2361,7 +2356,7 @@ begin
     mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
-  Screen.Cursor := crHourGlass;
+  Screen.Cursor     := crHourGlass;
 
   try
     // Preview incoming changes
@@ -2371,7 +2366,7 @@ begin
       if not sChanges.IsEmpty then
       begin
         Screen.Cursor := crDefault;
-        if MessageDlg(
+        if StyledMessageDlg(
           'The following files will be MODIFIED:' + sLineBreak + sLineBreak +
           sChanges + sLineBreak + sLineBreak +
           'Do you want to proceed? (A backup branch will be created)',
@@ -2406,10 +2401,10 @@ begin
     else
     begin
       Log( 'Pull failed: ' + sLog );
-      MessageDlg( 'Pull failed: ' + sLog, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Pull failed: ' + sLog, mtError, [ mbOK ], 0 );
     end;
   finally
-    Screen.Cursor := crDefault;
+    Screen.Cursor   := crDefault;
   end;
 
 end;
@@ -2424,7 +2419,7 @@ begin
 
   BuildHistoryMenu;
 
-  Pt := btnHistory.ClientToScreen( Point( 0, btnHistory.Height ) );
+  Pt                := btnHistory.ClientToScreen( Point( 0, btnHistory.Height ) );
   pmHistory.Popup( Pt.X, Pt.Y );
 
 end;
@@ -2440,11 +2435,11 @@ begin
 
   pmHistory.Items.Clear;
 
-  History := FRepoManager.CommitHistory;
+  History           := FRepoManager.CommitHistory;
 
   if Length( History ) = 0 then
   begin
-    MenuItem := TMenuItem.Create( pmHistory );
+    MenuItem        := TMenuItem.Create( pmHistory );
     MenuItem.Caption := '(No history)';
     MenuItem.Enabled := False;
     pmHistory.Items.Add( MenuItem );
@@ -2453,9 +2448,9 @@ begin
 
   for var i := 0 to High( History ) do
   begin
-    MenuItem := TMenuItem.Create( pmHistory );
+    MenuItem        := TMenuItem.Create( pmHistory );
     MenuItem.Caption := History[ i ];
-    MenuItem.Tag := i;
+    MenuItem.Tag    := i;
     MenuItem.OnClick := HistoryMenuItemClick;
     pmHistory.Items.Add( MenuItem );
   end;
@@ -2471,8 +2466,8 @@ var
   History           : TArray<string>;
 begin
 
-  MenuItem := Sender as TMenuItem;
-  History := FRepoManager.CommitHistory;
+  MenuItem          := Sender as TMenuItem;
+  History           := FRepoManager.CommitHistory;
 
   if ( MenuItem.Tag >= 0 ) and ( MenuItem.Tag <= High( History ) ) then
     edtCommitMessage.Text := History[ MenuItem.Tag ];
@@ -2490,9 +2485,9 @@ var
   OpenDialog        : TOpenDialog;
 begin
 
-  sClientPath := FRepoManager.GitClientPath;
-  sFilePattern := FRepoManager.FilePattern;
-  sIndexerPath := FRepoManager.DelphiIndexerPath;
+  sClientPath       := FRepoManager.GitClientPath;
+  sFilePattern      := FRepoManager.FilePattern;
+  sIndexerPath      := FRepoManager.DelphiIndexerPath;
 
   // Use separate InputQuery calls since the multi-value version has issues
   if InputQuery( 'Settings', 'Git Client Path (e.g., C:\Program Files\Fork\Fork.exe):', sClientPath ) then
@@ -2503,18 +2498,18 @@ begin
       // so anything outside a glob whitelist could inject commands.
       if ( not TGitRepoManager.IsSafeFilePattern( sFilePattern ) ) then
       begin
-        MessageDlg( 'File pattern contains characters that are not allowed.' + sLineBreak + sLineBreak +
+        StyledMessageDlg(  'File pattern contains characters that are not allowed.' + sLineBreak + sLineBreak +
           'Use only letters, digits, glob characters ( * ? [ ] ), dots, dashes, underscores, slashes, commas, and spaces.',
           mtError, [ mbOK ], 0 );
         Exit;
       end;
 
       // Ask if user wants to configure delphi-indexer path
-      if MessageDlg( 'Configure delphi-indexer.exe path?' + sLineBreak + sLineBreak +
+      if StyledMessageDlg(  'Configure delphi-indexer.exe path?' + sLineBreak + sLineBreak +
         'Current: ' + IfThen( sIndexerPath.IsEmpty, '(Auto-detect)', sIndexerPath ),
         mtConfirmation, [ mbYes, mbNo ], 0 ) = mrYes then
       begin
-        OpenDialog := TOpenDialog.Create( nil );
+        OpenDialog  := TOpenDialog.Create( nil );
         try
           OpenDialog.Title := 'Locate delphi-indexer.exe';
           OpenDialog.Filter := 'Delphi Indexer|delphi-indexer.exe|Executable Files|*.exe|All Files|*.*';
@@ -2553,7 +2548,7 @@ begin
 
   BuildTemplatesMenu;
 
-  Pt := btnTemplates.ClientToScreen( Point( 0, btnTemplates.Height ) );
+  Pt                := btnTemplates.ClientToScreen( Point( 0, btnTemplates.Height ) );
   pmTemplates.Popup( Pt.X, Pt.Y );
 
 end;
@@ -2569,11 +2564,11 @@ begin
 
   pmTemplates.Items.Clear;
 
-  Templates := FRepoManager.CommitTemplates;
+  Templates         := FRepoManager.CommitTemplates;
 
   if Length( Templates ) = 0 then
   begin
-    MenuItem := TMenuItem.Create( pmTemplates );
+    MenuItem        := TMenuItem.Create( pmTemplates );
     MenuItem.Caption := '(No templates - use File > Template Settings to add)';
     MenuItem.Enabled := False;
     pmTemplates.Items.Add( MenuItem );
@@ -2582,9 +2577,9 @@ begin
 
   for var i := 0 to High( Templates ) do
   begin
-    MenuItem := TMenuItem.Create( pmTemplates );
+    MenuItem        := TMenuItem.Create( pmTemplates );
     MenuItem.Caption := Templates[ i ];
-    MenuItem.Tag := i;
+    MenuItem.Tag    := i;
     MenuItem.OnClick := TemplateMenuItemClick;
     pmTemplates.Items.Add( MenuItem );
   end;
@@ -2600,8 +2595,8 @@ var
   Templates         : TArray<string>;
 begin
 
-  MenuItem := Sender as TMenuItem;
-  Templates := FRepoManager.CommitTemplates;
+  MenuItem          := Sender as TMenuItem;
+  Templates         := FRepoManager.CommitTemplates;
 
   if ( MenuItem.Tag >= 0 ) and ( MenuItem.Tag <= High( Templates ) ) then
     edtCommitMessage.Text := Templates[ MenuItem.Tag ];
@@ -2616,7 +2611,7 @@ var
   Templates         : TArray<string>;
 begin
 
-  Templates := FRepoManager.CommitTemplates;
+  Templates         := FRepoManager.CommitTemplates;
 
   if TTemplateSettingsDialog.Execute( Templates ) then
   begin
@@ -2649,11 +2644,11 @@ var
   sCurrentGroup     : string;
 begin
 
-  sCurrentGroup := cboGroupFilter.Text;
+  sCurrentGroup     := cboGroupFilter.Text;
   cboGroupFilter.Items.Clear;
   cboGroupFilter.Items.Add( '(All Groups)' );
 
-  Groups := FRepoManager.GetAllGroups;
+  Groups            := FRepoManager.GetAllGroups;
 
   for var i := 0 to High( Groups ) do
     cboGroupFilter.Items.Add( Groups[ i ] );
@@ -2663,7 +2658,7 @@ begin
     cboGroupFilter.ItemIndex := 0
   else
   begin
-    var iIndex := cboGroupFilter.Items.IndexOf( sCurrentGroup );
+    var iIndex      := cboGroupFilter.Items.IndexOf( sCurrentGroup );
 
     if iIndex >= 0 then
       cboGroupFilter.ItemIndex := iIndex
@@ -2680,9 +2675,9 @@ procedure TMainForm.cboGroupFilterChange( Sender: TObject );
 begin
 
   if cboGroupFilter.ItemIndex <= 0 then
-    FGroupFilter := ''
+    FGroupFilter    := ''
   else
-    FGroupFilter := cboGroupFilter.Text;
+    FGroupFilter    := cboGroupFilter.Text;
 
   PopulateListView;
 
@@ -2700,14 +2695,14 @@ var
   Groups            : TArray<string>;
 begin
 
-  MenuItem := Sender as TMenuItem;
-  sGroup := '';
+  MenuItem          := Sender as TMenuItem;
+  sGroup            := '';
 
   // Determine group name first
   if MenuItem.Tag = -1 then
   begin
     // Clear group
-    sGroup := '';
+    sGroup          := '';
   end
   else if MenuItem.Tag = -2 then
   begin
@@ -2715,7 +2710,7 @@ begin
     if ( not InputQuery( 'New Group', 'Enter group name:', sGroup ) ) then
       Exit;
 
-    sGroup := Trim( sGroup );
+    sGroup          := Trim( sGroup );
 
     if sGroup.IsEmpty then
       Exit;
@@ -2723,22 +2718,22 @@ begin
   else
   begin
     // Existing group
-    Groups := FRepoManager.GetAllGroups;
+    Groups          := FRepoManager.GetAllGroups;
 
     if ( MenuItem.Tag >= 0 ) and ( MenuItem.Tag <= High( Groups ) ) then
-      sGroup := Groups[ MenuItem.Tag ]
+      sGroup        := Groups[ MenuItem.Tag ]
     else
       Exit;
   end;
 
   // Apply to all checked repositories
-  iCount := 0;
+  iCount            := 0;
 
   for var i := 0 to lvRepos.Items.Count - 1 do
   begin
     if lvRepos.Items[ i ].Checked then
     begin
-      iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+      iRepoIndex    := Integer( lvRepos.Items[ i ].Data );
       FRepoManager.SetRepoGroup( iRepoIndex, sGroup );
       Inc( iCount );
     end;
@@ -2774,7 +2769,7 @@ var
 begin
 
   // Count selected repositories
-  iCount := 0;
+  iCount            := 0;
 
   for var i := 0 to lvRepos.Items.Count - 1 do
   begin
@@ -2784,12 +2779,12 @@ begin
 
   if iCount = 0 then
   begin
-    MessageDlg( 'No repositories selected.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg(  'No repositories selected.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
   // Strong warning about local code being modified
-  if MessageDlg(
+  if StyledMessageDlg(
     'WARNING: Pull will merge remote changes into your LOCAL code.' + sLineBreak + sLineBreak +
     'Your local files MAY BE MODIFIED by this operation.' + sLineBreak + sLineBreak +
     'A backup branch will be created before pulling.' + sLineBreak + sLineBreak +
@@ -2799,16 +2794,16 @@ begin
 
   // Fetch and preview incoming changes
   Log( 'Fetching and previewing incoming changes...' );
-  Screen.Cursor := crHourGlass;
-  slPreview := TStringList.Create;
-  bHasChanges := False;
+  Screen.Cursor     := crHourGlass;
+  slPreview         := TStringList.Create;
+  bHasChanges       := False;
 
   try
     for var i := 0 to lvRepos.Items.Count - 1 do
     begin
       if lvRepos.Items[ i ].Checked then
       begin
-        iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+        iRepoIndex  := Integer( lvRepos.Items[ i ].Data );
         if FRepoManager.GetIncomingChanges( iRepoIndex, sChanges, sLog ) then
         begin
           if not sChanges.IsEmpty then
@@ -2822,13 +2817,13 @@ begin
       end;
     end;
   finally
-    Screen.Cursor := crDefault;
+    Screen.Cursor   := crDefault;
   end;
 
   // Show preview and confirm
   if bHasChanges then
   begin
-    if MessageDlg(
+    if StyledMessageDlg(
       'The following files will be MODIFIED by the pull:' + sLineBreak + sLineBreak +
       slPreview.Text + sLineBreak +
       'Do you want to proceed? (Backup branches will be created)',
@@ -2845,15 +2840,15 @@ begin
   slPreview.Free;
 
   // Now perform the actual pull with backup
-  Screen.Cursor := crHourGlass;
-  iSuccess := 0;
+  Screen.Cursor     := crHourGlass;
+  iSuccess          := 0;
 
   try
     for var i := 0 to lvRepos.Items.Count - 1 do
     begin
       if lvRepos.Items[ i ].Checked then
       begin
-        iRepoIndex := Integer( lvRepos.Items[ i ].Data );
+        iRepoIndex  := Integer( lvRepos.Items[ i ].Data );
 
         Log( Format( '=== Pulling %s ===', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
 
@@ -2878,7 +2873,7 @@ begin
       end;
     end;
   finally
-    Screen.Cursor := crDefault;
+    Screen.Cursor   := crDefault;
   end;
 
   Log( Format( 'Pull completed: %d of %d successful.', [ iSuccess, iCount ] ) );
@@ -2899,7 +2894,7 @@ var
 begin
 
   // Count selected repositories
-  iCount := 0;
+  iCount            := 0;
 
   for var i := 0 to lvRepos.Items.Count - 1 do
   begin
@@ -2909,22 +2904,22 @@ begin
 
   if iCount = 0 then
   begin
-    MessageDlg( 'No repositories selected.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg(  'No repositories selected.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
-  if MessageDlg( Format( 'Resolve conflicts for %d repository(ies) by keeping LOCAL versions?' + sLineBreak +
-    sLineBreak + 'This will:' + sLineBreak +
-    '- Keep your local version of all conflicted files' + sLineBreak +
-    '- Commit the merge resolution' + sLineBreak +
-    '- Push to remote', [ iCount ] ),
+  if StyledMessageDlg(  Format( 'Resolve conflicts for %d repository(ies) by keeping LOCAL versions?' + sLineBreak +
+      sLineBreak + 'This will:' + sLineBreak +
+      '- Keep your local version of all conflicted files' + sLineBreak +
+      '- Commit the merge resolution' + sLineBreak +
+      '- Push to remote', [ iCount ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
   var slReindexDirs := TStringList.Create;
   try
-    Screen.Cursor := crHourGlass;
-    iSuccess := 0;
+    Screen.Cursor   := crHourGlass;
+    iSuccess        := 0;
 
     try
       for var i := 0 to lvRepos.Items.Count - 1 do
@@ -2979,7 +2974,7 @@ var
 begin
 
   // Count selected repositories
-  iCount := 0;
+  iCount            := 0;
 
   for var i := 0 to lvRepos.Items.Count - 1 do
   begin
@@ -2989,18 +2984,18 @@ begin
 
   if iCount = 0 then
   begin
-    MessageDlg( 'No repositories selected.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg(  'No repositories selected.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
-  if MessageDlg( Format( 'Push %d repository(ies) without committing?', [ iCount ] ),
+  if StyledMessageDlg(  Format( 'Push %d repository(ies) without committing?', [ iCount ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
   var slReindexDirs := TStringList.Create;
   try
-    Screen.Cursor := crHourGlass;
-    iSuccess := 0;
+    Screen.Cursor   := crHourGlass;
+    iSuccess        := 0;
 
     try
       for var i := 0 to lvRepos.Items.Count - 1 do
@@ -3054,7 +3049,7 @@ var
 begin
 
   // Count selected repositories
-  iCount := 0;
+  iCount            := 0;
 
   for var i := 0 to lvRepos.Items.Count - 1 do
   begin
@@ -3064,12 +3059,12 @@ begin
 
   if iCount = 0 then
   begin
-    MessageDlg( 'No repositories selected.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg(  'No repositories selected.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
   // Strong warning about force push
-  if MessageDlg(
+  if StyledMessageDlg(
     'WARNING: Force Push will OVERWRITE the remote repository history!' + sLineBreak + sLineBreak +
     'This makes your local code the definitive version.' + sLineBreak +
     'Any commits on the remote that are not in your local will be LOST.' + sLineBreak + sLineBreak +
@@ -3079,7 +3074,7 @@ begin
     Exit;
 
   // Second confirmation for safety
-  if MessageDlg(
+  if StyledMessageDlg(
     'FINAL CONFIRMATION' + sLineBreak + sLineBreak +
     'You are about to force push ' + IntToStr( iCount ) + ' repository(ies).' + sLineBreak + sLineBreak +
     'Remote history will be overwritten. This cannot be undone.' + sLineBreak + sLineBreak +
@@ -3089,8 +3084,8 @@ begin
 
   var slReindexDirs := TStringList.Create;
   try
-    Screen.Cursor := crHourGlass;
-    iSuccess := 0;
+    Screen.Cursor   := crHourGlass;
+    iSuccess        := 0;
 
     try
       for var i := 0 to lvRepos.Items.Count - 1 do
@@ -3158,8 +3153,8 @@ var
   iRemainingTimeout : Integer;
 begin
 
-  Result := False;
-  AOutput := '';
+  Result            := False;
+  AOutput           := '';
 
   SecurityAttr.nLength := SizeOf( TSecurityAttributes );
   SecurityAttr.bInheritHandle := True;
@@ -3170,7 +3165,7 @@ begin
 
   try
     ZeroMemory( @StartupInfo, SizeOf( TStartupInfo ) );
-    StartupInfo.cb := SizeOf( TStartupInfo );
+    StartupInfo.cb  := SizeOf( TStartupInfo );
     StartupInfo.hStdOutput := hWritePipe;
     StartupInfo.hStdError := hWritePipe;
     StartupInfo.dwFlags := STARTF_USESTDHANDLES or STARTF_USESHOWWINDOW;
@@ -3178,7 +3173,7 @@ begin
 
     ZeroMemory( @ProcessInfo, SizeOf( TProcessInformation ) );
 
-    lSuccess := CreateProcess(
+    lSuccess        := CreateProcess(
       nil,
       PChar( ACommand ),
       nil,
@@ -3194,7 +3189,7 @@ begin
     if lSuccess then
     begin
       CloseHandle( hWritePipe );
-      hWritePipe := 0;
+      hWritePipe    := 0;
 
       SetLength( Buffer, 4096 );
       iRemainingTimeout := ATimeout;
@@ -3228,12 +3223,12 @@ begin
       while PeekNamedPipe( hReadPipe, nil, 0, nil, @dwBytesAvail, nil ) and ( dwBytesAvail > 0 ) do
       begin
         if ReadFile( hReadPipe, Buffer[ 0 ], Length( Buffer ), dwBytesRead, nil ) and ( dwBytesRead > 0 ) then
-          AOutput := AOutput + TEncoding.UTF8.GetString( Buffer, 0, dwBytesRead );
+          AOutput   := AOutput + TEncoding.UTF8.GetString( Buffer, 0, dwBytesRead );
       end;
 
       // Check exit code to determine success
       if GetExitCodeProcess( ProcessInfo.hProcess, dwExitCode ) then
-        Result := ( dwExitCode = 0 );
+        Result      := ( dwExitCode = 0 );
 
       CloseHandle( ProcessInfo.hProcess );
       CloseHandle( ProcessInfo.hThread );
@@ -3262,14 +3257,14 @@ var
   sContent          : string;
 begin
 
-  sGitIgnorePath := TPath.Combine( sFolder, '.gitignore' );
+  sGitIgnorePath    := TPath.Combine( sFolder, '.gitignore' );
 
   // Don't overwrite an existing .gitignore
   if TFile.Exists( sGitIgnorePath ) then
     Exit;
 
   if sProjectType = 'Delphi / Pascal' then
-    sContent :=
+    sContent        :=
       '# Delphi compiler-generated binaries' + sLineBreak +
       '*.exe' + sLineBreak +
       '*.dll' + sLineBreak +
@@ -3306,7 +3301,7 @@ begin
       '__history/' + sLineBreak +
       '__recovery/' + sLineBreak
   else if sProjectType = 'C / C++' then
-    sContent :=
+    sContent        :=
       '*.o' + sLineBreak +
       '*.obj' + sLineBreak +
       '*.exe' + sLineBreak +
@@ -3318,7 +3313,7 @@ begin
       'build/' + sLineBreak +
       'cmake-build-*/' + sLineBreak
   else if sProjectType = 'C#' then
-    sContent :=
+    sContent        :=
       'bin/' + sLineBreak +
       'obj/' + sLineBreak +
       '*.user' + sLineBreak +
@@ -3326,7 +3321,7 @@ begin
       '.vs/' + sLineBreak +
       'packages/' + sLineBreak
   else if sProjectType = 'Java' then
-    sContent :=
+    sContent        :=
       '*.class' + sLineBreak +
       '*.jar' + sLineBreak +
       '*.war' + sLineBreak +
@@ -3335,7 +3330,7 @@ begin
       '.gradle/' + sLineBreak +
       '.idea/' + sLineBreak
   else if sProjectType = 'Python' then
-    sContent :=
+    sContent        :=
       '__pycache__/' + sLineBreak +
       '*.pyc' + sLineBreak +
       '*.pyo' + sLineBreak +
@@ -3345,28 +3340,28 @@ begin
       '.venv/' + sLineBreak +
       'venv/' + sLineBreak
   else if ( sProjectType = 'JavaScript / Node' ) or ( sProjectType = 'TypeScript' ) then
-    sContent :=
+    sContent        :=
       'node_modules/' + sLineBreak +
       'dist/' + sLineBreak +
       'build/' + sLineBreak +
       '.env' + sLineBreak +
       '*.log' + sLineBreak
   else if sProjectType = 'Go' then
-    sContent :=
+    sContent        :=
       'bin/' + sLineBreak +
       'vendor/' + sLineBreak +
       '*.exe' + sLineBreak
   else if sProjectType = 'Rust' then
-    sContent :=
+    sContent        :=
       'target/' + sLineBreak +
       'Cargo.lock' + sLineBreak
   else if sProjectType = 'HTML / Web' then
-    sContent :=
+    sContent        :=
       'node_modules/' + sLineBreak +
       '.env' + sLineBreak +
       'dist/' + sLineBreak
   else
-    Exit; // (None) — no .gitignore
+    Exit;                               // (None) — no .gitignore
 
   try
     TFile.WriteAllText( sGitIgnorePath, sContent, TEncoding.UTF8 );
@@ -3390,11 +3385,11 @@ var
   iChoice           : Integer;
 begin
 
-  Result := False;
-  sRepoName := ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) );
+  Result            := False;
+  sRepoName         := ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) );
 
   // Ask the user what to do
-  iChoice := MessageDlg(
+  iChoice           := StyledMessageDlg(
     Format( '"%s" is not a Git repository.', [ sRepoName ] ) + sLineBreak + sLineBreak +
     'Would you like to initialise it and push to a remote?' + sLineBreak + sLineBreak +
     'Yes = Codeberg' + sLineBreak +
@@ -3410,7 +3405,7 @@ begin
   begin
     if not FRepoManager.HasCodebergCredentials then
     begin
-      MessageDlg( 'Please configure Codeberg credentials first.', mtWarning, [ mbOK ], 0 );
+      StyledMessageDlg(  'Please configure Codeberg credentials first.', mtWarning, [ mbOK ], 0 );
       mnuCodebergSettingsClick( nil );
 
       if not FRepoManager.HasCodebergCredentials then
@@ -3421,7 +3416,7 @@ begin
   begin
     if not FRepoManager.HasGitHubCredentials then
     begin
-      MessageDlg( 'Please configure GitHub credentials first.', mtWarning, [ mbOK ], 0 );
+      StyledMessageDlg(  'Please configure GitHub credentials first.', mtWarning, [ mbOK ], 0 );
       mnuGitHubSettingsClick( nil );
 
       if not FRepoManager.HasGitHubCredentials then
@@ -3430,9 +3425,9 @@ begin
   end;
 
   // Get repository details with project type
-  sDescription := '';
-  lPrivate := True;
-  sProjectType := 'Delphi / Pascal';
+  sDescription      := '';
+  lPrivate          := True;
+  sProjectType      := 'Delphi / Pascal';
 
   if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate, sProjectType ) ) then
     Exit;
@@ -3440,7 +3435,7 @@ begin
   // Write .gitignore based on project type before init
   WriteGitIgnoreForProjectType( sFolder, sProjectType );
 
-  Screen.Cursor := crHourGlass;
+  Screen.Cursor     := crHourGlass;
 
   try
     // Step 1: Initialise local repository
@@ -3449,7 +3444,7 @@ begin
     if not FRepoManager.InitializeRepository( sFolder, sLog ) then
     begin
       Log( 'Error: ' + sLog );
-      MessageDlg( 'Failed to initialise repository: ' + sLog, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to initialise repository: ' + sLog, mtError, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -3463,7 +3458,7 @@ begin
       if not FRepoManager.CreateCodebergRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) then
       begin
         Log( 'Error: ' + sError );
-        MessageDlg( 'Failed to create Codeberg repository: ' + sError, mtError, [ mbOK ], 0 );
+        StyledMessageDlg(  'Failed to create Codeberg repository: ' + sError, mtError, [ mbOK ], 0 );
         Exit;
       end;
     end
@@ -3474,7 +3469,7 @@ begin
       if not FRepoManager.CreateGitHubRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) then
       begin
         Log( 'Error: ' + sError );
-        MessageDlg( 'Failed to create GitHub repository: ' + sError, mtError, [ mbOK ], 0 );
+        StyledMessageDlg(  'Failed to create GitHub repository: ' + sError, mtError, [ mbOK ], 0 );
         Exit;
       end;
     end;
@@ -3485,7 +3480,7 @@ begin
     if not FRepoManager.AddRemoteOrigin( sFolder, sRemoteURL, sLog ) then
     begin
       Log( 'Error: ' + sLog );
-      MessageDlg( 'Failed to add remote origin: ' + sLog, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to add remote origin: ' + sLog, mtError, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -3495,7 +3490,7 @@ begin
     if not FRepoManager.InitialCommitAndPush( sFolder, 'Initial commit', sLog ) then
     begin
       Log( 'Error: ' + sLog );
-      MessageDlg( 'Failed to commit and push: ' + sLog, mtError, [ mbOK ], 0 );
+      StyledMessageDlg(  'Failed to commit and push: ' + sLog, mtError, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -3504,9 +3499,9 @@ begin
     // Add to repository list
     FRepoManager.AddRepository( sFolder );
     Log( Format( '=== %s initialised and pushed ===', [ sRepoName ] ) );
-    Result := True;
+    Result          := True;
   finally
-    Screen.Cursor := crDefault;
+    Screen.Cursor   := crDefault;
   end;
 
 end;
@@ -3529,13 +3524,13 @@ begin
     Exit;
 
   // Find delphi-indexer.exe location
-  sIndexerPath := '';
+  sIndexerPath      := '';
 
   // 1. Check user-configured path first (verify it still exists)
   if not FRepoManager.DelphiIndexerPath.IsEmpty then
   begin
     if FileExists( FRepoManager.DelphiIndexerPath ) then
-      sIndexerPath := FRepoManager.DelphiIndexerPath
+      sIndexerPath  := FRepoManager.DelphiIndexerPath
     else
     begin
       FRepoManager.DelphiIndexerPath := '';
@@ -3544,11 +3539,11 @@ begin
   end;
 
   // 2. Check PATH environment variable
-  FilePart := nil;
+  FilePart          := nil;
 
   if sIndexerPath.IsEmpty and ( SearchPath( nil, PChar( DELPHI_INDEXER_EXE ), nil, MAX_PATH, SearchBuffer, FilePart ) <> 0 ) then
   begin
-    sIndexerPath := SearchBuffer;
+    sIndexerPath    := SearchBuffer;
     FRepoManager.DelphiIndexerPath := sIndexerPath;
     FRepoManager.SaveConfig;
   end;
@@ -3556,7 +3551,7 @@ begin
   // 3. Check default installation location
   if sIndexerPath.IsEmpty and FileExists( DEFAULT_INSTALL_PATH ) then
   begin
-    sIndexerPath := DEFAULT_INSTALL_PATH;
+    sIndexerPath    := DEFAULT_INSTALL_PATH;
     FRepoManager.DelphiIndexerPath := sIndexerPath;
     FRepoManager.SaveConfig;
   end;
@@ -3571,7 +3566,7 @@ begin
   for sPath in ADirs do
   begin
     Log( Format( 'Triggering delphi-lookup reindex: %s', [ sPath ] ) );
-    sParams := Format( '"%s" "%s" --category user', [ sIndexerPath, sPath ] );
+    sParams         := Format( '"%s" "%s" --category user', [ sIndexerPath, sPath ] );
 
     if ExecuteCommand( sParams, sOutput ) then
       Log( 'delphi-lookup reindex completed successfully' )
@@ -3593,7 +3588,7 @@ begin
   if ( ssCtrl in Shift ) and ( Key = Ord( 'A' ) ) then
   begin
     mmoLog.SelectAll;
-    Key := 0;
+    Key             := 0;
   end;
 
 end;
@@ -3608,7 +3603,7 @@ begin
     if btnCommitPush.Enabled then
       btnCommitPushClick( btnCommitPush );
 
-    Key := 0;
+    Key             := 0;
 
   end;
 

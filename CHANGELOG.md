@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `GetCurrentBranch` / `HasAnyCommit` / `IsWorkingTreeClean` helpers for safer Git flow decisions (2026-04-18) — `uGitRepoManager.pas`
 
 ### Changed
+- All MainFrm message dialogs migrated from `MessageDlg` to `StyledMessageDlg` (`VCL.StyledTaskDialog`) — 76 call sites — so dialogs render consistently with the app's Aqua Light Slate VCL style; `uses` clause tidied (2026-05-19) — `MainFrm.pas`
 - Migration now runs off the UI thread — the app stays responsive during `push --all` (2026-04-18) — `MainFrm.pas`
 - Migration aborts if the working tree is dirty or the repo has no commits, instead of leaving a half-migrated state (2026-04-18) — `uGitRepoManager.pas`
 - `CreateCodebergRepository` / `CreateGitHubRepository` now delegate to a shared `CreateRemoteRepository` that builds request bodies with `TJSONObject` (safe escaping) and surfaces the API-returned clone URL verbatim (2026-04-18) — `uGitRepoManager.pas`
