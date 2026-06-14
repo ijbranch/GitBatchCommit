@@ -275,4 +275,4 @@ Generate a new token and update it via the respective Settings dialog (**Codeber
 ---
 
 *GitBatchCommit Users Guide - Version 1.5.0*
-*Last Updated: 2 April 2026*
+*Last Updated: 14 June 2026*

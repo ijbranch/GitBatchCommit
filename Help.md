@@ -503,7 +503,7 @@ git push
 | Aspect | Details |
 |--------|---------|
 | **What** | JSON file storing all persistent data |
-| **Where** | `%USERPROFILE%\GitBatchCommit\repositories.json` |
+| **Where** | `%APPDATA%\GitBatchCommit\repositories.json` (i.e. `…\AppData\Roaming\GitBatchCommit`) |
 | **When** | Created automatically on first use |
 | **Why** | Persist settings, repos, credentials between sessions |
 | **How** | Automatic - no manual editing required |
@@ -579,7 +579,7 @@ This confirms which indexed directory is being updated and whether the operation
 
 | Shortcut | Action | Where |
 |----------|--------|-------|
-| F1 | Open Help (README.md) | Anywhere |
+| F1 | Open Help (Users Guide.md) | Anywhere |
 | F5 | Refresh Status | Anywhere |
 | Ctrl+A | Select All Text | Log panel |
 | Ctrl+C | Copy Selected Text | Log panel |
@@ -682,4 +682,4 @@ Option B - Overwrite Remote:
 ---
 
 *GitBatchCommit Help Guide - Version 1.5.0*
-*Last Updated: 26 January 2026*
+*Last Updated: 14 June 2026*
