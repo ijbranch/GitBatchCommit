@@ -110,9 +110,11 @@ begin
     Dlg.chkPrivate.Checked := lPrivate;
 
     // Shrink form — project type hidden by default in DFM. Move buttons up to fill the gap.
-    Dlg.btnOK.Top := 125;
-    Dlg.btnCancel.Top := 125;
-    Dlg.ClientHeight := 165;
+    // Position relative to the (already DPI-scaled) checkbox and use ScaleValue for the gaps,
+    // so the layout stays correct on high-DPI displays instead of overlapping the checkbox.
+    Dlg.btnOK.Top := Dlg.chkPrivate.Top + Dlg.chkPrivate.Height + Dlg.ScaleValue( 16 );
+    Dlg.btnCancel.Top := Dlg.btnOK.Top;
+    Dlg.ClientHeight := Dlg.btnOK.Top + Dlg.btnOK.Height + Dlg.ScaleValue( 15 );
 
     if Dlg.ShowModal = mrOK then
     begin

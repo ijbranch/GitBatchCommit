@@ -75,3 +75,6 @@ __recovery/
 
 # Boss dependency manager vendor folder https://github.com/HashLoad/boss
 modules/
+
+# Codegraph code-intelligence index (local tool cache)
+.codegraph/
