@@ -1398,7 +1398,7 @@ begin
   end;
 
   // Get repository details
-  sRepoName         := ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) );
+  sRepoName         := SanitizeRepoName( ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) ) );
   sDescription      := '';
   lPrivate          := False;
 
@@ -1540,7 +1540,7 @@ begin
   end;
 
   // Get repository details (reuse Codeberg dialog as it has same fields)
-  sRepoName         := ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) );
+  sRepoName         := SanitizeRepoName( ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) ) );
   sDescription      := '';
   lPrivate          := False;
 
@@ -3386,7 +3386,7 @@ var
 begin
 
   Result            := False;
-  sRepoName         := ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) );
+  sRepoName         := SanitizeRepoName( ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) ) );
 
   // Ask the user what to do
   iChoice           := StyledMessageDlg(

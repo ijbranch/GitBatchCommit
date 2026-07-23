@@ -564,6 +564,17 @@ function RepoStatusToString( const Status: TRepoStatus ): string;
 /// </summary>
 function RemoteProviderToString( const Provider: TRemoteProvider ): string;
 
+/// <summary>
+///   Sanitises a string into a repository name accepted by Codeberg/GitHub:
+///   drops whitespace (so a "Title Case" folder becomes "TitleCase"), replaces
+///   any other character outside [A-Za-z0-9._-] with '-', collapses runs of
+///   '-', and trims leading/trailing separators. Applied to the folder-derived
+///   default so a folder name with spaces no longer produces a rejected name.
+/// </summary>
+/// <param name="AName">The raw name, typically a folder name.</param>
+/// <returns>A host-safe repo name; 'repo' when nothing usable remains.</returns>
+function SanitizeRepoName( const AName: string ): string;
+
 implementation
 
 function RepoStatusToString( const Status: TRepoStatus ): string;
@@ -590,6 +601,32 @@ begin
   else
     Result := 'None';
   end;
+
+end;
+
+function SanitizeRepoName( const AName: string ): string;
+begin
+
+  Result := '';
+
+  for var c in AName do
+    case c of
+      'A'..'Z', 'a'..'z', '0'..'9', '-', '_', '.':
+        Result := Result + c;
+      ' ', #9:
+        ; // drop whitespace: "Front Door Camera" -> "FrontDoorCamera"
+    else
+      Result := Result + '-';
+    end;
+
+  // Collapse runs of '-' left by stripped punctuation, then trim separators
+  while Pos( '--', Result ) > 0 do
+    Result := StringReplace( Result, '--', '-', [ rfReplaceAll ] );
+
+  Result := Result.Trim( [ '-', '.', '_' ] );
+
+  if Result = '' then
+    Result := 'repo';
 
 end;
 

@@ -4,6 +4,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Folder names with spaces (or other characters invalid for a Git host) produced a repo name that Codeberg/GitHub rejected. The default repo name is now passed through a new `SanitizeRepoName` (drops whitespace so a "Title Case" folder becomes "TitleCase", replaces other invalid characters with `-`, collapses/trims separators) at all three Initialize & Push pre-fill sites (Codeberg, GitHub, and the generic init). The field remains editable (2026-06-18) — `uGitRepoManager.pas`, `MainFrm.pas`
+
 ### Added
 - Custom application icon — multi-resolution `.ico` (16/24/32/48/64/128/256 px) depicting a git-branch glyph (white main branch with two commit nodes, git-orange feature branch merging in) on a slate gradient tile, themed to match the app's Aqua Light Slate VCL style. Replaces the stock `delphi_PROJECTICON.ico` across the Base, Win32, and Win64 build configurations; embedded as `MAINICON` in the regenerated project resource (2026-05-19) — `GitBatchCommit.ico`, `GitBatchCommit.dproj`, `GitBatchCommit.res`
 - Icon generator script — reproducible GDI+ renderer for the application icon (vector "git-branch on slate" design, all sizes, repo-portable via `$PSScriptRoot`); regenerates `GitBatchCommit.ico` byte-identically (2026-05-19) — `tools/generate-icon.ps1`
