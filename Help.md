@@ -560,13 +560,13 @@ When reindexing is triggered after a commit, log messages appear:
 
 **Success:**
 ```
-Triggering delphi-lookup reindex: E:\DBiWorkflow Development
+Triggering delphi-lookup reindex: E:\DBiWorkflow Development v 5
 delphi-lookup reindex completed successfully
 ```
 
 **Failure:**
 ```
-Triggering delphi-lookup reindex: E:\DBiWorkflow Development
+Triggering delphi-lookup reindex: E:\DBiWorkflow Development v 5
 delphi-lookup reindex FAILED
 Error: [error details from delphi-indexer]
 ```
@@ -682,4 +682,4 @@ Option B - Overwrite Remote:
 ---
 
 *GitBatchCommit Help Guide - Version 1.5.0*
-*Last Updated: 14 June 2026*
+*Last Updated: 28 July 2026*

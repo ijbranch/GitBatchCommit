@@ -68,10 +68,14 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 | FastMM5 | High-performance memory manager | https://github.com/pleriche/FastMM5 |
 | Aqua Light Slate | VCL visual style (optional - falls back to default if unavailable) | Included with RAD Studio Premium Styles |
 | delphi-lookup | Optional: Delphi symbol indexer for auto-reindex after commits | https://github.com/JavierusTk/delphi-lookup |
+| EurekaLog 7 | Exception reporting; compiled in under the `EurekaLog` conditional define | https://www.eurekalog.com |
+| ELExtraPlugIns | GITLAK EurekaLog plug-in aggregator, referenced by absolute path from `GitBatchCommit.dpr` | `E:\DBiWorkflow Development v 5\DBiCommonFiles` |
 
 **Notes:**
 - To remove the FastMM5 dependency, remove `FastMM5` from the uses clause in `GitBatchCommit.dpr`. The project will then use Delphi's default memory manager.
 - delphi-lookup integration is completely optional. GitBatchCommit works normally without it installed.
+- The EurekaLog units are compiled from the EurekaLog installation (`Lib\` and `Source\Extras\`, both on the IDE's Win64 library path). Do **not** keep local copies of EurekaLog source or `.dcu` files in the project folder — the project directory is searched first, so a stale copy shadows the installed version and the build fails with `F2051 Unit … was compiled with a different version of …`. The cure is to delete the offending `.dcu`/`.pas` from the project root and rebuild.
+- `ELExtraPlugIns` is referenced by an absolute path in both `GitBatchCommit.dpr` and the project's unit search path. If the shared `DBiCommonFiles` folder is moved or renamed, update both or the build fails with `F1026 File not found`.
 
 ## Installation
 
@@ -346,17 +350,17 @@ GitBatchCommit includes optional integration with [delphi-lookup](https://github
 2. If a match is found, incremental reindexing runs in the background (non-blocking, typically 100-500ms)
 3. The parent indexed directory gets reindexed - no unnecessary processing of other indexed directories
 
-**Example:** If you have `E:\DBiWorkflow Development` indexed and commit to `E:\DBiWorkflow Development\DBiFoneology`, the entire `E:\DBiWorkflow Development` directory is reindexed (including DBiFoneology's changes). Other indexed directories are skipped.
+**Example:** If you have `E:\DBiWorkflow Development v 5` indexed and commit to `E:\DBiWorkflow Development v 5\DBiFoneology`, the entire `E:\DBiWorkflow Development v 5` directory is reindexed (including DBiFoneology's changes). Other indexed directories are skipped.
 
 **Confirmation:** When reindexing is triggered, you'll see log messages:
 ```
-Triggering delphi-lookup reindex: E:\DBiWorkflow Development
+Triggering delphi-lookup reindex: E:\DBiWorkflow Development v 5
 delphi-lookup reindex completed successfully
 ```
 
 If reindexing fails, you'll see:
 ```
-Triggering delphi-lookup reindex: E:\DBiWorkflow Development
+Triggering delphi-lookup reindex: E:\DBiWorkflow Development v 5
 delphi-lookup reindex FAILED
 Error: [error details from delphi-indexer]
 ```
@@ -579,3 +583,4 @@ This project is provided as-is for personal use only.
 *Version: 1.3 – 1 January 2026 15:00*
 *Version: 1.4 – 15 January 2026*
 *Version: 1.5 – 26 January 2026*
+*Version: 1.5.1 – 28 July 2026*

@@ -5,7 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Build failed with `F2051 Unit EFastMM5Support was compiled with a different version of ETypes.TLeaksOption`, and then with `F1026 File not found: E:\DBiWorkflow Development\DBiCommonFiles\ELExtraPlugIns.pas`. Two causes: stale EurekaLog `.dcu` files left in the project root (built 2026-06-18) shadowed the current EurekaLog 7.16+ library units, and the shared `DBiCommonFiles` folder had since been renamed to `DBiWorkflow Development v 5`. Removed the stale root `.dcu` files and repointed the `ELExtraPlugIns` reference and unit search path at the current folder (2026-07-28) — `GitBatchCommit.dpr`, `GitBatchCommit.dproj`
+
 - Folder names with spaces (or other characters invalid for a Git host) produced a repo name that Codeberg/GitHub rejected. The default repo name is now passed through a new `SanitizeRepoName` (drops whitespace so a "Title Case" folder becomes "TitleCase", replaces other invalid characters with `-`, collapses/trims separators) at all three Initialize & Push pre-fill sites (Codeberg, GitHub, and the generic init). The field remains editable (2026-06-18) — `uGitRepoManager.pas`, `MainFrm.pas`
+
+### Removed
+- Per-project copy of the EurekaLog Extras unit `EExtraExceptionInfo.pas` (an outdated revision predating the `E_*_INFO` define rename). **Why:** from EurekaLog 7.16 the `Source\Extras` folder is compiled directly off the library search path, so a local copy only shadows the installed version and re-creates the stale-unit failure above (2026-07-28) — `EExtraExceptionInfo.pas`
 
 ### Added
 - `.gitattributes` — pin CRLF checkout for all text file types, independent of each clone's `core.autocrlf`; binaries marked explicitly, Pascal linguist hints included. (2026-07-28) — `.gitattributes`
