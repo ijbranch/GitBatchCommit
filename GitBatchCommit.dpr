@@ -64,7 +64,7 @@ uses
   EExtraExceptionInfo,
   ExceptionLog7,
   {$ENDIF EurekaLog}
-  ELExtraPlugIns in 'E:\DBiWorkflow Development v 5\DBiCommonFiles\ELExtraPlugIns.pas',
+  ELExtraPlugIns in 'E:\DBiWorkflow Development\DBiCommonFiles\ELExtraPlugIns.pas',
   Vcl.Forms,
   Vcl.Themes,
   Vcl.Styles,

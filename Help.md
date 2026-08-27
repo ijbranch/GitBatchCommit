@@ -538,7 +538,7 @@ git push
 
 1. Checks user-configured custom path (if configured via Settings)
 2. Checks PATH environment variable for delphi-indexer.exe
-3. Checks default location: `D:\delphi-lookup\delphi-indexer.exe`
+3. Checks default location: `D:\glldelphi-lookup\delphi-indexer.exe`
 4. Saves discovered path to configuration for faster future lookups
 5. Silently skips reindexing if not found
 
@@ -560,13 +560,13 @@ When reindexing is triggered after a commit, log messages appear:
 
 **Success:**
 ```
-Triggering delphi-lookup reindex: E:\DBiWorkflow Development v 5
+Triggering delphi-lookup reindex: E:\DBiWorkflow Development
 delphi-lookup reindex completed successfully
 ```
 
 **Failure:**
 ```
-Triggering delphi-lookup reindex: E:\DBiWorkflow Development v 5
+Triggering delphi-lookup reindex: E:\DBiWorkflow Development
 delphi-lookup reindex FAILED
 Error: [error details from delphi-indexer]
 ```

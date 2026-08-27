@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- The post-commit reindex fell back to `D:\delphi-lookup\delphi-indexer.exe`, a folder that no longer exists — delphi-lookup was relocated to `D:\glldelphi-lookup` when it was forked into GITLAK. `DEFAULT_INSTALL_PATH` repointed at the new folder, so the reindex still runs when `delphi-indexer.exe` is not on `PATH` (2026-08-27) — `MainFrm.pas`
+- Repointed the `ELExtraPlugIns` reference and unit search path at `E:\DBiWorkflow Development` — the shared-suite folder dropped its `v 5` suffix on 2026-07-30, reverting the 2026-07-28 repoint below (2026-07-30) — `GitBatchCommit.dpr`, `GitBatchCommit.dproj`
+
 ### Fixed
 - Build failed with `F2051 Unit EFastMM5Support was compiled with a different version of ETypes.TLeaksOption`, and then with `F1026 File not found: E:\DBiWorkflow Development\DBiCommonFiles\ELExtraPlugIns.pas`. Two causes: stale EurekaLog `.dcu` files left in the project root (built 2026-06-18) shadowed the current EurekaLog 7.16+ library units, and the shared `DBiCommonFiles` folder had since been renamed to `DBiWorkflow Development v 5`. Removed the stale root `.dcu` files and repointed the `ELExtraPlugIns` reference and unit search path at the current folder (2026-07-28) — `GitBatchCommit.dpr`, `GitBatchCommit.dproj`
 

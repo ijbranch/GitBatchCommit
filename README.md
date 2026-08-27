@@ -69,7 +69,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 | Aqua Light Slate | VCL visual style (optional - falls back to default if unavailable) | Included with RAD Studio Premium Styles |
 | delphi-lookup | Optional: Delphi symbol indexer for auto-reindex after commits | https://github.com/JavierusTk/delphi-lookup |
 | EurekaLog 7 | Exception reporting; compiled in under the `EurekaLog` conditional define | https://www.eurekalog.com |
-| ELExtraPlugIns | GITLAK EurekaLog plug-in aggregator, referenced by absolute path from `GitBatchCommit.dpr` | `E:\DBiWorkflow Development v 5\DBiCommonFiles` |
+| ELExtraPlugIns | GITLAK EurekaLog plug-in aggregator, referenced by absolute path from `GitBatchCommit.dpr` | `E:\DBiWorkflow Development\DBiCommonFiles` |
 
 **Notes:**
 - To remove the FastMM5 dependency, remove `FastMM5` from the uses clause in `GitBatchCommit.dpr`. The project will then use Delphi's default memory manager.
@@ -350,17 +350,17 @@ GitBatchCommit includes optional integration with [delphi-lookup](https://github
 2. If a match is found, incremental reindexing runs in the background (non-blocking, typically 100-500ms)
 3. The parent indexed directory gets reindexed - no unnecessary processing of other indexed directories
 
-**Example:** If you have `E:\DBiWorkflow Development v 5` indexed and commit to `E:\DBiWorkflow Development v 5\DBiFoneology`, the entire `E:\DBiWorkflow Development v 5` directory is reindexed (including DBiFoneology's changes). Other indexed directories are skipped.
+**Example:** If you have `E:\DBiWorkflow Development` indexed and commit to `E:\DBiWorkflow Development\DBiFoneology`, the entire `E:\DBiWorkflow Development` directory is reindexed (including DBiFoneology's changes). Other indexed directories are skipped.
 
 **Confirmation:** When reindexing is triggered, you'll see log messages:
 ```
-Triggering delphi-lookup reindex: E:\DBiWorkflow Development v 5
+Triggering delphi-lookup reindex: E:\DBiWorkflow Development
 delphi-lookup reindex completed successfully
 ```
 
 If reindexing fails, you'll see:
 ```
-Triggering delphi-lookup reindex: E:\DBiWorkflow Development v 5
+Triggering delphi-lookup reindex: E:\DBiWorkflow Development
 delphi-lookup reindex FAILED
 Error: [error details from delphi-indexer]
 ```
@@ -369,7 +369,7 @@ Error: [error details from delphi-indexer]
 
 - **Automatic Detection**: GitBatchCommit automatically finds delphi-indexer.exe if:
   - It's in your system PATH environment variable, or
-  - It's installed at the default location: `D:\delphi-lookup\delphi-indexer.exe`
+  - It's installed at the default location: `D:\glldelphi-lookup\delphi-indexer.exe`
   - The discovered path is saved to configuration for faster future lookups
 
 - **Manual Configuration**: If auto-detection fails, configure the path via File > Settings:

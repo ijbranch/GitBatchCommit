@@ -3509,7 +3509,7 @@ end;
 procedure TMainForm.RunPendingReindexes( const ADirs: TStringList );
 const
   DELPHI_INDEXER_EXE = 'delphi-indexer.exe';
-  DEFAULT_INSTALL_PATH = 'D:\delphi-lookup\delphi-indexer.exe';
+  DEFAULT_INSTALL_PATH = 'D:\glldelphi-lookup\delphi-indexer.exe';
 var
   sIndexerPath      : string;
   SearchBuffer      : array[ 0..MAX_PATH ] of Char;
