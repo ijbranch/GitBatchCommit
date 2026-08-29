@@ -229,13 +229,6 @@ type
     function GetTrackedFileCount( const sRepoPath: string ): Integer;
 
     /// <summary>
-    ///   Gets the number of modified/staged/untracked files in the repository.
-    /// </summary>
-    /// <param name="sRepoPath">Path to the repository.</param>
-    /// <returns>Number of modified, staged or untracked entries.</returns>
-    function GetModifiedFileCount( const sRepoPath: string ): Integer;
-
-    /// <summary>
     ///   Returns the path to the configuration file.
     /// </summary>
     /// <returns>Full path to repositories.json, falling back to the application
@@ -1588,28 +1581,6 @@ begin
 
   // Use git ls-files to get list of tracked files
   if ExecuteGitCommand( sRepoPath, 'ls-files', sOutput ) then
-  begin
-    sOutput := Trim( sOutput );
-
-    if ( not sOutput.IsEmpty ) then
-    begin
-      Lines := sOutput.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
-      Result := Length( Lines );
-    end;
-  end;
-
-end;
-
-function TGitRepoManager.GetModifiedFileCount( const sRepoPath: string ): Integer;
-var
-  sOutput           : string;
-  Lines             : TArray<string>;
-begin
-
-  Result := 0;
-
-  // Use git status --porcelain to get modified/staged/untracked files
-  if ExecuteGitCommand( sRepoPath, 'status --porcelain', sOutput ) then
   begin
     sOutput := Trim( sOutput );
 

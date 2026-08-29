@@ -63,6 +63,13 @@ uses
   EBase,
   EExtraExceptionInfo,
   ExceptionLog7,
+  {$ENDIF EurekaLog}
+  {$IFDEF EurekaLog}
+  // GITLAK plug-in aggregator - registers the ELPlugin_* units via their
+  // initialization sections. It sits in its OWN EurekaLog conditional, placed
+  // after the block above, deliberately: the EL IDE expert rewrites the block it
+  // owns and moves anything inside it out, but leaves a separate block alone.
+  // This is the arrangement used by 26 of the 30 DBiWorkflow projects.
   ELExtraPlugIns in 'E:\DBiWorkflow Development\DBiCommonFiles\ELExtraPlugIns.pas',
   {$ENDIF EurekaLog}
   Vcl.Forms,
@@ -87,5 +94,6 @@ begin
   Application.Run;
 
 end.
+
 
 

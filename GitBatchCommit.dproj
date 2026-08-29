@@ -126,8 +126,8 @@
   <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     <VerInfo_Locale>1033</VerInfo_Locale>
-    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.87;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.0.0.0</VerInfo_Keys>
-    <VerInfo_Build>87</VerInfo_Build>
+    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.91;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.0.0.0</VerInfo_Keys>
+    <VerInfo_Build>91</VerInfo_Build>
     <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
     <VerInfo_MinorVer>6</VerInfo_MinorVer>
   </PropertyGroup>
@@ -149,8 +149,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
     <AppDPIAwarenessMode>unaware</AppDPIAwarenessMode>
-    <VerInfo_Build>56</VerInfo_Build>
-    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.56;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.0.0.0</VerInfo_Keys>
+    <VerInfo_Build>57</VerInfo_Build>
+    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.57;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.0.0.0</VerInfo_Keys>
     <VerInfo_MinorVer>6</VerInfo_MinorVer>
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>

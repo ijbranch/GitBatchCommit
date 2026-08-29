@@ -2599,7 +2599,6 @@ begin
     // present: '*.o' is a substring of '*.obj', so once '*.obj' was listed
     // '*.o' could never be added. It also matched text inside comments and
     // inside longer paths.
-    slExistingRules := TStringList.Create;
     slExistingRules.CaseSensitive := False;
 
     for var i := 0 to slExisting.Count - 1 do
@@ -2675,6 +2674,7 @@ begin
   finally
     slExisting.Free;
     slToAdd.Free;
+    slExistingRules.Free;
   end;
 
 end;
