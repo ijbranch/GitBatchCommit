@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.5.0
+  Version: 1.6.0
 
   Description:
     A Delphi VCL application for committing and pushing changes to multiple
@@ -63,8 +63,8 @@ uses
   EBase,
   EExtraExceptionInfo,
   ExceptionLog7,
-  {$ENDIF EurekaLog}
   ELExtraPlugIns in 'E:\DBiWorkflow Development\DBiCommonFiles\ELExtraPlugIns.pas',
+  {$ENDIF EurekaLog}
   Vcl.Forms,
   Vcl.Themes,
   Vcl.Styles,

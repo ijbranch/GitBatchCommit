@@ -17,12 +17,15 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Visibility Management** - Change repository visibility (public/private) via right-click context menu
 - **Parallel Status Refresh** - Repository status checks run in parallel on background threads, keeping the UI responsive
 - **Status Detection** - Automatically detects repository status:
-  - **Clean** - No local changes, up to date with remote
+  - **Clean** - No local changes, and level with the remote
   - **Modified** - Local uncommitted changes present (modified, staged, untracked, or deleted files)
-  - **Pull Required** - Remote has updates that need pulling
+  - **Conflicted** - Unmerged paths, or an unfinished merge/rebase/cherry-pick/revert/bisect. Commit & Push refuses to act on these
+  - **Pull Required** - The upstream has commits this clone does not, shown with the count
+  - **Push Required** - This clone has commits the upstream does not, shown with the count
+  - **Diverged** - Both of the above, shown as `(+ahead/-behind)`
   - **Error** - Repository not accessible or not a valid Git repo
 
-  Status is determined by running `git status --porcelain`. Any output indicates modifications.
+  The working tree is assessed with `git status --porcelain`, which covers modified, staged, untracked, deleted and renamed files as well as dirty submodules. Unmerged paths are identified from the porcelain `XY` codes (`DD`, `AU`, `UD`, `UA`, `DU`, `AA`, `UU`) and take priority over everything else, because staging them with `add -A` would commit the conflict markers. Changes that are only build output (`.dcu`, `.exe`, platform folders and so on) do not count as modifications. The relationship to the remote is measured with `git rev-list --left-right --count @{upstream}...HEAD`, which is locale-independent and reports both directions at once.
 - **Branch Display** - Shows the current branch for each repository
 - **Remote Provider Display** - Shows the remote provider (GitHub, Codeberg, Other, None) for each repository
 - **Version Display** - Shows the project version extracted from Delphi `.dproj` files (searches repository and subdirectories)
@@ -36,7 +39,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Smart Button State** - Commit & Push button only enabled when repositories are selected and commit message is entered
 - **Operation Log** - Detailed log of all Git operations performed
 - **Help System** - Press F1 to view README documentation; Help > About for version info
-- **Colour-Coded Status** - Repository rows are colour-coded by status (green=Clean, yellow=Modified, orange=Pull Required, red=Error)
+- **Colour-Coded Status** - Repository rows are colour-coded by status (green=Clean, yellow=Modified, orange=Pull Required, pale cyan=Push Required, purple=Diverged, strong red=Conflicted, red=Error)
 - **Open in Git Client** - Right-click to open repository in configured external Git client (e.g., Fork)
 - **Open in Explorer** - Right-click to open repository folder in Windows Explorer
 - **Pull Operation** - Right-click to pull changes from remote for a single repository (fast-forward only — refuses to create a merge commit on diverged history)
@@ -47,7 +50,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **File Pattern Filtering** - Optionally stage only files matching a pattern (e.g., `*.pas`) via File > Settings
 - **delphi-lookup Integration** - Automatically triggers incremental reindexing of committed repositories for delphi-lookup symbol search (optional, auto-detected)
 - **Pull Selected** - Pull changes from remote for multiple selected repositories at once (with safeguards)
-- **Resolve Conflicts** - Automatically resolve merge conflicts by keeping local versions for all selected repositories
+- **Resolve Conflicts** - Resolve an in-progress merge by keeping your local version of every conflicted file (the incoming remote version of those files is discarded), then commit and push. Repositories with no merge in progress are skipped
 - **Push Only** - Push already-committed changes without creating a new commit (useful when local branch is ahead of remote)
 - **Force Push** - Force push to overwrite remote history when local code is the source of truth
 - **Pull Safeguards** - Multiple safety features protect your local code when pulling:
@@ -225,6 +228,8 @@ When your local code is the "source of truth" and you need to overwrite the remo
 
 **Warning:** Force push overwrites remote history. Any commits on the remote that are not in your local repository will be permanently lost. Use with caution.
 
+GitBatchCommit uses `git push --force-with-lease` rather than a bare `--force`. The lease makes Git verify that the remote branch is still where your last fetch saw it, so a push made by someone else in the meantime **aborts the operation** instead of destroying their work. If you see a "stale info" or rejection message, fetch and review the incoming commits before trying again — that message means the force push just prevented data loss.
+
 ### Creating a New Codeberg Repository
 
 GitBatchCommit can initialize a local folder as a Git repository, create a corresponding repository on Codeberg, and push the initial commit - all in one operation.
@@ -334,7 +339,7 @@ To quickly check or uncheck multiple consecutive repositories:
 
 Select **File > Settings** to configure:
 
-- **Git Client Path** - Full path to your external Git client executable (e.g., `C:\Program Files\Fork\Fork.exe`)
+- **Git Client Path** - Full path to your external Git client executable (e.g., `C:\Program Files\Fork\Fork.exe`), used by **Open in Git Client**. If you point it at `git.exe` itself, GitBatchCommit will run that executable for all its own Git operations instead of resolving `git` from `PATH`
 - **File Pattern** - Optional pattern for staging files (e.g., `*.pas`). Leave empty to stage all files. Shell metacharacters are rejected for safety.
 - **delphi-indexer.exe Path** - Optional path to delphi-indexer.exe for automatic symbol reindexing after commits (auto-detected if not configured)
 
@@ -485,7 +490,7 @@ Repository paths and credentials are stored in a JSON file located at:
 
 The file is created automatically when you first add a repository or configure credentials.
 
-**Note:** Access tokens for Codeberg and GitHub are stored in plain text in this file. Ensure appropriate file system permissions if security is a concern.
+**Note:** Access tokens for Codeberg and GitHub are encrypted with the Windows Data Protection API (DPAPI) under your user account before being written to this file, and appear as an opaque `dpapi:`-prefixed value. They can only be decrypted by the same Windows user on the same machine, so copying the file elsewhere does not carry a usable credential. A token written in plain text by a build before 1.6.0 is still read, and is re-encrypted the next time settings are saved.
 
 ## Project Structure
 
@@ -519,6 +524,20 @@ Potential features for future versions:
 This project is provided as-is for personal use only.
 
 ## Version History
+
+> Full detail lives in `CHANGELOG.md`, which is the authoritative record of changes.
+> This section is a short summary only.
+
+### 1.6.0
+
+- **Fixed** a batch abort with `No mapping for the Unicode character exists in the target multi-byte code page` - captured process output was decoded one pipe read at a time, so a multi-byte character split across a read boundary raised
+- **Fixed** every commit message beginning with an invisible UTF-8 BOM
+- **Fixed** commit log blocks and list-row refreshes being attributed to the wrong repository
+- **Fixed** Fix .gitignore adding `*.res`, which would have stopped compiled resources being staged
+- **Added** Conflicted, Push Required and Diverged statuses; Commit & Push now refuses a repository with unresolved conflicts or an unfinished merge/rebase
+- **Changed** Force Push to `--force-with-lease`, so it aborts rather than destroying someone else's commits
+- **Security** - Codeberg and GitHub tokens are now DPAPI-encrypted at rest, and credentials are redacted from the log
+- Numerous thread-safety, shutdown, re-entrancy and resource-lifetime fixes
 
 ### 1.5.0
 
@@ -584,3 +603,4 @@ This project is provided as-is for personal use only.
 *Version: 1.4 – 15 January 2026*
 *Version: 1.5 – 26 January 2026*
 *Version: 1.5.1 – 28 July 2026*
+*Version: 1.6.0 – 30 August 2026*

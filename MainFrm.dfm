@@ -391,6 +391,21 @@ object MainForm: TMainForm
           RadioItem = True
           OnClick = mnuFilterClick
         end
+        object mnuFilterPushRequired: TMenuItem
+          Caption = 'P&ush Required'
+          RadioItem = True
+          OnClick = mnuFilterClick
+        end
+        object mnuFilterDiverged: TMenuItem
+          Caption = '&Diverged'
+          RadioItem = True
+          OnClick = mnuFilterClick
+        end
+        object mnuFilterConflicted: TMenuItem
+          Caption = 'Co&nflicted'
+          RadioItem = True
+          OnClick = mnuFilterClick
+        end
         object mnuFilterError: TMenuItem
           Caption = '&Error'
           RadioItem = True

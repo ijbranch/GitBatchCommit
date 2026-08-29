@@ -80,11 +80,13 @@ type
     /// <param name="sDescription">Returned repository description.</param>
     /// <param name="lPrivate">Returned private flag.</param>
     /// <returns>True if user clicked OK, False if cancelled.</returns>
+    /// <returns>True if the user confirmed the dialog.</returns>
     class function Execute( var sRepoName, sDescription: string; var lPrivate: Boolean ): Boolean; overload;
 
     /// <summary>
     ///   Shows the dialog with project type selection and returns the entered values.
     /// </summary>
+    /// <returns>True if the user confirmed the dialog.</returns>
     class function Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
       var sProjectType: string ): Boolean; overload;
   end;

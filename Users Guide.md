@@ -150,7 +150,7 @@ Before pulling, the app shows:
 
 If a pull results in merge conflicts:
 
-1. Click **Resolve Conflicts** — this keeps your local version of conflicted files
+1. Click **Resolve Conflicts** — this keeps your local version of conflicted files and **discards the incoming remote version of those files**. It only acts on a repository with a merge actually in progress; others are skipped
 2. Then click **Push Only** to send the resolution to the remote
 
 For complex merges requiring manual review, use an external Git client instead.
@@ -161,7 +161,19 @@ For complex merges requiring manual review, use an external Git client instead.
 |--------|-------------|
 | **Commit & Push Selected** | Normal workflow — stages, commits, and pushes |
 | **Push Only** | When you've already committed locally but haven't pushed yet |
-| **Force Push** | When you need to overwrite the remote with your local code (use with care — requires double confirmation) |
+| **Force Push** | When you need to overwrite the remote with your local code (use with care — requires double confirmation). Uses `--force-with-lease`, so it aborts rather than overwriting if someone else has pushed since your last fetch |
+
+**Reading the Status column**
+
+| Status | What it means | What to do |
+|--------|---------------|------------|
+| Clean | Nothing to do | — |
+| Modified | Uncommitted local changes | Commit & Push |
+| Conflicted | Unmerged files, or a half-finished merge/rebase | Resolve Conflicts, or finish the operation in your Git client. Commit & Push will refuse until you do |
+| Pull Required (n) | The remote has n commits you do not | Pull Selected |
+| Push Required (n) | You have n commits the remote does not | Push Only |
+| Diverged (+a/-b) | Both — you and the remote have moved on separately | Pull first, then push; or Force Push if your copy is authoritative |
+| Error | Not a valid or reachable repository | Check the path exists and contains `.git` |
 
 ## Remote Provider Integration
 
@@ -222,7 +234,7 @@ If [delphi-indexer](https://github.com/JavierusTk/delphi-lookup) is installed, t
 
 ### Application Settings (File > Settings)
 
-- **Git Client Path** — path to an external Git client (e.g., Fork, SourceTree) for "Open in Git Client"
+- **Git Client Path** — path to an external Git client (e.g., Fork, SourceTree) for "Open in Git Client". Point it at `git.exe` to make GitBatchCommit use that executable for its own Git calls too
 - **File Pattern** — optional pattern for selective staging (e.g., `*.pas *.dfm`). When empty, `git add -A` stages everything
 - **delphi-indexer Path** — auto-detected; override here if needed
 
@@ -274,5 +286,5 @@ Generate a new token and update it via the respective Settings dialog (**Codeber
 
 ---
 
-*GitBatchCommit Users Guide - Version 1.5.0*
+*GitBatchCommit Users Guide - Version 1.6.0*
 *Last Updated: 14 June 2026*

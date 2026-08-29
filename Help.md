@@ -75,7 +75,7 @@ A comprehensive reference for all GitBatchCommit capabilities.
 | **When** | Before committing - to select only repos that have changes to commit |
 | **Why** | Saves time by automatically selecting relevant repositories |
 | **How** | Click "Select Modified" button. All repos with "Modified" status become checked |
-| **Caveats** | Does not select "Pull Required" or "Error" status repos. Only selects visible repos (respects current filter) |
+| **Caveats** | Selects only "Modified" repos - not Conflicted, Pull Required, Push Required, Diverged or Error. Only selects visible repos (respects current filter) |
 | **Linkages** | Works with Group filter and Status filter |
 
 ### Select All
@@ -186,7 +186,7 @@ git push
 
 **Git Commands Executed:**
 ```
-git push --force
+git push --force-with-lease
 ```
 
 ---
@@ -374,7 +374,7 @@ git push
 | **When** | When you want to create new Codeberg repos or manage existing ones |
 | **Why** | Direct integration without leaving the application |
 | **How** | First: Codeberg > Settings (enter credentials). Then: Codeberg > Initialize & Push |
-| **Caveats** | Requires personal access token from codeberg.org/user/settings/applications. Token stored in plain text |
+| **Caveats** | Requires personal access token from codeberg.org/user/settings/applications. Token encrypted at rest with DPAPI (current user, this machine) |
 | **Linkages** | Created repos automatically added to managed list |
 
 ### GitHub Integration
@@ -386,7 +386,7 @@ git push
 | **When** | When you want to create new GitHub repos or manage existing ones |
 | **Why** | Direct integration without leaving the application |
 | **How** | First: GitHub > Settings (enter credentials). Then: GitHub > Initialize & Push |
-| **Caveats** | Requires personal access token with `repo` scope from github.com/settings/tokens. Token stored in plain text |
+| **Caveats** | Requires personal access token with `repo` scope from github.com/settings/tokens. Token encrypted at rest with DPAPI (current user, this machine) |
 | **Linkages** | Created repos automatically added to managed list |
 
 ### Change Visibility (Public/Private)
@@ -433,10 +433,25 @@ git push
 
 | Status | Meaning | Row Colour |
 |--------|---------|------------|
-| Clean | No local changes, up to date with remote | Green |
+| Clean | No local changes, and level with the upstream | Green |
 | Modified | Local uncommitted changes present | Yellow |
-| Pull Required | Remote has updates to pull | Orange |
+| Conflicted | Unmerged paths, or an unfinished merge/rebase/cherry-pick/revert/bisect | Strong red |
+| Pull Required (n) | Upstream has n commits this clone lacks | Orange |
+| Push Required (n) | This clone has n commits the upstream lacks | Pale cyan |
+| Diverged (+a/-b) | a commits ahead and b behind at the same time | Purple |
 | Error | Repository not accessible or invalid | Red |
+
+**How each is determined:**
+
+| Check | Command | Notes |
+|-------|---------|-------|
+| Working tree | `git status --porcelain` | Covers modified, staged, untracked, deleted and renamed files, and dirty submodules |
+| Conflicts | porcelain `XY` codes `DD` `AU` `UD` `UA` `DU` `AA` `UU` | Outranks everything else - Commit & Push refuses while any are present |
+| Unfinished operation | `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `BISECT_LOG`, `rebase-merge/`, `rebase-apply/` | Reported as Conflicted |
+| Build-output-only change | extension and platform-folder match | Treated as Clean; `debug/` and `release/` alone are NOT treated as build output, so `docs/release/notes.md` still counts as a real change |
+| Ahead / behind | `git rev-list --left-right --count @{upstream}...HEAD` | Locale-independent, both directions in one call; zero/zero when the branch has no upstream |
+
+**Not detected:** stashed work, and changes to files marked `assume-unchanged` or `skip-worktree`. Neither appears in `git status`.
 
 ### Status Filter
 
@@ -494,7 +509,7 @@ git push
 
 | Setting | Purpose | Example |
 |---------|---------|---------|
-| Git Client Path | External Git client executable | `C:\Program Files\Fork\Fork.exe` |
+| Git Client Path | External Git client executable; if set to `git.exe`, also used for GitBatchCommit's own Git calls | `C:\Program Files\Fork\Fork.exe` |
 | File Pattern | Only stage files matching pattern | `*.pas` (empty = all files) |
 | delphi-indexer.exe Path | Optional symbol indexer for auto-reindex | Auto-detected or custom path |
 
@@ -507,7 +522,7 @@ git push
 | **When** | Created automatically on first use |
 | **Why** | Persist settings, repos, credentials between sessions |
 | **How** | Automatic - no manual editing required |
-| **Caveats** | **Contains credentials in plain text** - secure file system permissions recommended |
+| **Caveats** | Credentials are DPAPI-encrypted (current user, this machine) and appear as opaque `dpapi:` values; the rest of the file is plain JSON |
 | **Linkages** | Stores: Repository list, groups, credentials, settings, history, templates |
 
 ### Edit .gitignore
@@ -681,5 +696,5 @@ Option B - Overwrite Remote:
 
 ---
 
-*GitBatchCommit Help Guide - Version 1.5.0*
+*GitBatchCommit Help Guide - Version 1.6.0*
 *Last Updated: 28 July 2026*

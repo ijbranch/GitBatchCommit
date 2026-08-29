@@ -100,15 +100,36 @@ type
     btnDelete: TButton;
     btnOK: TButton;
     btnCancel: TButton;
+    /// <summary>
+    ///   Initialises the dialog and prepares the template list.
+    /// </summary>
     procedure FormCreate( Sender: TObject );
+    /// <summary>
+    ///   Prompts for a new template and appends it to the list.
+    /// </summary>
     procedure btnAddClick( Sender: TObject );
+    /// <summary>
+    ///   Prompts for replacement text for the selected template.
+    /// </summary>
     procedure btnEditClick( Sender: TObject );
+    /// <summary>
+    ///   Removes the selected template after confirmation.
+    /// </summary>
     procedure btnDeleteClick( Sender: TObject );
+    /// <summary>
+    ///   Updates the Edit and Delete button states for the new selection.
+    /// </summary>
     procedure lstTemplatesClick( Sender: TObject );
   private
     FTemplates        : TArray<string>;
 
+    /// <summary>
+    ///   Enables Edit and Delete only while a template is selected.
+    /// </summary>
     procedure UpdateButtonStates;
+    /// <summary>
+    ///   Refills the list box from the current template array.
+    /// </summary>
     procedure PopulateList;
   public
     /// <summary>
