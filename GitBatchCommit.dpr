@@ -70,7 +70,7 @@ uses
   // after the block above, deliberately: the EL IDE expert rewrites the block it
   // owns and moves anything inside it out, but leaves a separate block alone.
   // This is the arrangement used by 26 of the 30 DBiWorkflow projects.
-  ELExtraPlugIns in 'E:\DBiWorkflow Development\DBiCommonFiles\ELExtraPlugIns.pas',
+  ELExtraPlugIns,
   {$ENDIF EurekaLog}
   Vcl.Forms,
   Vcl.Themes,

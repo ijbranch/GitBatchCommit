@@ -17,6 +17,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `GetCurrentBranch` / `HasAnyCommit` / `IsWorkingTreeClean` helpers for safer Git flow decisions (2026-04-18) — `uGitRepoManager.pas`
 
 ### Changed
+- `ELExtraPlugIns` is now resolved from the common `E:\EurekaLog` source folder (2026-09-02) — `GitBatchCommit.dpr`, `GitBatchCommit.dproj`
+  **Why:** the GITLAK EurekaLog plug-in set moved out of `E:\DBiWorkflow Development\DBiCommonFiles`
+  into `E:\EurekaLog`, which is on the RAD Studio Win64 library search path. The explicit `in '<path>'` clause and its `DCCReference` are gone, along with the project's stale `DBiCommonFiles` unit-search-path entry.
+  This also restores `ELPlugin_AddCommonData`, which had been commented out of the aggregator
+  because it referenced DBiWorkflow-only units (`UsersData`, `CompanyData`, `AppData`,
+  `AsyncLogWriter`). It is now host-agnostic, so this project's crash reports carry the EXE
+  anti-tamper fingerprint, machine identity, memory/disk state, PID and active-form fields again.
 - `ELExtraPlugIns` now sits in its **own** `{$IFDEF EurekaLog} … {$ENDIF EurekaLog}` block, placed immediately after the main EurekaLog block, matching the DBiWorkflow suite. Moving it inside the *main* block did not survive — the EL IDE expert rewrites the block it owns and pushed the reference back out on the next IDE build — but a separate block of its own is left alone, which is how 26 of the 30 suite projects handle it (the other four keep it in the main block with a note to put it back when the expert moves it). Previously it sat outside any conditional, so a non-EurekaLog build still referenced it (2026-08-30) — `GitBatchCommit.dpr`
 - Version aligned at **1.6.0** across `APP_VERSION`, the `.dpr` header and the `.dproj` version info, which had drifted to 1.5.0.x; `README.md`, `Help.md` and `Users Guide.md` updated for the new statuses, `--force-with-lease`, the conflict semantics, DPAPI token storage and the Git-client-path change, and their version footers brought forward (2026-08-30) — `GitBatchCommit.dproj`, `GitBatchCommit.dpr`, `README.md`, `Help.md`, `Users Guide.md`
 - `NeedsPull` replaced by `GetAheadBehind`, which answers both directions from a single `rev-list --left-right --count`. `GetRepoStatus` removed — it was a second, drifting copy of `RefreshStatus`'s logic with no remaining callers (2026-08-30) — `uGitRepoManager.pas`
