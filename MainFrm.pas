@@ -63,7 +63,7 @@ uses
   System.SysUtils, System.StrUtils, System.Variants, System.Classes, System.Types, System.UITypes, System.Generics.Collections, System.Generics.Defaults,
   System.Threading, System.SyncObjs, System.IOUtils,
   VCL.StyledTaskDialog,
-  uGitRepoManager, uCodebergDialog, uCodebergSettings, uGitHubSettings, uTemplateSettings;
+  uGitRepoManager, uNewRepositoryDialog, uCodebergSettings, uGitHubSettings, uTemplateSettings;
 
 type
   /// <summary>
@@ -2197,7 +2197,7 @@ begin
   sDescription      := '';
   lPrivate          := False;
 
-  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate, 'Codeberg' ) ) then
+  if ( not TNewRepositoryDialog.Execute( sRepoName, sDescription, lPrivate, 'Codeberg' ) ) then
     Exit;
 
   // Confirm operation
@@ -2348,7 +2348,7 @@ begin
   sDescription      := '';
   lPrivate          := False;
 
-  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate, 'GitHub' ) ) then
+  if ( not TNewRepositoryDialog.Execute( sRepoName, sDescription, lPrivate, 'GitHub' ) ) then
     Exit;
 
   // Confirm operation
@@ -2519,7 +2519,7 @@ begin
   sDescription      := '';
   lPrivate          := False;
 
-  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate, sTargetName ) ) then
+  if ( not TNewRepositoryDialog.Execute( sRepoName, sDescription, lPrivate, sTargetName ) ) then
     Exit;
 
   if StyledMessageDlg(  Format(
@@ -4345,7 +4345,7 @@ begin
   lPrivate          := True;
   sProjectType      := 'Delphi / Pascal';
 
-  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate, sProjectType,
+  if ( not TNewRepositoryDialog.Execute( sRepoName, sDescription, lPrivate, sProjectType,
     IfThen( iChoice = mrYes, 'GitHub', 'Codeberg' ) ) ) then
     Exit;
 

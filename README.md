@@ -508,7 +508,7 @@ If encryption is ever unavailable, the token is **omitted from the file rather t
 | `MainFrm.pas` | Main form unit - UI and user interaction |
 | `MainFrm.dfm` | Main form design file |
 | `uGitRepoManager.pas` | Git repository manager class - handles all Git, Codeberg, and GitHub operations |
-| `uCodebergDialog.pas` | Dialog for entering new repository details |
+| `uNewRepositoryDialog.pas` | Host-neutral dialog for entering new repository details (GitHub or Codeberg) |
 | `uCodebergSettings.pas` | Dialog for configuring Codeberg credentials |
 | `uGitHubSettings.pas` | Dialog for configuring GitHub credentials |
 | `uTemplateSettings.pas` | Dialog for managing commit message templates |

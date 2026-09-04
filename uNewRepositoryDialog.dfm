@@ -1,4 +1,4 @@
-object CodebergDialog: TCodebergDialog
+object NewRepositoryDialog: TNewRepositoryDialog
   Left = 0
   Top = 0
   BorderStyle = bsDialog

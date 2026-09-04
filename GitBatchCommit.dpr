@@ -77,7 +77,7 @@ uses
   Vcl.Styles,
   MainFrm in 'MainFrm.pas' {MainForm},
   uGitRepoManager in 'uGitRepoManager.pas',
-  uCodebergDialog in 'uCodebergDialog.pas' {CodebergDialog},
+  uNewRepositoryDialog in 'uNewRepositoryDialog.pas' {NewRepositoryDialog},
   uCodebergSettings in 'uCodebergSettings.pas' {CodebergSettingsDialog},
   uGitHubSettings in 'uGitHubSettings.pas' {GitHubSettingsDialog},
   uTemplateSettings in 'uTemplateSettings.pas' {TemplateSettingsDialog};

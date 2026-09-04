@@ -31,7 +31,7 @@
 *)
 
 (*
-  uCodebergDialog.pas - Codeberg Repository Creation Dialog
+  uNewRepositoryDialog.pas - New Repository Creation Dialog
 
   Copyright (c) 2025 GITLAK Software
   All Rights Reserved
@@ -48,7 +48,7 @@
     Codeberg repository.
 *)
 
-unit uCodebergDialog;
+unit uNewRepositoryDialog;
 
 interface
 
@@ -60,9 +60,14 @@ uses
 
 type
   /// <summary>
-  ///   Dialog form for creating a new Codeberg repository.
+  ///   Dialog form for creating a new remote repository.
   /// </summary>
-  TCodebergDialog = class( TForm )
+  /// <remarks>
+  ///   Host-neutral: the same dialog serves GitHub and Codeberg creation and
+  ///   both directions of migration, taking the host name as a parameter so
+  ///   its caption names whichever host it is actually creating on.
+  /// </remarks>
+  TNewRepositoryDialog = class( TForm )
     lblRepoName: TLabel;
     lblDescription: TLabel;
     edtRepoName: TEdit;
@@ -119,13 +124,13 @@ type
   end;
 
 var
-  CodebergDialog    : TCodebergDialog;
+  NewRepositoryDialog    : TNewRepositoryDialog;
 
 implementation
 
 {$R *.dfm}
 
-procedure TCodebergDialog.DialogCloseQuery( Sender: TObject; var CanClose: Boolean );
+procedure TNewRepositoryDialog.DialogCloseQuery( Sender: TObject; var CanClose: Boolean );
 begin
 
   CanClose := True;
@@ -142,14 +147,14 @@ begin
 
 end;
 
-class function TCodebergDialog.Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
+class function TNewRepositoryDialog.Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
   const sHostName: string ): Boolean;
 var
-  Dlg               : TCodebergDialog;
+  Dlg               : TNewRepositoryDialog;
 begin
 
   Result := False;
-  Dlg := TCodebergDialog.Create( nil );
+  Dlg := TNewRepositoryDialog.Create( nil );
 
   try
     Dlg.Caption := Format( 'Create %s Repository', [ sHostName ] );
@@ -180,14 +185,14 @@ begin
 
 end;
 
-class function TCodebergDialog.Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
+class function TNewRepositoryDialog.Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
   var sProjectType: string; const sHostName: string ): Boolean;
 var
-  Dlg               : TCodebergDialog;
+  Dlg               : TNewRepositoryDialog;
 begin
 
   Result := False;
-  Dlg := TCodebergDialog.Create( nil );
+  Dlg := TNewRepositoryDialog.Create( nil );
 
   try
     Dlg.Caption := Format( 'Create %s Repository', [ sHostName ] );

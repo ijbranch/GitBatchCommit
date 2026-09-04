@@ -128,8 +128,8 @@
   <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     <VerInfo_Locale>1033</VerInfo_Locale>
-    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.103;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.6.0.0</VerInfo_Keys>
-    <VerInfo_Build>103</VerInfo_Build>
+    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.104;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.6.0.0</VerInfo_Keys>
+    <VerInfo_Build>104</VerInfo_Build>
     <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
     <VerInfo_MinorVer>6</VerInfo_MinorVer>
   </PropertyGroup>
@@ -151,8 +151,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
     <AppDPIAwarenessMode>unaware</AppDPIAwarenessMode>
-    <VerInfo_Build>67</VerInfo_Build>
-    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.67;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.6.0.0</VerInfo_Keys>
+    <VerInfo_Build>69</VerInfo_Build>
+    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.69;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.6.0.0</VerInfo_Keys>
     <VerInfo_MinorVer>6</VerInfo_MinorVer>
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
@@ -166,8 +166,8 @@
       <Form>MainForm</Form>
     </DCCReference>
     <DCCReference Include="uGitRepoManager.pas" />
-    <DCCReference Include="uCodebergDialog.pas">
-      <Form>CodebergDialog</Form>
+    <DCCReference Include="uNewRepositoryDialog.pas">
+      <Form>NewRepositoryDialog</Form>
     </DCCReference>
     <DCCReference Include="uCodebergSettings.pas">
       <Form>CodebergSettingsDialog</Form>
