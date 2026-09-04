@@ -28,7 +28,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
   The working tree is assessed with `git status --porcelain`, which covers modified, staged, untracked, deleted and renamed files as well as dirty submodules. Unmerged paths are identified from the porcelain `XY` codes (`DD`, `AU`, `UD`, `UA`, `DU`, `AA`, `UU`) and take priority over everything else, because staging them with `add -A` would commit the conflict markers. Changes that are only build output (`.dcu`, `.exe`, platform folders and so on) do not count as modifications. The relationship to the remote is measured with `git rev-list --left-right --count @{upstream}...HEAD`, which is locale-independent and reports both directions at once.
 - **Branch Display** - Shows the current branch for each repository
 - **Remote Provider Display** - Shows the remote provider (GitHub, Codeberg, Other, None) for each repository
-- **Version Display** - Shows the project version extracted from Delphi `.dproj` files (searches repository and subdirectories)
+- **Version Display** - Shows the project version extracted from Delphi `.dproj` files (reads the root `.dproj`, falling back to a subdirectory scan)
 - **Automatic Version Tagging** - For Delphi projects, automatically creates and pushes Git tags based on the version number in the `.dproj` file when committing
 - **Batch Operations** - Commit and push to multiple repositories with one click
 - **Quick Selection** - Buttons to select all, none, or only modified repositories
@@ -38,9 +38,11 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Status Filtering** - Use View > Filter menu to show only repositories with specific status
 - **Smart Button State** - Commit & Push button only enabled when repositories are selected and commit message is entered
 - **Operation Log** - Detailed log of all Git operations performed
-- **Help System** - Press F1 to view README documentation; Help > About for version info
-- **Colour-Coded Status** - Repository rows are colour-coded by status (green=Clean, yellow=Modified, orange=Pull Required, pale cyan=Push Required, purple=Diverged, strong red=Conflicted, red=Error)
+- **Help System** - Press F1 to view `Users Guide.md`; Help > About for version info
+- **Colour-Coded Status** - Repository rows are colour-coded by status (light green=Clean, light yellow=Modified, light orange=Pull Required, pale green=Push Required, light purple=Diverged, strong red=Conflicted, light red=Error)
 - **Open in Git Client** - Right-click to open repository in configured external Git client (e.g., Fork)
+- **Safe Refusals** - Declines rather than guessing when a repository's state cannot be established: an unfinished merge/rebase, unresolved conflicts, a detached HEAD, or a `git status` that failed. Force Push additionally refuses when the remote has moved since the last refresh
+- **Worktree and Submodule Support** - The real Git directory is resolved with `git rev-parse`, so linked worktrees and submodules (where `.git` is a file, not a folder) are handled like any other repository
 - **Open in Explorer** - Right-click to open repository folder in Windows Explorer
 - **Pull Operation** - Right-click to pull changes from remote for a single repository (fast-forward only — refuses to create a merge commit on diverged history)
 - **Commit Message History** - Click the dropdown button next to the commit message to select from recent messages (up to 20 stored)
@@ -72,13 +74,13 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 | Aqua Light Slate | VCL visual style (optional - falls back to default if unavailable) | Included with RAD Studio Premium Styles |
 | delphi-lookup | Optional: Delphi symbol indexer for auto-reindex after commits | https://github.com/JavierusTk/delphi-lookup |
 | EurekaLog 7 | Exception reporting; compiled in under the `EurekaLog` conditional define | https://www.eurekalog.com |
-| ELExtraPlugIns | GITLAK EurekaLog plug-in aggregator, referenced by absolute path from `GitBatchCommit.dpr` | `E:\DBiWorkflow Development\DBiCommonFiles` |
+| ELExtraPlugIns | GITLAK EurekaLog plug-in aggregator, referenced by bare unit name from `GitBatchCommit.dpr` | `E:\EurekaLog` |
 
 **Notes:**
 - To remove the FastMM5 dependency, remove `FastMM5` from the uses clause in `GitBatchCommit.dpr`. The project will then use Delphi's default memory manager.
 - delphi-lookup integration is completely optional. GitBatchCommit works normally without it installed.
 - The EurekaLog units are compiled from the EurekaLog installation (`Lib\` and `Source\Extras\`, both on the IDE's Win64 library path). Do **not** keep local copies of EurekaLog source or `.dcu` files in the project folder — the project directory is searched first, so a stale copy shadows the installed version and the build fails with `F2051 Unit … was compiled with a different version of …`. The cure is to delete the offending `.dcu`/`.pas` from the project root and rebuild.
-- `ELExtraPlugIns` is referenced by an absolute path in both `GitBatchCommit.dpr` and the project's unit search path. If the shared `DBiCommonFiles` folder is moved or renamed, update both or the build fails with `F1026 File not found`.
+- `ELExtraPlugIns` is resolved from `E:\EurekaLog`, which is on the RAD Studio Win64 library search path - there is no `in '<path>'` clause and no project search-path entry. If that folder is moved or renamed, update both or the build fails with `F1026 File not found`.
 
 ## Installation
 
@@ -135,7 +137,7 @@ The application performs the following Git commands for each selected repository
 
 ```
 git add -A
-git commit -m "Your message"
+git commit -F <temp message file>
 git push
 ```
 
@@ -180,10 +182,10 @@ The Pull operation includes multiple safety features to protect your local code:
 
 - **Warning Dialog** - Clear warning that local files may be modified
 - **Change Preview** - Shows exactly which files will be modified before pulling
-- **Automatic Backup** - Creates a timestamped backup branch (e.g., `backup-2026-01-15-143022`) before pulling
-- **Recovery Option** - If something goes wrong, reset to the backup branch with: `git reset --hard backup-YYYY-MM-DD-HHMMSS`
+- **Automatic Backup** - Creates a timestamped backup branch (e.g., `backup-2026-01-15-143022-517`) before pulling
+- **Recovery Option** - If something goes wrong, reset to the backup branch with: `git reset --hard backup-YYYY-MM-DD-HHMMSS-zzz`
 
-To delete backup branches after confirming everything is OK: `git branch -d backup-YYYY-MM-DD-HHMMSS`
+To delete backup branches after confirming everything is OK: `git branch -d backup-YYYY-MM-DD-HHMMSS-zzz`
 
 ### Resolving Merge Conflicts
 
@@ -302,8 +304,8 @@ GitBatchCommit can move a repository's remote from one host to the other in a si
 **Important:**
 
 - The old remote repository is **not** deleted. Once you have confirmed the migration succeeded, remove it manually via the web interface on the source host.
-- Target-host credentials must be configured first (File > Settings for Codeberg/GitHub). If missing, the settings dialog opens automatically.
-- If a remote named `codeberg` or `github` already exists locally, it is removed first so the rename can proceed.
+- Target-host credentials must be configured first (**GitHub > Settings...** or **Codeberg > Settings...**). If missing, the settings dialog opens automatically.
+- If a remote named `codeberg`, `github`, or `old-origin` when the previous host was neither already exists locally, it is removed first so the rename can proceed.
 
 ### Changing Repository Visibility
 
@@ -339,7 +341,7 @@ To quickly check or uncheck multiple consecutive repositories:
 
 Select **File > Settings** to configure:
 
-- **Git Client Path** - Full path to your external Git client executable (e.g., `C:\Program Files\Fork\Fork.exe`), used by **Open in Git Client**. If you point it at `git.exe` itself, GitBatchCommit will run that executable for all its own Git operations instead of resolving `git` from `PATH`
+- **Git Client Path** - Full path to your external Git client executable (e.g., `C:\Program Files\Fork\Fork.exe`), used by **Open in Git Client**. GitBatchCommit runs this executable for its own Git operations only when its filename is `git.exe`; anything else is used solely for **Open in Git Client** instead of resolving `git` from `PATH`
 - **File Pattern** - Optional pattern for staging files (e.g., `*.pas`). Leave empty to stage all files. Shell metacharacters are rejected for safety.
 - **delphi-indexer.exe Path** - Optional path to delphi-indexer.exe for automatic symbol reindexing after commits (auto-detected if not configured)
 
@@ -477,7 +479,7 @@ Right-click on a repository to access quick actions:
 
 ### Getting Help
 
-- Press **F1** or select **Help > Help Contents** to open the README.md documentation
+- Press **F1** or select **Help > Help Contents** to open `Users Guide.md`
 - Select **Help > About** to view version information and application details
 
 ## Configuration
@@ -485,7 +487,7 @@ Right-click on a repository to access quick actions:
 Repository paths and credentials are stored in a JSON file located at:
 
 ```
-%USERPROFILE%\GitBatchCommit\repositories.json
+%APPDATA%\GitBatchCommit\repositories.json
 ```
 
 The file is created automatically when you first add a repository or configure credentials.
@@ -554,7 +556,7 @@ This project is provided as-is for personal use only.
 ### 1.4.0
 
 - Added Version column to repository list - displays version extracted from Delphi `.dproj` files
-- Searches repository root and all subdirectories for `.dproj` files
+- Reads the `.dproj` in the repository root; only when there is none does it scan subdirectories
 - Added automatic version tagging for Delphi projects - creates Git tags (e.g., `v3.9.1.719`) on commit
 - Tags are automatically pushed to remote (GitHub/Codeberg) and appear in Releases section
 - Added **Pull Selected** button - pull changes for multiple repositories at once
@@ -604,3 +606,4 @@ This project is provided as-is for personal use only.
 *Version: 1.5 – 26 January 2026*
 *Version: 1.5.1 – 28 July 2026*
 *Version: 1.6.0 – 30 August 2026*
+*Revised: 1.6.0 – 5 September 2026*

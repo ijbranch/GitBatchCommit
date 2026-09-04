@@ -133,7 +133,7 @@ A comprehensive reference for all GitBatchCommit capabilities.
 **Git Commands Executed:**
 ```
 git add -A                    (or pattern-based if configured)
-git commit -m "Your message"
+git commit -F <temp message file>
 git push
 git tag -a vX.X.X.X -m "..."  (if Delphi project with version)
 git push origin vX.X.X.X      (pushes the tag)
@@ -148,7 +148,7 @@ git push origin vX.X.X.X      (pushes the tag)
 | **When** | When committing a repository containing a `.dproj` file with FileVersion |
 | **Why** | Creates release markers visible in GitHub/Codeberg Releases section |
 | **How** | Automatic - extracts version from `.dproj`, creates tag like `v1.0.0.123`, pushes tag |
-| **Caveats** | Only creates tag if it doesn't already exist. Searches subdirectories for `.dproj` files. Only works with Delphi projects |
+| **Caveats** | Only creates tag if it doesn't already exist. Prefers the root `.dproj`, scanning subdirectories only when there is none. Only works with Delphi projects |
 | **Linkages** | Version displayed in Version column. Tags appear in remote's Tags/Releases |
 
 ---
@@ -197,12 +197,12 @@ git push --force-with-lease
 
 | Aspect | Details |
 |--------|---------|
-| **What** | Fetches and merges remote changes for one repository |
+| **What** | Fast-forwards one repository to its upstream (`git pull --ff-only`) |
 | **Where** | Right-click context menu > Pull |
 | **When** | When a single repo shows "Pull Required" status |
 | **Why** | To incorporate remote changes into local repository |
 | **How** | Right-click repo > Pull > Review warnings > Review changes > Confirm |
-| **Caveats** | **WARNING: Modifies local files!** Creates backup branch first. May cause merge conflicts |
+| **Caveats** | **WARNING: Modifies local files!** Creates a backup branch first - which captures COMMITTED history only, not uncommitted work. Cannot merge, so a non-fast-forward pull is refused rather than producing a conflict |
 | **Linkages** | If conflicts occur, use Resolve Conflicts button |
 
 ### Pull Selected
@@ -214,7 +214,7 @@ git push --force-with-lease
 | **When** | When multiple repos show "Pull Required" status |
 | **Why** | Batch pull operation instead of pulling one at a time |
 | **How** | Check repos > Click "Pull Selected" > Review warning > Review file changes > Confirm |
-| **Caveats** | **WARNING: Modifies local files!** Creates backup branches. May cause merge conflicts in multiple repos |
+| **Caveats** | **WARNING: Modifies local files!** Creates backup branches, which capture COMMITTED history only. Cannot merge, so a non-fast-forward pull is refused rather than producing a conflict |
 | **Linkages** | If conflicts occur, use Resolve Conflicts button |
 
 ### Pull Safeguards
@@ -227,7 +227,7 @@ git push --force-with-lease
 | **Why** | To prevent accidental loss of local work |
 | **How** | Automatic - warning shown, changes previewed, backup created |
 | **Caveats** | Backup branches accumulate - delete manually when no longer needed |
-| **Linkages** | Backup branch named `backup-YYYY-MM-DD-HHMMSS`. Recovery: `git reset --hard backup-...` |
+| **Linkages** | Backup branch named `backup-YYYY-MM-DD-HHMMSS-zzz`. Recovery: `git reset --hard backup-...` |
 
 **Safeguard Details:**
 
@@ -237,12 +237,12 @@ git push --force-with-lease
 
 **Recovery from Bad Pull:**
 ```
-git reset --hard backup-2026-01-15-143022
+git reset --hard backup-2026-01-15-143022-517
 ```
 
 **Cleanup After Successful Pull:**
 ```
-git branch -d backup-2026-01-15-143022
+git branch -d backup-2026-01-15-143022-517
 ```
 
 ---
@@ -410,7 +410,7 @@ git push
 | **When** | When you want to change which host a repository lives on — works in both directions |
 | **Why** | One-click migration instead of creating the remote, renaming, and re-pushing manually |
 | **How** | Select repo > choose destination menu > confirm name/description/visibility > confirm summary. The target repo is created; the previous origin is preserved locally as a `codeberg` / `github` secondary remote; `origin` is swapped; all branches (`git push -u origin --all`) and tags (`git push origin --tags`) are pushed |
-| **Caveats** | The old remote repository is NOT deleted — remove it manually via the web UI once you have verified the migration. Target host credentials must be configured first (settings dialog opens automatically if missing). An existing local remote named `codeberg` or `github` is removed first so the rename can proceed |
+| **Caveats** | The old remote repository is NOT deleted — remove it manually via the web UI once you have verified the migration. Target host credentials must be configured first (settings dialog opens automatically if missing). An existing local remote named `codeberg`, `github`, or `old-origin` when the previous host was neither is removed first so the rename can proceed |
 | **Linkages** | Uses stored credentials from Codeberg/GitHub Settings. Provider column updates after migration |
 
 ---
@@ -434,11 +434,11 @@ git push
 | Status | Meaning | Row Colour |
 |--------|---------|------------|
 | Clean | No local changes, and level with the upstream | Green |
-| Modified | Local uncommitted changes present | Yellow |
+| Modified | Local uncommitted changes present | Light yellow |
 | Conflicted | Unmerged paths, or an unfinished merge/rebase/cherry-pick/revert/bisect | Strong red |
-| Pull Required (n) | Upstream has n commits this clone lacks | Orange |
-| Push Required (n) | This clone has n commits the upstream lacks | Pale cyan |
-| Diverged (+a/-b) | a commits ahead and b behind at the same time | Purple |
+| Pull Required (n) | Upstream has n commits this clone lacks | Light orange |
+| Push Required (n) | This clone has n commits the upstream lacks | Pale green |
+| Diverged (+a/-b) | a commits ahead and b behind at the same time | Light purple |
 | Error | Repository not accessible or invalid | Red |
 
 **How each is determined:**
@@ -447,7 +447,24 @@ git push
 |-------|---------|-------|
 | Working tree | `git status --porcelain` | Covers modified, staged, untracked, deleted and renamed files, and dirty submodules |
 | Conflicts | porcelain `XY` codes `DD` `AU` `UD` `UA` `DU` `AA` `UU` | Outranks everything else - Commit & Push refuses while any are present |
-| Unfinished operation | `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `BISECT_LOG`, `rebase-merge/`, `rebase-apply/` | Reported as Conflicted |
+| Unfinished operation | `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `BISECT_LOG`, `sequencer/todo`, `rebase-merge/`, `rebase-apply/` - located via `git rev-parse --absolute-git-dir`, so worktrees and submodules are handled | Reported as Conflicted |
+| Build output only | The working tree has changes, but every one is a build artifact | Scored Clean, and the status text says **"- build output only"** so the repository is not skipped silently |
+
+### When an operation refuses to run
+
+GitBatchCommit declines rather than guessing whenever it cannot establish the repository's state. Each of these is reported per repository in the log, and the rest of the batch continues.
+
+| Refusal | Why |
+|---|---|
+| "unfinished merge, rebase, cherry-pick, revert or bisect" | `git add -A` would stage files still containing conflict markers, and the commit would push them |
+| "could not determine the repository state" | `git status` failed or timed out. An indeterminate state is treated as a refusal, never as permission |
+| "unresolved conflicts" | Unmerged paths are present |
+| "HEAD is detached or the branch is unborn" | Commit and push both appear to succeed on a detached HEAD, leaving the work reachable only from the reflog |
+| Force push: "the remote has moved since this repository's status was last refreshed" | The lease is pinned to the upstream commit shown in the list when it was last refreshed. Refresh and review the incoming commits before retrying |
+
+### Closing while work is running
+
+Closing the window during a Git operation asks whether to cancel it. Cancellation is checked between repositories, so the window closes once the operation in flight has finished - normally a second or two, longer if a network call is timing out. Answering **No** leaves the window open and the batch running.
 | Build-output-only change | extension and platform-folder match | Treated as Clean; `debug/` and `release/` alone are NOT treated as build output, so `docs/release/notes.md` still counts as a real change |
 | Ahead / behind | `git rev-list --left-right --count @{upstream}...HEAD` | Locale-independent, both directions in one call; zero/zero when the branch has no upstream |
 
@@ -461,7 +478,7 @@ git push
 | **Where** | View > Filter menu |
 | **When** | When you want to focus on repos needing specific action |
 | **Why** | Reduces clutter, targeted batch operations |
-| **How** | View > Filter > Select status (All, Clean, Modified, Pull Required, Error) |
+| **How** | View > Filter > Select status (All, Clean, Modified, Conflicted, Pull Required, Push Required, Diverged, Error) |
 | **Caveats** | Selection buttons only affect visible repos |
 | **Linkages** | Works with Group filter |
 
@@ -485,7 +502,7 @@ git push
 | **Where** | Main list: "Version" column |
 | **When** | For Delphi projects with version information |
 | **Why** | Quick reference for project versions without opening IDE |
-| **How** | Automatic - searches repo and subdirectories for `.dproj` files |
+| **How** | Automatic - reads the root `.dproj`, scanning subdirectories only when there is none; the highest version wins |
 | **Caveats** | Only works for Delphi projects. Shows first `.dproj` found if multiple exist |
 | **Linkages** | Used for automatic version tagging during commit |
 
@@ -509,7 +526,7 @@ git push
 
 | Setting | Purpose | Example |
 |---------|---------|---------|
-| Git Client Path | External Git client executable; if set to `git.exe`, also used for GitBatchCommit's own Git calls | `C:\Program Files\Fork\Fork.exe` |
+| Git Client Path | External Git client executable; used for GitBatchCommit's own Git calls only when its filename is `git.exe` | `C:\Program Files\Fork\Fork.exe` |
 | File Pattern | Only stage files matching pattern | `*.pas` (empty = all files) |
 | delphi-indexer.exe Path | Optional symbol indexer for auto-reindex | Auto-detected or custom path |
 
@@ -545,7 +562,7 @@ git push
 | **Where** | Automatic after Commit & Push, Push Only, Force Push, or Resolve Conflicts; configurable via File > Settings |
 | **When** | After successfully pushing changes to a repository |
 | **Why** | Keeps delphi-lookup symbol database current with latest code changes |
-| **How** | Automatic - reindexes the parent indexed directory in background. Triggers for exact matches or subdirectories. Configure path via File > Settings if needed |
+| **How** | Automatic - reindexes each repository it has just pushed, in the background. Configure path via File > Settings if needed |
 | **Caveats** | Requires delphi-lookup installed. Only reindexes if repository is (or is within) a delphi-lookup indexed directory. Silently skips if not found |
 | **Linkages** | Uses [delphi-indexer](https://github.com/JavierusTk/delphi-lookup) by JavierusTk. Non-blocking (~100-500ms). Auto-detects from PATH or default location |
 
@@ -610,7 +627,7 @@ This confirms which indexed directory is being updated and whether the operation
 |---------|--------------------------------|
 | **Symptom** | Push fails with "rejected" or "non-fast-forward" error |
 | **Cause** | Someone else pushed, or you pushed from another machine |
-| **Solutions** | 1) Pull Selected (merges remote changes), or 2) Force Push (overwrites remote) |
+| **Solutions** | 1) Pull Selected (fast-forwards to the remote), or 2) Force Push (overwrites remote) |
 | **Recommendation** | Use Pull if you want remote changes. Use Force Push if local is source of truth |
 
 ### Pull Overwrote My Code
@@ -618,8 +635,8 @@ This confirms which indexed directory is being updated and whether the operation
 | Problem | Pull merged unwanted remote changes into local |
 |---------|----------------------------------------------|
 | **Symptom** | Local files changed unexpectedly after pull |
-| **Cause** | `git pull` merges remote into local by default |
-| **Solutions** | Reset to backup branch: `git reset --hard backup-YYYY-MM-DD-HHMMSS` |
+| **Cause** | The remote has commits this clone lacks; the fast-forward-only pull cannot apply them over local commits |
+| **Solutions** | Reset to backup branch: `git reset --hard backup-YYYY-MM-DD-HHMMSS-zzz` |
 | **Prevention** | Review change preview before confirming pull. Use Force Push if local is source of truth |
 
 ### Repository Shows Error Status
@@ -688,13 +705,13 @@ Option B - Overwrite Remote:
 
 ### Recovery from Bad Pull
 ```
-1. Note the backup branch name from log (backup-YYYY-MM-DD-HHMMSS)
+1. Note the backup branch name from log (backup-YYYY-MM-DD-HHMMSS-zzz)
 2. Open command prompt in repo folder
-3. Run: git reset --hard backup-YYYY-MM-DD-HHMMSS
+3. Run: git reset --hard backup-YYYY-MM-DD-HHMMSS-zzz
 4. Use "Force Push" to sync remote
 ```
 
 ---
 
 *GitBatchCommit Help Guide - Version 1.6.0*
-*Last Updated: 28 July 2026*
+*Last Updated: 5 September 2026*

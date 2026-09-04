@@ -71,9 +71,24 @@ Rows are colour-coded:
 
 | Colour | Status | Meaning |
 |--------|--------|---------|
-| Green | Clean | No local changes, up to date with remote |
-| Yellow | Modified | You have uncommitted changes |
-| Orange | Pull Required | The remote has new commits you don't have locally |
+| Light green | Clean | No local changes, up to date with remote |
+| Light yellow | Modified | You have uncommitted changes |
+| Strong red | Conflicted | Unmerged paths, or an unfinished merge/rebase |
+| Light orange | Pull Required | The remote has new commits you don't have locally |
+| Pale green | Push Required | Committed work that has not been pushed |
+| Light purple | Diverged | Commits on both sides - ahead AND behind |
+
+A repository whose only changes are build output (`.dcu`, `.map`, `Win64\Release\` and so on) is shown as **Clean - build output only**. It is deliberately excluded from Commit & Push, and the status text says so rather than leaving it out silently.
+
+### When an operation refuses
+
+GitBatchCommit refuses rather than guessing whenever it cannot be sure of a repository's state - an unfinished merge or rebase, unresolved conflicts, a detached HEAD, or a `git status` that failed. The reason appears in the log for that repository and the rest of the batch carries on.
+
+Force Push additionally refuses if the remote has moved on since the list was last refreshed, even though a backup exists. Refresh, review what came in, then decide.
+
+### Closing during an operation
+
+If you close the window while Git work is running, you are asked whether to cancel it. The window closes once the current repository finishes.
 | Red | Error | Path doesn't exist, or Git command failed |
 
 ### Refreshing Status
@@ -124,7 +139,7 @@ For a more detailed commit message (like the standard Git summary + body format)
 
 ### By Status
 
-Use **View > Filter** to show only repos with a specific status (All, Clean, Modified, Pull Required, Error).
+Use **View > Filter** to show only repos with a specific status (All, Clean, Modified, Conflicted, Pull Required, Push Required, Diverged, Error).
 
 ### By Group
 
@@ -144,7 +159,7 @@ When a repository shows "Pull Required" (orange):
 Before pulling, the app shows:
 1. A warning that local files may be modified
 2. A preview of incoming changes
-3. An automatic backup branch is created (named `backup-YYYY-MM-DD-HHMMSS`)
+3. An automatic backup branch is created (named `backup-YYYY-MM-DD-HHMMSS-zzz`)
 
 ### Resolving Conflicts
 
@@ -191,7 +206,7 @@ For complex merges requiring manual review, use an external Git client instead.
 
 ### Migrating Between Hosts
 
-Select a repository, then pick **Migrate Selected Repository to Codeberg** (under the Codeberg menu) or **Migrate Selected Repository to GitHub** (under the GitHub menu). The target repo is created, `origin` is repointed to it, and all branches and tags are pushed. The previous origin URL is kept as a secondary remote (named `codeberg` or `github`) so it can be restored. The old remote repository is not deleted — remove it via the web UI once you are satisfied with the migration.
+Select a repository, then pick **Migrate Selected Repository to Codeberg** (under the Codeberg menu) or **Migrate Selected Repository to GitHub** (under the GitHub menu). The target repo is created, `origin` is repointed to it, and all branches and tags are pushed. The previous origin URL is kept as a secondary remote (named `codeberg`, `github`, or `old-origin` when the previous host was neither) so it can be restored. The old remote repository is not deleted — remove it via the web UI once you are satisfied with the migration.
 
 ### Changing Visibility
 
@@ -215,7 +230,7 @@ Right-click any repository in the list for:
 
 ### Version Display
 
-For Delphi projects, the Version column shows the `FileVersion` from the `.dproj` file. The app searches the repository root and subdirectories for `.dproj` files.
+For Delphi projects, the Version column shows the `FileVersion` from the `.dproj` file. The app reads the `.dproj` in the repository root, and only scans subdirectories when there is none. Where several are found the highest version wins.
 
 ### Automatic Version Tagging
 
@@ -234,7 +249,7 @@ If [delphi-indexer](https://github.com/JavierusTk/delphi-lookup) is installed, t
 
 ### Application Settings (File > Settings)
 
-- **Git Client Path** — path to an external Git client (e.g., Fork, SourceTree) for "Open in Git Client". Point it at `git.exe` to make GitBatchCommit use that executable for its own Git calls too
+- **Git Client Path** — path to an external Git client (e.g., Fork, SourceTree) for "Open in Git Client". Point it at `git.exe` to make GitBatchCommit use that executable for its own Git calls; any other executable is used only for **Open in Git Client**
 - **File Pattern** — optional pattern for selective staging (e.g., `*.pas *.dfm`). When empty, `git add -A` stages everything
 - **delphi-indexer Path** — auto-detected; override here if needed
 
@@ -287,4 +302,4 @@ Generate a new token and update it via the respective Settings dialog (**Codeber
 ---
 
 *GitBatchCommit Users Guide - Version 1.6.0*
-*Last Updated: 14 June 2026*
+*Last Updated: 5 September 2026*
