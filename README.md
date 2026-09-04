@@ -11,8 +11,8 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Repository Management** - Add and remove Git repositories from a persistent list
 - **Drag and Drop** - Drag repository folders from Windows Explorer directly onto the application. Dropping a non-Git folder offers to initialise it, create a remote repo, and push in one step
 - **New Repository Initialisation** - Automatic project type detection with `.gitignore` generation for Delphi, C/C++, C#, Java, Python, JavaScript, TypeScript, Go, Rust, and HTML
-- **Codeberg Integration** - Create new Codeberg repositories and push directly from the application (secondary; GitHub is the default host)
-- **GitHub Integration** - Create new GitHub repositories and push directly from the application
+- **GitHub Integration** - Create new GitHub repositories and push directly from the application. GitHub is the default host
+- **Codeberg Integration** - Create new Codeberg repositories and push directly from the application
 - **Migrate Between Hosts** - Move a repository's remote from Codeberg to GitHub (or back) via the GitHub/Codeberg menus. Creates the new repo on the target host, preserves the previous origin as a secondary remote for safety, swaps `origin`, and pushes all branches and tags
 - **Visibility Management** - Change repository visibility (public/private) via right-click context menu
 - **Parallel Status Refresh** - Repository status checks run in parallel on background threads, keeping the UI responsive
@@ -25,7 +25,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
   - **Diverged** - Both of the above, shown as `(+ahead/-behind)`
   - **Error** - Repository not accessible or not a valid Git repo
 
-  The working tree is assessed with `git status --porcelain`, which covers modified, staged, untracked, deleted and renamed files as well as dirty submodules. Unmerged paths are identified from the porcelain `XY` codes (`DD`, `AU`, `UD`, `UA`, `DU`, `AA`, `UU`) and take priority over everything else, because staging them with `add -A` would commit the conflict markers. Changes that are only build output (`.dcu`, `.exe`, platform folders and so on) do not count as modifications. The relationship to the remote is measured with `git rev-list --left-right --count @{upstream}...HEAD`, which is locale-independent and reports both directions at once.
+  The working tree is assessed with `git status --porcelain`, which covers modified, staged, untracked, deleted and renamed files as well as dirty submodules. Unmerged paths are identified from the porcelain `XY` codes (`DD`, `AU`, `UD`, `UA`, `DU`, `AA`, `UU`) and take priority over everything else, because staging them with `add -A` would commit the conflict markers. Changes that are only build output (`.dcu`, `.map`, platform build folders and so on; `.exe` and `.hpp` are deliberately NOT treated as build output, since plenty of repositories track tooling binaries and C/C++ headers on purpose) do not count as modifications. The relationship to the remote is measured with `git rev-list --left-right --count @{upstream}...HEAD`, which is locale-independent and reports both directions at once.
 - **Branch Display** - Shows the current branch for each repository
 - **Remote Provider Display** - Shows the remote provider (GitHub, Codeberg, Other, None) for each repository
 - **Version Display** - Shows the project version extracted from Delphi `.dproj` files (reads the root `.dproj`, falling back to a subdirectory scan)
@@ -41,7 +41,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Help System** - Press F1 to view `Users Guide.md`; Help > About for version info
 - **Colour-Coded Status** - Repository rows are colour-coded by status (light green=Clean, light yellow=Modified, light orange=Pull Required, pale green=Push Required, light purple=Diverged, strong red=Conflicted, light red=Error)
 - **Open in Git Client** - Right-click to open repository in configured external Git client (e.g., Fork)
-- **Safe Refusals** - Declines rather than guessing when a repository's state cannot be established: an unfinished merge/rebase, unresolved conflicts, a detached HEAD, or a `git status` that failed. Force Push additionally refuses when the remote has moved since the last refresh
+- **Safe Refusals** - Declines rather than guessing when a repository's state cannot be established: an unfinished merge, rebase, cherry-pick, revert or bisect; unresolved conflicts; a detached or unborn HEAD; or a `git status` that failed or timed out. Force Push additionally refuses when the remote has moved since the last refresh
 - **Worktree and Submodule Support** - The real Git directory is resolved with `git rev-parse`, so linked worktrees and submodules (where `.git` is a file, not a folder) are handled like any other repository
 - **Open in Explorer** - Right-click to open repository folder in Windows Explorer
 - **Pull Operation** - Right-click to pull changes from remote for a single repository (fast-forward only — refuses to create a merge commit on diverged history)
@@ -189,7 +189,7 @@ To delete backup branches after confirming everything is OK: `git branch -d back
 
 ### Resolving Merge Conflicts
 
-If pulling results in merge conflicts (shown in the log), you can resolve them automatically:
+If a merge performed outside this application has left conflicts (shown in the log), you can resolve them automatically:
 
 1. Tick the checkboxes next to repositories with conflicts
 2. Click **Resolve Conflicts** in the toolbar
@@ -230,39 +230,13 @@ When your local code is the "source of truth" and you need to overwrite the remo
 
 **Warning:** Force push overwrites remote history. Any commits on the remote that are not in your local repository will be permanently lost. Use with caution.
 
-GitBatchCommit uses `git push --force-with-lease` rather than a bare `--force`. The lease makes Git verify that the remote branch is still where your last fetch saw it, so a push made by someone else in the meantime **aborts the operation** instead of destroying their work. If you see a "stale info" or rejection message, fetch and review the incoming commits before trying again — that message means the force push just prevented data loss.
+GitBatchCommit uses `git push --force-with-lease` rather than a bare `--force`, and pins the lease to the upstream commit recorded when the repository's status was last refreshed — that is, what the list was showing you. A push made by someone else since then **aborts the operation** instead of destroying their work. If you see a "stale info" or rejection message, refresh and review the incoming commits before trying again — that message means the force push just prevented data loss.
 
-### Creating a New Codeberg Repository
-
-GitBatchCommit can initialize a local folder as a Git repository, create a corresponding repository on Codeberg, and push the initial commit - all in one operation.
-
-**First-time Setup:**
-
-1. Select **Codeberg > Settings**
-2. Enter your Codeberg username
-3. Enter a personal access token (generate at codeberg.org/user/settings/applications)
-4. Click **OK** - credentials are saved for future use
-
-**Creating a Repository:**
-
-1. Select **Codeberg > Initialize & Push to Codeberg**
-2. Select the folder you want to initialize
-3. Enter the repository name (pre-filled from folder name)
-4. Optionally add a description
-5. Choose whether the repository should be private
-6. Confirm the operation
-
-The application will:
-- Initialize a Git repository in the folder
-- Create the repository on Codeberg
-- Add the remote origin
-- Commit all files
-- Push to Codeberg
-- Add the repository to your managed list
+The pinning matters: a bare `--force-with-lease` compares against the remote-tracking ref, and this application fetches on every status refresh. Without an explicit commit, its own background fetch would quietly move the ref forward and the lease would pass on commits you had never seen.
 
 ### Creating a New GitHub Repository
 
-GitBatchCommit can also initialize a local folder and push to GitHub.
+GitBatchCommit can initialize a local folder as a Git repository, create a corresponding repository on GitHub, and push the initial commit - all in one operation.
 
 **First-time Setup:**
 
@@ -280,16 +254,44 @@ GitBatchCommit can also initialize a local folder and push to GitHub.
 5. Choose whether the repository should be private
 6. Confirm the operation
 
-The process is identical to Codeberg - the application initializes the repository, creates it on GitHub, and pushes the initial commit.
+The application will:
+- Initialize a Git repository in the folder
+- Create the repository on GitHub
+- Add the remote origin
+- Commit all files
+- Push to GitHub
+- Add the repository to your managed list
 
-### Migrating a Repository Between Codeberg and GitHub
+### Creating a New Codeberg Repository
 
-GitBatchCommit can move a repository's remote from one host to the other in a single operation. This works in both directions (Codeberg → GitHub and GitHub → Codeberg).
+GitBatchCommit can also initialize a local folder and push to Codeberg.
+
+**First-time Setup:**
+
+1. Select **Codeberg > Settings**
+2. Enter your Codeberg username
+3. Enter a personal access token (generate at codeberg.org/user/settings/applications)
+4. Click **OK** - credentials are saved for future use
+
+**Creating a Repository:**
+
+1. Select **Codeberg > Initialize & Push to Codeberg**
+2. Select the folder you want to initialize
+3. Enter the repository name (pre-filled from folder name)
+4. Optionally add a description
+5. Choose whether the repository should be private
+6. Confirm the operation
+
+The process is identical to GitHub - the application initializes the repository, creates it on Codeberg, and pushes the initial commit.
+
+### Migrating a Repository Between GitHub and Codeberg
+
+GitBatchCommit can move a repository's remote from one host to the other in a single operation. This works in both directions (Codeberg -> GitHub and GitHub -> Codeberg).
 
 **Steps:**
 
 1. Select the repository in the list
-2. Choose **Codeberg > Migrate Selected Repository to Codeberg...** or **GitHub > Migrate Selected Repository to GitHub...** depending on the destination
+2. Choose **GitHub > Migrate Selected Repository to GitHub...** or **Codeberg > Migrate Selected Repository to Codeberg...** depending on the destination
 3. Confirm/adjust the target repository name, description, and visibility in the dialog
 4. Review the confirmation summary and click **Yes**
 
@@ -305,7 +307,9 @@ GitBatchCommit can move a repository's remote from one host to the other in a si
 
 - The old remote repository is **not** deleted. Once you have confirmed the migration succeeded, remove it manually via the web interface on the source host.
 - Target-host credentials must be configured first (**GitHub > Settings...** or **Codeberg > Settings...**). If missing, the settings dialog opens automatically.
-- If a remote named `codeberg`, `github`, or `old-origin` when the previous host was neither already exists locally, it is removed first so the rename can proceed.
+- If a local remote of that alias name already exists, it is **left alone** and a numbered suffix is used instead — a mirror remote you set up yourself is never destroyed, along with its refspecs and push URL.
+- Branches that exist only on the old remote are recovered locally before the push, so nothing is left behind on the host you are migrating away from.
+- If any step fails, the original remotes are restored, so a failed migration cannot leave the repository with no `origin` or with `origin` pointing at an empty new remote.
 
 ### Changing Repository Visibility
 
@@ -492,7 +496,9 @@ Repository paths and credentials are stored in a JSON file located at:
 
 The file is created automatically when you first add a repository or configure credentials.
 
-**Note:** Access tokens for Codeberg and GitHub are encrypted with the Windows Data Protection API (DPAPI) under your user account before being written to this file, and appear as an opaque `dpapi:`-prefixed value. They can only be decrypted by the same Windows user on the same machine, so copying the file elsewhere does not carry a usable credential. A token written in plain text by a build before 1.6.0 is still read, and is re-encrypted the next time settings are saved.
+**Note:** Access tokens for GitHub and Codeberg are encrypted with the Windows Data Protection API (DPAPI) under your user account, with application-specific entropy, before being written to this file. They appear as an opaque `dpapi:`-prefixed value and can only be decrypted by the same Windows user on the same machine, so copying the file elsewhere does not carry a usable credential.
+
+If encryption is ever unavailable, the token is **omitted from the file rather than written in clear text**, and the settings dialog tells you so. A stored token that cannot be decrypted is never overwritten with an empty value either — the original is written back untouched, so an environment problem cannot silently destroy the credential. Tokens written by an earlier build, whether in plain text or without entropy, are still read and are re-encrypted the next time settings are saved.
 
 ## Project Structure
 
@@ -538,7 +544,7 @@ This project is provided as-is for personal use only.
 - **Fixed** Fix .gitignore adding `*.res`, which would have stopped compiled resources being staged
 - **Added** Conflicted, Push Required and Diverged statuses; Commit & Push now refuses a repository with unresolved conflicts or an unfinished merge/rebase
 - **Changed** Force Push to `--force-with-lease`, so it aborts rather than destroying someone else's commits
-- **Security** - Codeberg and GitHub tokens are now DPAPI-encrypted at rest, and credentials are redacted from the log
+- **Security** - GitHub and Codeberg tokens are now DPAPI-encrypted at rest, and credentials are redacted from the log
 - Numerous thread-safety, shutdown, re-entrancy and resource-lifetime fixes
 
 ### 1.5.0

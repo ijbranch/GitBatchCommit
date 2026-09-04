@@ -57,7 +57,7 @@ Each row shows:
 | **Name** | Repository folder name |
 | **Path** | Full path on disk |
 | **Branch** | Current Git branch (usually `main`) |
-| **Remote** | Hosting provider: Codeberg, GitHub, Other, or None |
+| **Remote** | Hosting provider: GitHub, Codeberg, Other, or None |
 | **Tracked Files** | Number of files Git is tracking |
 | **Modified** | Number of changed/new/deleted files |
 | **Status** | Current state (see below) |
@@ -77,19 +77,19 @@ Rows are colour-coded:
 | Light orange | Pull Required | The remote has new commits you don't have locally |
 | Pale green | Push Required | Committed work that has not been pushed |
 | Light purple | Diverged | Commits on both sides - ahead AND behind |
+| Light red | Error | Path doesn't exist, or Git command failed |
 
-A repository whose only changes are build output (`.dcu`, `.map`, `Win64\Release\` and so on) is shown as **Clean - build output only**. It is deliberately excluded from Commit & Push, and the status text says so rather than leaving it out silently.
+A repository whose only changes are build output (`.dcu`, `.map`, `Win64\Release\` and so on) has **" - build output only"** appended to its status. Such a repository does not count as Modified, so Commit & Push deliberately skips it - the status text says so rather than leaving it out silently.
 
 ### When an operation refuses
 
-GitBatchCommit refuses rather than guessing whenever it cannot be sure of a repository's state - an unfinished merge or rebase, unresolved conflicts, a detached HEAD, or a `git status` that failed. The reason appears in the log for that repository and the rest of the batch carries on.
+GitBatchCommit refuses rather than guessing whenever it cannot be sure of a repository's state - an unfinished merge, rebase, cherry-pick, revert or bisect; unresolved conflicts; a detached or unborn HEAD; or a `git status` that failed or timed out. The reason appears in the log for that repository and the rest of the batch carries on.
 
-Force Push additionally refuses if the remote has moved on since the list was last refreshed, even though a backup exists. Refresh, review what came in, then decide.
+Force Push additionally refuses if the remote has moved on since the list was last refreshed. Note that Force Push does **not** create a backup branch - only Pull does - so that refusal is the only thing standing between you and someone else's commits. Refresh, review what came in, then decide.
 
 ### Closing during an operation
 
-If you close the window while Git work is running, you are asked whether to cancel it. The window closes once the current repository finishes.
-| Red | Error | Path doesn't exist, or Git command failed |
+If you close the window while Git work is running, you are asked whether to cancel it. The window normally closes within a second or two of answering **Yes**, because cancellation is checked between repositories. If a Git call is stuck on a network timeout the window stays open and asks you to try again shortly - it will not free anything out from under a running operation.
 
 ### Refreshing Status
 
@@ -163,7 +163,7 @@ Before pulling, the app shows:
 
 ### Resolving Conflicts
 
-If a pull results in merge conflicts:
+If a merge performed outside this application has left conflicts:
 
 1. Click **Resolve Conflicts** — this keeps your local version of conflicted files and **discards the incoming remote version of those files**. It only acts on a repository with a merge actually in progress; others are skipped
 2. Then click **Push Only** to send the resolution to the remote
@@ -192,25 +192,25 @@ For complex merges requiring manual review, use an external Git client instead.
 
 ## Remote Provider Integration
 
-### Codeberg
-
-- **Codeberg > Settings** — enter your username and API token (generate at codeberg.org/user/settings/applications)
-- **Codeberg > Initialize & Push** — creates a new Codeberg repo and pushes your local code to it
-- **Codeberg > Migrate Selected Repository to Codeberg** — moves the selected repository from GitHub (or another host) onto Codeberg
-
 ### GitHub
 
 - **GitHub > Settings** — enter your username and personal access token (generate at github.com/settings/tokens, needs `repo` scope)
 - **GitHub > Initialize & Push** — creates a new GitHub repo and pushes your local code to it
 - **GitHub > Migrate Selected Repository to GitHub** — moves the selected repository from Codeberg (or another host) onto GitHub
 
+### Codeberg
+
+- **Codeberg > Settings** — enter your username and API token (generate at codeberg.org/user/settings/applications)
+- **Codeberg > Initialize & Push** — creates a new Codeberg repo and pushes your local code to it
+- **Codeberg > Migrate Selected Repository to Codeberg** — moves the selected repository from GitHub (or another host) onto Codeberg
+
 ### Migrating Between Hosts
 
-Select a repository, then pick **Migrate Selected Repository to Codeberg** (under the Codeberg menu) or **Migrate Selected Repository to GitHub** (under the GitHub menu). The target repo is created, `origin` is repointed to it, and all branches and tags are pushed. The previous origin URL is kept as a secondary remote (named `codeberg`, `github`, or `old-origin` when the previous host was neither) so it can be restored. The old remote repository is not deleted — remove it via the web UI once you are satisfied with the migration.
+Select a repository, then pick **Migrate Selected Repository to GitHub** (under the GitHub menu) or **Migrate Selected Repository to Codeberg** (under the Codeberg menu). The target repo is created, `origin` is repointed to it, and all branches and tags are pushed. The previous origin URL is kept as a secondary remote (named `codeberg`, `github`, or `old-origin` when the previous host was neither) so it can be restored. The old remote repository is not deleted — remove it via the web UI once you are satisfied with the migration.
 
 ### Changing Visibility
 
-Right-click a repository and choose **Set Public** or **Set Private** to change its visibility on Codeberg or GitHub.
+Right-click a repository and choose **Set Public** or **Set Private** to change its visibility on GitHub or Codeberg.
 
 ## Context Menu (Right-Click)
 
@@ -239,7 +239,7 @@ When you commit a Delphi project, the app automatically:
 2. Creates an annotated Git tag (e.g., `v1.5.0.38`)
 3. Pushes the tag to the remote
 
-Tags appear in your Codeberg/GitHub Releases section.
+Tags appear in your GitHub/Codeberg Releases section.
 
 ### delphi-lookup Integration
 

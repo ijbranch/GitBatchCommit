@@ -186,7 +186,7 @@ git push
 
 **Git Commands Executed:**
 ```
-git push --force-with-lease
+git push --force-with-lease=<branch>:<commit shown at last refresh> origin -- <branch>
 ```
 
 ---
@@ -203,7 +203,7 @@ git push --force-with-lease
 | **Why** | To incorporate remote changes into local repository |
 | **How** | Right-click repo > Pull > Review warnings > Review changes > Confirm |
 | **Caveats** | **WARNING: Modifies local files!** Creates a backup branch first - which captures COMMITTED history only, not uncommitted work. Cannot merge, so a non-fast-forward pull is refused rather than producing a conflict |
-| **Linkages** | If conflicts occur, use Resolve Conflicts button |
+| **Linkages** | A non-fast-forward pull is refused, so this cannot leave the tree conflicted. Resolve Conflicts is for conflicts created OUTSIDE this application |
 
 ### Pull Selected
 
@@ -215,7 +215,7 @@ git push --force-with-lease
 | **Why** | Batch pull operation instead of pulling one at a time |
 | **How** | Check repos > Click "Pull Selected" > Review warning > Review file changes > Confirm |
 | **Caveats** | **WARNING: Modifies local files!** Creates backup branches, which capture COMMITTED history only. Cannot merge, so a non-fast-forward pull is refused rather than producing a conflict |
-| **Linkages** | If conflicts occur, use Resolve Conflicts button |
+| **Linkages** | A non-fast-forward pull is refused, so this cannot leave the tree conflicted. Resolve Conflicts is for conflicts created OUTSIDE this application |
 
 ### Pull Safeguards
 
@@ -255,7 +255,7 @@ git branch -d backup-2026-01-15-143022-517
 |--------|---------|
 | **What** | Automatically resolves merge conflicts by keeping local versions |
 | **Where** | Toolbar button: "Resolve Conflicts" |
-| **When** | After a pull results in merge conflicts |
+| **When** | After a merge performed OUTSIDE this application has left conflicts |
 | **Why** | Quick resolution when you want local code to take precedence |
 | **How** | Check repos with conflicts > Click "Resolve Conflicts" > Confirm |
 | **Caveats** | Uses "keep local" strategy ONLY - remote changes are discarded. For complex merges requiring manual review, use external Git client |
@@ -365,18 +365,6 @@ git push
 
 ## Remote Providers
 
-### Codeberg Integration
-
-| Aspect | Details |
-|--------|---------|
-| **What** | Create and manage repositories on Codeberg |
-| **Where** | Codeberg menu |
-| **When** | When you want to create new Codeberg repos or manage existing ones |
-| **Why** | Direct integration without leaving the application |
-| **How** | First: Codeberg > Settings (enter credentials). Then: Codeberg > Initialize & Push |
-| **Caveats** | Requires personal access token from codeberg.org/user/settings/applications. Token encrypted at rest with DPAPI (current user, this machine) |
-| **Linkages** | Created repos automatically added to managed list |
-
 ### GitHub Integration
 
 | Aspect | Details |
@@ -387,6 +375,18 @@ git push
 | **Why** | Direct integration without leaving the application |
 | **How** | First: GitHub > Settings (enter credentials). Then: GitHub > Initialize & Push |
 | **Caveats** | Requires personal access token with `repo` scope from github.com/settings/tokens. Token encrypted at rest with DPAPI (current user, this machine) |
+| **Linkages** | Created repos automatically added to managed list |
+
+### Codeberg Integration
+
+| Aspect | Details |
+|--------|---------|
+| **What** | Create and manage repositories on Codeberg |
+| **Where** | Codeberg menu |
+| **When** | When you want to create new Codeberg repos or manage existing ones |
+| **Why** | Direct integration without leaving the application |
+| **How** | First: Codeberg > Settings (enter credentials). Then: Codeberg > Initialize & Push |
+| **Caveats** | Requires personal access token from codeberg.org/user/settings/applications. Token encrypted at rest with DPAPI (current user, this machine) |
 | **Linkages** | Created repos automatically added to managed list |
 
 ### Change Visibility (Public/Private)
@@ -401,7 +401,7 @@ git push
 | **Caveats** | Only works for GitHub and Codeberg repos. Requires valid credentials. Must have permission to modify settings |
 | **Linkages** | Uses stored credentials from respective Settings |
 
-### Migrate Between Codeberg and GitHub
+### Migrate Between GitHub and Codeberg
 
 | Aspect | Details |
 |--------|---------|
@@ -409,9 +409,9 @@ git push
 | **Where** | Codeberg menu > Migrate Selected Repository to Codeberg... / GitHub menu > Migrate Selected Repository to GitHub... |
 | **When** | When you want to change which host a repository lives on — works in both directions |
 | **Why** | One-click migration instead of creating the remote, renaming, and re-pushing manually |
-| **How** | Select repo > choose destination menu > confirm name/description/visibility > confirm summary. The target repo is created; the previous origin is preserved locally as a `codeberg` / `github` secondary remote; `origin` is swapped; all branches (`git push -u origin --all`) and tags (`git push origin --tags`) are pushed |
-| **Caveats** | The old remote repository is NOT deleted — remove it manually via the web UI once you have verified the migration. Target host credentials must be configured first (settings dialog opens automatically if missing). An existing local remote named `codeberg`, `github`, or `old-origin` when the previous host was neither is removed first so the rename can proceed |
-| **Linkages** | Uses stored credentials from Codeberg/GitHub Settings. Provider column updates after migration |
+| **How** | Select repo > choose destination menu > confirm name/description/visibility > confirm summary. The target repo is created; the previous origin is preserved locally as a `codeberg` / `github` secondary remote; `origin` is swapped; branches that existed only on the old remote are recovered locally first, then all branches (`git push -u origin --all`) and tags (`git push origin --tags`) are pushed |
+| **Caveats** | The old remote repository is NOT deleted — remove it manually via the web UI once you have verified the migration. Target host credentials must be configured first (settings dialog opens automatically if missing). An existing local remote of the alias name is **left alone** — a numbered suffix is used instead, so a mirror remote you already had is never destroyed. If any step fails, the original remotes are restored |
+| **Linkages** | Uses stored credentials from GitHub/Codeberg Settings. Provider column updates after migration |
 
 ---
 
@@ -433,13 +433,13 @@ git push
 
 | Status | Meaning | Row Colour |
 |--------|---------|------------|
-| Clean | No local changes, and level with the upstream | Green |
+| Clean | No local changes, and level with the upstream | Light green |
 | Modified | Local uncommitted changes present | Light yellow |
 | Conflicted | Unmerged paths, or an unfinished merge/rebase/cherry-pick/revert/bisect | Strong red |
 | Pull Required (n) | Upstream has n commits this clone lacks | Light orange |
 | Push Required (n) | This clone has n commits the upstream lacks | Pale green |
 | Diverged (+a/-b) | a commits ahead and b behind at the same time | Light purple |
-| Error | Repository not accessible or invalid | Red |
+| Error | Repository not accessible or invalid | Light red |
 
 **How each is determined:**
 
@@ -448,7 +448,10 @@ git push
 | Working tree | `git status --porcelain` | Covers modified, staged, untracked, deleted and renamed files, and dirty submodules |
 | Conflicts | porcelain `XY` codes `DD` `AU` `UD` `UA` `DU` `AA` `UU` | Outranks everything else - Commit & Push refuses while any are present |
 | Unfinished operation | `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `BISECT_LOG`, `sequencer/todo`, `rebase-merge/`, `rebase-apply/` - located via `git rev-parse --absolute-git-dir`, so worktrees and submodules are handled | Reported as Conflicted |
-| Build output only | The working tree has changes, but every one is a build artifact | Scored Clean, and the status text says **"- build output only"** so the repository is not skipped silently |
+| Build-output-only change | extension and platform-folder match | The status text gains **" - build output only"**, so the repository is visibly excluded from Commit & Push rather than silently omitted. `debug/` and `release/` alone are NOT treated as build output, so `docs/release/notes.md` still counts as a real change |
+| Ahead / behind | `git rev-list --left-right --count @{upstream}...HEAD` | Locale-independent, both directions in one call; zero/zero when the branch has no upstream |
+
+**Not detected:** stashed work, and changes to files marked `assume-unchanged` or `skip-worktree`. Neither appears in `git status`.
 
 ### When an operation refuses to run
 
@@ -464,11 +467,9 @@ GitBatchCommit declines rather than guessing whenever it cannot establish the re
 
 ### Closing while work is running
 
-Closing the window during a Git operation asks whether to cancel it. Cancellation is checked between repositories, so the window closes once the operation in flight has finished - normally a second or two, longer if a network call is timing out. Answering **No** leaves the window open and the batch running.
-| Build-output-only change | extension and platform-folder match | Treated as Clean; `debug/` and `release/` alone are NOT treated as build output, so `docs/release/notes.md` still counts as a real change |
-| Ahead / behind | `git rev-list --left-right --count @{upstream}...HEAD` | Locale-independent, both directions in one call; zero/zero when the branch has no upstream |
+Closing the window during a Git operation asks whether to cancel it. Cancellation is checked between repositories, so the window normally closes within a second or two of answering **Yes**. Answering **No** leaves the window open and the batch running.
 
-**Not detected:** stashed work, and changes to files marked `assume-unchanged` or `skip-worktree`. Neither appears in `git status`.
+If a Git call is stuck on a network timeout, the drain gives up after 90 seconds, the window stays open, and you are told to try closing again in a moment. The manager is never freed while a worker is still inside it.
 
 ### Status Filter
 
@@ -503,7 +504,7 @@ Closing the window during a Git operation asks whether to cancel it. Cancellatio
 | **When** | For Delphi projects with version information |
 | **Why** | Quick reference for project versions without opening IDE |
 | **How** | Automatic - reads the root `.dproj`, scanning subdirectories only when there is none; the highest version wins |
-| **Caveats** | Only works for Delphi projects. Shows first `.dproj` found if multiple exist |
+| **Caveats** | Only works for Delphi projects. Where several are found, the highest version wins |
 | **Linkages** | Used for automatic version tagging during commit |
 
 ---
@@ -667,7 +668,7 @@ This confirms which indexed directory is being updated and whether the operation
 
 ### Credentials Not Working
 
-| Problem | Codeberg or GitHub operations fail with auth error |
+| Problem | GitHub or Codeberg operations fail with auth error |
 |---------|---------------------------------------------------|
 | **Symptom** | API calls fail, "unauthorized" errors |
 | **Cause** | Invalid or expired access token |
