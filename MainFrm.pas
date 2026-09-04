@@ -4306,27 +4306,18 @@ begin
   iChoice           := StyledMessageDlg(
     Format( '"%s" is not a Git repository.', [ sRepoName ] ) + sLineBreak + sLineBreak +
     'Would you like to initialise it and push to a remote?' + sLineBreak + sLineBreak +
-    'Yes = Codeberg' + sLineBreak +
-    'No = GitHub' + sLineBreak +
+    'Yes = GitHub' + sLineBreak +
+    'No = Codeberg' + sLineBreak +
     'Cancel = Skip',
     mtConfirmation, [ mbYes, mbNo, mbCancel ], 0 );
 
   if iChoice = mrCancel then
     Exit;
 
-  // Check credentials for chosen provider
+  // Check credentials for chosen provider. Yes is GitHub - it is the host
+  // this application is pointed at, and the affirmative button should be the
+  // one the user almost always wants.
   if iChoice = mrYes then
-  begin
-    if not FRepoManager.HasCodebergCredentials then
-    begin
-      StyledMessageDlg(  'Please configure Codeberg credentials first.', mtWarning, [ mbOK ], 0 );
-      mnuCodebergSettingsClick( nil );
-
-      if not FRepoManager.HasCodebergCredentials then
-        Exit;
-    end;
-  end
-  else
   begin
     if not FRepoManager.HasGitHubCredentials then
     begin
@@ -4334,6 +4325,17 @@ begin
       mnuGitHubSettingsClick( nil );
 
       if not FRepoManager.HasGitHubCredentials then
+        Exit;
+    end;
+  end
+  else
+  begin
+    if not FRepoManager.HasCodebergCredentials then
+    begin
+      StyledMessageDlg(  'Please configure Codeberg credentials first.', mtWarning, [ mbOK ], 0 );
+      mnuCodebergSettingsClick( nil );
+
+      if not FRepoManager.HasCodebergCredentials then
         Exit;
     end;
   end;
@@ -4344,7 +4346,7 @@ begin
   sProjectType      := 'Delphi / Pascal';
 
   if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate, sProjectType,
-    IfThen( iChoice = mrYes, 'Codeberg', 'GitHub' ) ) ) then
+    IfThen( iChoice = mrYes, 'GitHub', 'Codeberg' ) ) ) then
     Exit;
 
   // Write .gitignore based on project type before init
@@ -4368,23 +4370,23 @@ begin
     // Step 2: Create remote repository
     if iChoice = mrYes then
     begin
-      Log( '=== Creating Codeberg Repository ===' );
-
-      if not FRepoManager.CreateCodebergRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) then
-      begin
-        Log( 'Error: ' + sError );
-        ErrorDlg( 'Failed to create Codeberg repository: ' + sError );
-        Exit;
-      end;
-    end
-    else
-    begin
       Log( '=== Creating GitHub Repository ===' );
 
       if not FRepoManager.CreateGitHubRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) then
       begin
         Log( 'Error: ' + sError );
         ErrorDlg( 'Failed to create GitHub repository: ' + sError );
+        Exit;
+      end;
+    end
+    else
+    begin
+      Log( '=== Creating Codeberg Repository ===' );
+
+      if not FRepoManager.CreateCodebergRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) then
+      begin
+        Log( 'Error: ' + sError );
+        ErrorDlg( 'Failed to create Codeberg repository: ' + sError );
         Exit;
       end;
     end;

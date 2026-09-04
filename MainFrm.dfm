@@ -339,24 +339,6 @@ object MainForm: TMainForm
         OnClick = mnuExitClick
       end
     end
-    object mnuCodeberg: TMenuItem
-      Caption = '&Codeberg'
-      object mnuInitPushCodeberg: TMenuItem
-        Caption = '&Initialize && Push to Codeberg...'
-        OnClick = mnuInitPushCodebergClick
-      end
-      object mnuMigrateToCodeberg: TMenuItem
-        Caption = '&Migrate Selected Repository to Codeberg...'
-        OnClick = mnuMigrateToCodebergClick
-      end
-      object mnuCodebergSep1: TMenuItem
-        Caption = '-'
-      end
-      object mnuCodebergSettings: TMenuItem
-        Caption = '&Settings...'
-        OnClick = mnuCodebergSettingsClick
-      end
-    end
     object mnuGitHub: TMenuItem
       Caption = '&GitHub'
       object mnuInitPushGitHub: TMenuItem
@@ -373,6 +355,24 @@ object MainForm: TMainForm
       object mnuGitHubSettings: TMenuItem
         Caption = '&Settings...'
         OnClick = mnuGitHubSettingsClick
+      end
+    end
+    object mnuCodeberg: TMenuItem
+      Caption = '&Codeberg'
+      object mnuInitPushCodeberg: TMenuItem
+        Caption = '&Initialize && Push to Codeberg...'
+        OnClick = mnuInitPushCodebergClick
+      end
+      object mnuMigrateToCodeberg: TMenuItem
+        Caption = '&Migrate Selected Repository to Codeberg...'
+        OnClick = mnuMigrateToCodebergClick
+      end
+      object mnuCodebergSep1: TMenuItem
+        Caption = '-'
+      end
+      object mnuCodebergSettings: TMenuItem
+        Caption = '&Settings...'
+        OnClick = mnuCodebergSettingsClick
       end
     end
     object mnuView: TMenuItem

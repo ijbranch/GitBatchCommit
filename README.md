@@ -11,9 +11,9 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Repository Management** - Add and remove Git repositories from a persistent list
 - **Drag and Drop** - Drag repository folders from Windows Explorer directly onto the application. Dropping a non-Git folder offers to initialise it, create a remote repo, and push in one step
 - **New Repository Initialisation** - Automatic project type detection with `.gitignore` generation for Delphi, C/C++, C#, Java, Python, JavaScript, TypeScript, Go, Rust, and HTML
-- **Codeberg Integration** - Create new Codeberg repositories and push directly from the application
+- **Codeberg Integration** - Create new Codeberg repositories and push directly from the application (secondary; GitHub is the default host)
 - **GitHub Integration** - Create new GitHub repositories and push directly from the application
-- **Migrate Between Hosts** - Move a repository's remote from Codeberg to GitHub (or back) via the Codeberg/GitHub menus. Creates the new repo on the target host, preserves the previous origin as a secondary remote for safety, swaps `origin`, and pushes all branches and tags
+- **Migrate Between Hosts** - Move a repository's remote from Codeberg to GitHub (or back) via the GitHub/Codeberg menus. Creates the new repo on the target host, preserves the previous origin as a secondary remote for safety, swaps `origin`, and pushes all branches and tags
 - **Visibility Management** - Change repository visibility (public/private) via right-click context menu
 - **Parallel Status Refresh** - Repository status checks run in parallel on background threads, keeping the UI responsive
 - **Status Detection** - Automatically detects repository status:

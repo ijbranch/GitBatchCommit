@@ -35,7 +35,7 @@ Repositories are saved automatically — they persist between sessions.
 
 If you drop a folder that is **not** already a Git repository, the app offers to set it up for you:
 
-1. A dialog asks which remote provider: **Codeberg**, **GitHub**, or **Cancel** to skip
+1. A dialog asks which remote provider: **Yes** for GitHub (the default), **No** for Codeberg, or **Cancel** to skip
 2. You enter the repository name, description, and choose public or private
 3. You select the **project type** (Delphi, Python, C#, etc.) — this generates an appropriate `.gitignore`
 4. The app initialises Git, creates the remote repository, commits all files, and pushes
