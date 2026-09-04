@@ -12,6 +12,9 @@ object MainForm: TMainForm
   Font.Style = []
   Menu = MainMenu
   Position = poScreenCenter
+  Constraints.MinHeight = 400
+  Constraints.MinWidth = 960
+  OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnShow = FormShow
@@ -131,7 +134,8 @@ object MainForm: TMainForm
       Top = 11
       Width = 541
       Height = 23
-      TabOrder = 4
+      Anchors = [akLeft, akTop, akRight]
+      TabOrder = 0
       OnChange = edtCommitMessageChange
     end
     object btnDetails: TButton
@@ -139,11 +143,12 @@ object MainForm: TMainForm
       Top = 10
       Width = 25
       Height = 25
+      Anchors = [akTop, akRight]
       Hint = 'Show/hide commit details'
       Caption = '...'
       ParentShowHint = False
       ShowHint = True
-      TabOrder = 0
+      TabOrder = 1
       OnClick = btnDetailsClick
     end
     object btnHistory: TButton
@@ -151,11 +156,12 @@ object MainForm: TMainForm
       Top = 10
       Width = 25
       Height = 25
+      Anchors = [akTop, akRight]
       Hint = 'Commit message history'
       Caption = #9660
       ParentShowHint = False
       ShowHint = True
-      TabOrder = 1
+      TabOrder = 2
       OnClick = btnHistoryClick
     end
     object btnTemplates: TButton
@@ -163,11 +169,12 @@ object MainForm: TMainForm
       Top = 10
       Width = 25
       Height = 25
+      Anchors = [akTop, akRight]
       Hint = 'Commit message templates'
       Caption = #9661
       ParentShowHint = False
       ShowHint = True
-      TabOrder = 2
+      TabOrder = 3
       OnClick = btnTemplatesClick
     end
     object btnCommitPush: TButton
@@ -175,8 +182,9 @@ object MainForm: TMainForm
       Top = 10
       Width = 170
       Height = 25
+      Anchors = [akTop, akRight]
       Caption = 'Commit && Push Selected'
-      TabOrder = 3
+      TabOrder = 4
       OnClick = btnCommitPushClick
     end
   end
@@ -198,7 +206,7 @@ object MainForm: TMainForm
     end
     object mmoDetails: TMemo
       Left = 112
-      Top = -1
+      Top = 0
       Width = 810
       Height = 70
       ScrollBars = ssVertical

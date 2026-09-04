@@ -68,7 +68,7 @@
     <SanitizedProjectName>GitBatchCommit</SanitizedProjectName>
     <DCC_Namespace>Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
     <VerInfo_Locale>3081</VerInfo_Locale>
-    <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=;CFBundleName=</VerInfo_Keys>
+    <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.6.0.0;Comments=;CFBundleName=</VerInfo_Keys>
     <Custom_Styles>"Aqua Light Slate|VCLSTYLE|$(BDSCOMMONDIR)\Styles\AquaLightSlate.vsf"</Custom_Styles>
     <Defines>EUREKALOG_VER7;$(Defines)</Defines>
     <DCC_Define>EUREKALOG_VER7;$(DCC_Define)</DCC_Define>
@@ -83,7 +83,7 @@
     <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
     <BT_BuildType>Debug</BT_BuildType>
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-    <VerInfo_Keys>FileDescription=$(MSBuildProjectName);FileVersion=1.6.0.38;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0</VerInfo_Keys>
+    <VerInfo_Keys>FileDescription=$(MSBuildProjectName);FileVersion=1.6.0.38;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.6.0.0</VerInfo_Keys>
     <VerInfo_Locale>1033</VerInfo_Locale>
     <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
     <UWP_DelphiLogo44>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_44.png</UWP_DelphiLogo44>
@@ -102,7 +102,7 @@
     <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
     <BT_BuildType>Debug</BT_BuildType>
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-    <VerInfo_Keys>FileDescription=$(MSBuildProjectName);FileVersion=1.6.0.38;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0</VerInfo_Keys>
+    <VerInfo_Keys>FileDescription=$(MSBuildProjectName);FileVersion=1.6.0.38;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.6.0.0</VerInfo_Keys>
     <VerInfo_Locale>1033</VerInfo_Locale>
     <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
     <AppDPIAwarenessMode>unaware</AppDPIAwarenessMode>
@@ -116,18 +116,20 @@
     <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
     <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
     <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
+    <DCC_RangeChecking>true</DCC_RangeChecking>
+    <DCC_IntegerOverflowCheck>true</DCC_IntegerOverflowCheck>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
     <AppDPIAwarenessMode>unaware</AppDPIAwarenessMode>
     <VerInfo_Build>39</VerInfo_Build>
-    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.39;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.0.0.0</VerInfo_Keys>
+    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.39;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.6.0.0</VerInfo_Keys>
     <VerInfo_MinorVer>6</VerInfo_MinorVer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     <VerInfo_Locale>1033</VerInfo_Locale>
-    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.95;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.0.0.0</VerInfo_Keys>
-    <VerInfo_Build>95</VerInfo_Build>
+    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.100;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.6.0.0</VerInfo_Keys>
+    <VerInfo_Build>100</VerInfo_Build>
     <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
     <VerInfo_MinorVer>6</VerInfo_MinorVer>
   </PropertyGroup>
@@ -143,14 +145,14 @@
     <AppDPIAwarenessMode>unaware</AppDPIAwarenessMode>
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     <VerInfo_Locale>1033</VerInfo_Locale>
-    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.42;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.0.0.0</VerInfo_Keys>
+    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.42;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.6.0.0</VerInfo_Keys>
     <VerInfo_Build>42</VerInfo_Build>
     <VerInfo_MinorVer>6</VerInfo_MinorVer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
     <AppDPIAwarenessMode>unaware</AppDPIAwarenessMode>
-    <VerInfo_Build>57</VerInfo_Build>
-    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.57;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.0.0.0</VerInfo_Keys>
+    <VerInfo_Build>66</VerInfo_Build>
+    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.66;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.6.0.0</VerInfo_Keys>
     <VerInfo_MinorVer>6</VerInfo_MinorVer>
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>

@@ -158,6 +158,13 @@ type
     /// </summary>
     procedure FormDestroy( Sender: TObject );
     /// <summary>
+    ///   Refuses to close while Git work is in flight, offering to cancel it
+    ///   first.
+    /// </summary>
+    /// <param name="Sender">The form raising the event.</param>
+    /// <param name="CanClose">Set False to keep the window open.</param>
+    procedure FormCloseQuery( Sender: TObject; var CanClose: Boolean );
+    /// <summary>
     ///   Posts the deferred load message the first time the form is shown, so the
     ///   repository list loads once the window is painted rather than blocking it.
     /// </summary>
@@ -340,13 +347,20 @@ type
   private
     const
       WM_LOAD_REPOS = WM_USER + 100;
-      clStatusClean = $E0FFE0;          // Light green
-      clStatusModified = $FFFFC0;       // Light yellow
-      clStatusPullRequired = $FFE0C0;   // Light orange
-      clStatusError = $C0C0FF;          // Light red
-      clStatusConflicted = $8080FF;     // Stronger red - needs hands-on resolution
-      clStatusPushRequired = $C0FFFF;   // Light yellow-green - local work not yet pushed
-      clStatusDiverged = $E0C0FF;       // Light purple - ahead AND behind
+      // A TColor literal is $00BBGGRR — blue, green, red — NOT $RRGGBB. Four of
+      // these were written in RGB order and therefore painted a different
+      // colour from the one their comment named: Modified rendered pale cyan,
+      // Pull Required light blue, Push Required pale yellow and Diverged pink,
+      // so Modified and Push Required were effectively transposed. Each value
+      // below is now written as RGB( r, g, b ) so the intent and the paint
+      // cannot drift apart again.
+      clStatusClean = TColor( $00E0FFE0 );        // RGB( 224, 255, 224 ) light green
+      clStatusModified = TColor( $00C0FFFF );     // RGB( 255, 255, 192 ) light yellow
+      clStatusPullRequired = TColor( $00C0E0FF ); // RGB( 255, 224, 192 ) light orange
+      clStatusError = TColor( $00C0C0FF );        // RGB( 255, 192, 192 ) light red
+      clStatusConflicted = TColor( $008080FF );   // RGB( 255, 128, 128 ) stronger red
+      clStatusPushRequired = TColor( $00C0FFC0 ); // RGB( 192, 255, 192 ) pale green
+      clStatusDiverged = TColor( $00FFC0E0 );     // RGB( 224, 192, 255 ) light purple
 
       /// <summary>
       ///   Upper bound on the number of lines retained in the log memo. Oldest
@@ -371,9 +385,29 @@ type
       FInitialLoadDone: Boolean;
       FLastClickedIndex: Integer;
       FRefreshing   : Boolean;
-      FCancelRefresh: Boolean;
-      FRefreshThread: TThread;
+      FCancelRefresh: Integer;
       FGroupFilter  : string;
+
+      /// <summary>
+      ///   Main-thread-owned copy of the repository list, refreshed from
+      ///   <c>TGitRepoManager.SnapshotAll</c> whenever the view is rebuilt.
+      /// </summary>
+      /// <remarks>
+      ///   Every list row's <c>Data</c> is an index into THIS array, and every
+      ///   read the UI performs comes from here. The form must never touch the
+      ///   manager's live array: <c>TRepoInfo</c> holds managed strings, and a
+      ///   worker publishing a new <c>StatusText</c> while the UI copies the
+      ///   old one frees the string out from under the reader.
+      /// </remarks>
+      FRepoCache    : TRepoInfoArray;
+
+      /// <summary>
+      ///   Set once the form has begun closing. Queued worker callbacks test it
+      ///   before touching any control, because a callback that was already in
+      ///   the synchronisation queue cannot be withdrawn — <c>RemoveQueuedEvents</c>
+      ///   is a no-op for the <c>TThread.Queue( nil, … )</c> form these use.
+      /// </summary>
+      FShuttingDown : Boolean;
 
       /// <summary>
       ///   Count of background worker threads still running. Incremented and
@@ -426,7 +460,7 @@ type
     ///   Updates a single list item with current repository data.
     /// </summary>
     /// <param name="iIndex">Index of the repository to update.</param>
-    procedure UpdateListItem( const iIndex: Integer );
+    procedure UpdateListItem( const sRepoPath: string );
 
     /// <summary>
     ///   Appends a message to the log memo and scrolls to show it.
@@ -532,7 +566,13 @@ type
     /// </remarks>
     /// <param name="ALog">Log text for this repository.</param>
     /// <param name="AIndex">Index of the repository whose row should refresh.</param>
-    procedure QueueCommitLog( const ALog: string; const AIndex: Integer );
+    /// <summary>
+    ///   Applies a newly discovered delphi-indexer path on the UI thread.
+    /// </summary>
+    /// <param name="APath">The resolved path to delphi-indexer.exe.</param>
+    procedure QueueIndexerPathUpdate( const APath: string );
+
+    procedure QueueCommitLog( const ALog, ARepoPath: string );
 
     /// <summary>
     ///   Copies the list view's checkbox states into the repository records.
@@ -541,6 +581,64 @@ type
     ///   and the next repopulate silently clears every tick.
     /// </summary>
     procedure SyncCheckedStateToManager;
+
+    /// <summary>
+    ///   Re-reads <see cref="FRepoCache"/> from the manager under its lock.
+    /// </summary>
+    procedure RefreshRepoCache;
+
+    /// <summary>
+    ///   Returns a cached repository record by row index, bounds-checked.
+    /// </summary>
+    /// <remarks>
+    ///   Release builds have range checking off, so an unguarded
+    ///   <c>FRepoCache[ i ]</c> on a stale index reads past the array and treats
+    ///   whatever follows as string pointers. Every handler goes through here.
+    /// </remarks>
+    /// <param name="iIndex">Index carried by the list row.</param>
+    /// <param name="ARepo">Receives the cached record.</param>
+    /// <returns>True if the index was in range.</returns>
+    function RepoAt( const iIndex: Integer; out ARepo: TRepoInfo ): Boolean;
+
+    /// <summary>
+    ///   Returns the working-tree path of a cached repository, or an empty
+    ///   string when the index is out of range.
+    /// </summary>
+    /// <param name="iIndex">Index carried by the list row.</param>
+    /// <returns>The repository path, or empty.</returns>
+    function RepoPathAt( const iIndex: Integer ): string;
+
+    /// <summary>
+    ///   Shows an error dialog with credentials masked.
+    /// </summary>
+    /// <remarks>
+    ///   Git echoes the remote URL verbatim in most push and fetch errors, so a
+    ///   remote of the form <c>https://user:token@host</c> puts a live
+    ///   credential in the message. <c>Log</c> already redacted; the dialogs did
+    ///   not — and the dialog is the window that gets screenshotted into a bug
+    ///   report.
+    /// </remarks>
+    /// <param name="sMessage">The message to display.</param>
+    /// <param name="DlgType">Dialog type; defaults to an error.</param>
+    procedure ErrorDlg( const sMessage: string; const DlgType: TMsgDlgType = mtError );
+
+    /// <summary>
+    ///   Enables or disables every action that starts Git work.
+    /// </summary>
+    /// <remarks>
+    ///   A boolean flag consulted by some handlers is not a guard. Disabling the
+    ///   controls is, and it is what stops Force Push being clicked part-way
+    ///   through a commit batch — two threads running Git in the same working
+    ///   tree, which surfaces to the user as an <c>index.lock</c> failure.
+    /// </remarks>
+    /// <param name="bBusy">True while work is in flight.</param>
+    procedure SetBatchUIState( const bBusy: Boolean );
+
+    /// <summary>
+    ///   Returns True when a batch, refresh or worker thread is still active.
+    /// </summary>
+    /// <returns>True if any Git work is in flight.</returns>
+    function IsBusy: Boolean;
 
     /// <summary>
     ///   Takes the batch guard. Returns False ( and tells the user ) when a
@@ -639,8 +737,8 @@ begin
   FGroupFilter      := '';
   FInitialLoadDone  := False;
   FLastClickedIndex := -1;
-  FCancelRefresh    := False;
-  FRefreshThread    := nil;
+  FCancelRefresh    := 0;
+  FShuttingDown     := False;
   FActiveWorkers    := 0;
   FCommitting       := False;
   FBatchRunning     := False;
@@ -700,7 +798,7 @@ begin
     if ( not FRepoManager.LoadConfig ) then
       mmoLog.Lines.Add( 'Warning: Failed to load configuration file' );
 
-    iCount          := Length( FRepoManager.Repos );
+    iCount          := Length( FRepoCache );
     mmoLog.Lines.Add( Format( 'Found %d repositories', [ iCount ] ) );
     ScrollLogToEnd;
 
@@ -732,9 +830,9 @@ var
   iCount            : Integer;
 begin
 
-  if FRefreshing then
+  if IsBusy then
   begin
-    Log( 'Refresh already in progress...' );
+    Log( 'Another operation is already running - refresh skipped.' );
     Exit;
   end;
 
@@ -744,12 +842,14 @@ begin
     Exit;
 
   FRefreshing       := True;
-  FCancelRefresh    := False;
+  TInterlocked.Exchange( FCancelRefresh, 0 );
   Screen.Cursor     := crHourGlass;
 
   TInterlocked.Increment( FActiveWorkers );
 
-  FRefreshThread    := TThread.CreateAnonymousThread(
+  SetBatchUIState( True );
+
+  var RefreshThread: TThread := TThread.CreateAnonymousThread(
     procedure
     begin
 
@@ -768,11 +868,14 @@ begin
             end,
             function: Boolean
             begin
-              Result := FCancelRefresh;
+              Result := TInterlocked.CompareExchange( FCancelRefresh, 0, 0 ) <> 0;
             end );
         except
           on E: Exception do
+          begin
             LogSafe( 'Refresh failed: ' + E.Message );
+            ReRaiseIfDefect( E );
+          end;
         end;
 
         TThread.Synchronize( nil,
@@ -780,9 +883,17 @@ begin
           begin
 
             FRefreshing := False;
-            FRefreshThread := nil;
 
-            if not FCancelRefresh then
+            // The form may already be tearing down. A queued or synchronised
+            // callback cannot be withdrawn - RemoveQueuedEvents is a no-op for
+            // the TThread.Queue( nil, ... ) form used throughout - so every one
+            // of them has to check for itself before touching a control.
+            if FShuttingDown then
+              Exit;
+
+            SetBatchUIState( False );
+
+            if TInterlocked.CompareExchange( FCancelRefresh, 0, 0 ) = 0 then
             begin
               Screen.Cursor := crDefault;
               PopulateListView;
@@ -795,35 +906,95 @@ begin
       end;
 
     end );
-  FRefreshThread.FreeOnTerminate := True;
-  FRefreshThread.Start;
+  RefreshThread.FreeOnTerminate := True;
+  RefreshThread.Start;
 
 end;
 
 /// <summary>
 ///   Cleans up resources when the form is destroyed.
 /// </summary>
+procedure TMainForm.FormCloseQuery( Sender: TObject; var CanClose: Boolean );
+begin
+
+  CanClose := True;
+
+  if ( not IsBusy ) then
+    Exit;
+
+  // Refuse to close while Git work is in flight, rather than closing and
+  // hoping the wait in FormDestroy is long enough. It was not: RefreshStatus
+  // issues up to six Git calls per repository, one of them a network fetch
+  // with a 60-second timeout, so a single unreachable remote comfortably
+  // outlasts the shutdown budget - and the old code then freed the manager
+  // anyway, out from under a running worker.
+  if StyledMessageDlg( 'Git operations are still running.' + sLineBreak + sLineBreak +
+    'Cancel them and close once they have stopped?', mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
+  begin
+    CanClose := False;
+    Exit;
+  end;
+
+  TInterlocked.Exchange( FCancelRefresh, 1 );
+  Log( 'Cancelling background work...' );
+  Screen.Cursor := crHourGlass;
+
+  try
+    // Cancellation is checked between repositories, so a drain normally takes
+    // only as long as the Git call in flight. Bounded so a wedged network call
+    // cannot lock the user out of their own window.
+    var iWaited := 0;
+
+    while ( TInterlocked.CompareExchange( FActiveWorkers, 0, 0 ) > 0 ) and
+          ( iWaited < WORKER_SHUTDOWN_TIMEOUT_MS ) do
+    begin
+      CheckSynchronize( 10 );
+      Sleep( 10 );
+      Inc( iWaited, 20 );
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+
+  CanClose := TInterlocked.CompareExchange( FActiveWorkers, 0, 0 ) = 0;
+
+  if ( not CanClose ) then
+    StyledMessageDlg( 'A Git operation has not stopped yet - it is probably waiting on a ' +
+      'network timeout. Try closing again in a moment.', mtWarning, [ mbOK ], 0 );
+
+end;
+
 procedure TMainForm.FormDestroy( Sender: TObject );
 begin
 
-  // Cancel every background worker and wait for all of them. The previous
-  // version waited only on FRefreshing, which the commit/push and migrate
-  // threads never set — so closing the window mid-commit freed the repository
-  // manager while a worker was still inside CommitAndPush.
-  FCancelRefresh    := True;
+  // From here on, no queued callback may touch this form. RemoveQueuedEvents
+  // cannot help: for the TThread.Queue( nil, ... ) form used throughout, both
+  // overloads test the thread or method against nil and therefore remove
+  // nothing at all. A flag each callback checks is the only thing that works.
+  FShuttingDown     := True;
+  TInterlocked.Exchange( FCancelRefresh, 1 );
 
+  // FormCloseQuery already refuses to close while work is in flight, so
+  // reaching here with workers running means shutdown was not user-initiated
+  // (a Windows session end, or Application.Terminate). Wait, but bounded - an
+  // unbounded wait here would hang the logoff.
   var iWaited       := 0;
 
-  while ( TInterlocked.CompareExchange( FActiveWorkers, 0, 0 ) > 0 ) and ( iWaited < WORKER_SHUTDOWN_TIMEOUT_MS ) do
+  while ( TInterlocked.CompareExchange( FActiveWorkers, 0, 0 ) > 0 ) and
+        ( iWaited < WORKER_SHUTDOWN_TIMEOUT_MS ) do
   begin
     // CheckSynchronize lets the workers' Synchronize/Queue calls complete so
     // they can actually finish, and Sleep keeps this off a 100% CPU spin.
     CheckSynchronize( 10 );
-    Inc( iWaited, 10 );
+    Sleep( 10 );
+    Inc( iWaited, 20 );
   end;
 
-  // Drop the queued UI callbacks belonging to this form before it goes away.
-  TThread.RemoveQueuedEvents( nil );
+  // Detach the handlers that read repository state before anything is freed. A
+  // WM_PAINT dispatched between here and TCustomForm.Destroy would otherwise
+  // reach the custom-draw handler with a nil manager.
+  lvRepos.OnCustomDrawItem := nil;
+  lvRepos.OnItemChecked := nil;
 
   // Bring the records in step with the ticked rows before the final save.
   // NOTE: tick state is intentionally NOT persisted across sessions - the app
@@ -832,10 +1003,96 @@ begin
   begin
     SyncCheckedStateToManager;
     FRepoManager.SaveConfig;
-    FreeAndNil( FRepoManager );
+
+    // Only free the manager once nothing can still be inside it. If a worker
+    // is somehow still running, LEAK IT DELIBERATELY: the process is going
+    // away regardless, and freeing it here would put an access violation on a
+    // freed critical section in front of the user on their way out. The old
+    // code freed unconditionally after a capped wait, which is exactly that
+    // crash.
+    if TInterlocked.CompareExchange( FActiveWorkers, 0, 0 ) = 0 then
+      FreeAndNil( FRepoManager )
+    else
+    begin
+      OutputDebugString( PChar( 'GitBatchCommit: worker still running at shutdown - ' +
+        'the repository manager was leaked deliberately rather than freed under it.' ) );
+      FRepoManager := nil;
+    end;
   end;
 
+  SetLength( FRepoCache, 0 );
   FreeAndNil( FFilteredIndices );
+
+end;
+
+procedure TMainForm.RefreshRepoCache;
+begin
+
+  if Assigned( FRepoManager ) then
+    FRepoCache := FRepoManager.SnapshotAll
+  else
+    SetLength( FRepoCache, 0 );
+
+end;
+
+function TMainForm.RepoAt( const iIndex: Integer; out ARepo: TRepoInfo ): Boolean;
+begin
+
+  Result := ( iIndex >= 0 ) and ( iIndex <= High( FRepoCache ) );
+
+  if Result then
+    ARepo := FRepoCache[ iIndex ];
+
+end;
+
+function TMainForm.RepoPathAt( const iIndex: Integer ): string;
+begin
+
+  Result := '';
+
+  if ( iIndex >= 0 ) and ( iIndex <= High( FRepoCache ) ) then
+    Result := FRepoCache[ iIndex ].Path;
+
+end;
+
+procedure TMainForm.ErrorDlg( const sMessage: string; const DlgType: TMsgDlgType );
+begin
+
+  StyledMessageDlg( RedactSecrets( sMessage ), DlgType, [ mbOK ], 0 );
+
+end;
+
+function TMainForm.IsBusy: Boolean;
+begin
+
+  Result := FRefreshing or FCommitting or FBatchRunning or
+    ( TInterlocked.CompareExchange( FActiveWorkers, 0, 0 ) > 0 );
+
+end;
+
+procedure TMainForm.SetBatchUIState( const bBusy: Boolean );
+begin
+
+  if FShuttingDown then
+    Exit;
+
+  btnPullSelected.Enabled     := not bBusy;
+  btnResolveConflicts.Enabled := not bBusy;
+  btnPushOnly.Enabled         := not bBusy;
+  btnForcePush.Enabled        := not bBusy;
+  btnSelectModified.Enabled   := not bBusy;
+  btnSelectAll.Enabled        := not bBusy;
+  btnSelectNone.Enabled       := not bBusy;
+  mnuAddRepository.Enabled    := not bBusy;
+  mnuRemoveSelected.Enabled   := not bBusy;
+  mnuRefreshStatus.Enabled    := not bBusy;
+  mnuSettings.Enabled         := not bBusy;
+  pmRepos.AutoPopup           := not bBusy;
+
+  if bBusy then
+    btnCommitPush.Enabled := False
+  else
+    UpdateCommitButtonState;
 
 end;
 
@@ -1046,15 +1303,20 @@ var
   FilterStatus      : TRepoStatus;
 begin
 
+  // One locked copy per rebuild. Every read below - the filter, the sort
+  // comparer and PopulateListView's row fill - works from this array, so the
+  // manager's live records are never touched from the UI thread.
+  RefreshRepoCache;
+
   FFilteredIndices.Clear;
 
   // Apply filter
-  for var i := 0 to High( FRepoManager.Repos ) do
+  for var i := 0 to High( FRepoCache ) do
   begin
     // Apply group filter first
     // Case-insensitive: groups are free text from InputQuery, so 'Delphi' and
     // 'delphi' would otherwise be two different groups.
-    if ( FGroupFilter <> '' ) and ( not SameText( FRepoManager.Repos[ i ].Group, FGroupFilter ) ) then
+    if ( FGroupFilter <> '' ) and ( not SameText( FRepoCache[ i ].Group, FGroupFilter ) ) then
       Continue;
 
     // Apply status filter
@@ -1074,7 +1336,7 @@ begin
         FilterStatus := rsUnknown;
       end;
 
-      if FRepoManager.Repos[ i ].Status = FilterStatus then
+      if FRepoCache[ i ].Status = FilterStatus then
         FFilteredIndices.Add( i );
     end;
   end;
@@ -1094,13 +1356,13 @@ begin
             case FSortColumn of
               4:
                 begin
-                  iValA := FRepoManager.Repos[ A ].TrackedFileCount;
-                  iValB := FRepoManager.Repos[ B ].TrackedFileCount;
+                  iValA := FRepoCache[ A ].TrackedFileCount;
+                  iValB := FRepoCache[ B ].TrackedFileCount;
                 end;
               5:
                 begin
-                  iValA := FRepoManager.Repos[ A ].ModifiedFileCount;
-                  iValB := FRepoManager.Repos[ B ].ModifiedFileCount;
+                  iValA := FRepoCache[ A ].ModifiedFileCount;
+                  iValB := FRepoCache[ B ].ModifiedFileCount;
                 end;
             else
               iValA := 0;
@@ -1117,33 +1379,33 @@ begin
             case FSortColumn of
               0:
                 begin
-                  sValA := FRepoManager.Repos[ A ].Name;
-                  sValB := FRepoManager.Repos[ B ].Name;
+                  sValA := FRepoCache[ A ].Name;
+                  sValB := FRepoCache[ B ].Name;
                 end;
               1:
                 begin
-                  sValA := FRepoManager.Repos[ A ].Path;
-                  sValB := FRepoManager.Repos[ B ].Path;
+                  sValA := FRepoCache[ A ].Path;
+                  sValB := FRepoCache[ B ].Path;
                 end;
               2:
                 begin
-                  sValA := FRepoManager.Repos[ A ].Branch;
-                  sValB := FRepoManager.Repos[ B ].Branch;
+                  sValA := FRepoCache[ A ].Branch;
+                  sValB := FRepoCache[ B ].Branch;
                 end;
               3:
                 begin
-                  sValA := RemoteProviderToString( FRepoManager.Repos[ A ].Provider );
-                  sValB := RemoteProviderToString( FRepoManager.Repos[ B ].Provider );
+                  sValA := RemoteProviderToString( FRepoCache[ A ].Provider );
+                  sValB := RemoteProviderToString( FRepoCache[ B ].Provider );
                 end;
               6:
                 begin
-                  sValA := FRepoManager.Repos[ A ].StatusText;
-                  sValB := FRepoManager.Repos[ B ].StatusText;
+                  sValA := FRepoCache[ A ].StatusText;
+                  sValB := FRepoCache[ B ].StatusText;
                 end;
               7:
                 begin
-                  sValA := FRepoManager.Repos[ A ].Version;
-                  sValB := FRepoManager.Repos[ B ].Version;
+                  sValA := FRepoCache[ A ].Version;
+                  sValB := FRepoCache[ B ].Version;
                 end;
             else
               sValA := '';
@@ -1245,7 +1507,9 @@ var
 begin
 
   // A rebuild during a batch would invalidate the row indices the batch is
-  // working through; defer it to EndBatch instead.
+  // working through; defer it to EndBatch instead. Batches now address
+  // repositories by path, so this is about the VIEW staying stable rather than
+  // about correctness.
   if FBatchRunning then
   begin
     FPopulatePending := True;
@@ -1272,15 +1536,15 @@ begin
       begin
         iRepoIndex  := FFilteredIndices[ i ];
         var Item    := lvRepos.Items.Add;
-        Item.Caption := FRepoManager.Repos[ iRepoIndex ].Name;
-        Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].Path );
-        Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].Branch );
-        Item.SubItems.Add( RemoteProviderToString( FRepoManager.Repos[ iRepoIndex ].Provider ) );
-        Item.SubItems.Add( IntToStr( FRepoManager.Repos[ iRepoIndex ].TrackedFileCount ) );
-        Item.SubItems.Add( IntToStr( FRepoManager.Repos[ iRepoIndex ].ModifiedFileCount ) );
-        Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].StatusText );
-        Item.SubItems.Add( FRepoManager.Repos[ iRepoIndex ].Version );
-        Item.Checked := FRepoManager.Repos[ iRepoIndex ].Selected;
+        Item.Caption := FRepoCache[ iRepoIndex ].Name;
+        Item.SubItems.Add( FRepoCache[ iRepoIndex ].Path );
+        Item.SubItems.Add( FRepoCache[ iRepoIndex ].Branch );
+        Item.SubItems.Add( RemoteProviderToString( FRepoCache[ iRepoIndex ].Provider ) );
+        Item.SubItems.Add( IntToStr( FRepoCache[ iRepoIndex ].TrackedFileCount ) );
+        Item.SubItems.Add( IntToStr( FRepoCache[ iRepoIndex ].ModifiedFileCount ) );
+        Item.SubItems.Add( FRepoCache[ iRepoIndex ].StatusText );
+        Item.SubItems.Add( FRepoCache[ iRepoIndex ].Version );
+        Item.Checked := FRepoCache[ iRepoIndex ].Selected;
         Item.Data   := Pointer( iRepoIndex );
       end;
     finally
@@ -1298,33 +1562,50 @@ end;
 /// <summary>
 ///   Updates a single list item with current repository data.
 /// </summary>
-procedure TMainForm.UpdateListItem( const iIndex: Integer );
+procedure TMainForm.UpdateListItem( const sRepoPath: string );
+var
+  Repo              : TRepoInfo;
 begin
 
-  // Find the list item with matching repo index
-  for var i := 0 to lvRepos.Items.Count - 1 do
+  if sRepoPath.IsEmpty or ( not Assigned( FRepoManager ) ) then
+    Exit;
+
+  // Take the current record from the manager, under its lock, and refresh the
+  // cached copy with it. Addressing the row by PATH means a list that has been
+  // rebuilt, filtered or shortened since the work started still updates the
+  // right row - or none at all, which is also correct.
+  if ( not FRepoManager.GetRepoSnapshotByPath( sRepoPath, Repo ) ) then
+    Exit;
+
+  for var iI := 0 to lvRepos.Items.Count - 1 do
   begin
-    if Integer( lvRepos.Items[ i ].Data ) = iIndex then
-    begin
-      FUpdatingList := True;
+    var iRepoIndex := Integer( lvRepos.Items[ iI ].Data );
 
-      try
-        var Item    := lvRepos.Items[ i ];
-        Item.Caption := FRepoManager.Repos[ iIndex ].Name;
-        Item.SubItems[ 0 ] := FRepoManager.Repos[ iIndex ].Path;
-        Item.SubItems[ 1 ] := FRepoManager.Repos[ iIndex ].Branch;
-        Item.SubItems[ 2 ] := RemoteProviderToString( FRepoManager.Repos[ iIndex ].Provider );
-        Item.SubItems[ 3 ] := IntToStr( FRepoManager.Repos[ iIndex ].TrackedFileCount );
-        Item.SubItems[ 4 ] := IntToStr( FRepoManager.Repos[ iIndex ].ModifiedFileCount );
-        Item.SubItems[ 5 ] := FRepoManager.Repos[ iIndex ].StatusText;
-        Item.SubItems[ 6 ] := FRepoManager.Repos[ iIndex ].Version;
-        lvRepos.UpdateItems( i, i );
-      finally
-        FUpdatingList := False;
-      end;
+    if ( iRepoIndex < 0 ) or ( iRepoIndex > High( FRepoCache ) ) then
+      Continue;
 
-      Exit;
+    if ( not SameText( FRepoCache[ iRepoIndex ].Path, sRepoPath ) ) then
+      Continue;
+
+    FRepoCache[ iRepoIndex ] := Repo;
+    FUpdatingList := True;
+
+    try
+      var Item    := lvRepos.Items[ iI ];
+      Item.Caption := Repo.Name;
+      Item.SubItems[ 0 ] := Repo.Path;
+      Item.SubItems[ 1 ] := Repo.Branch;
+      Item.SubItems[ 2 ] := RemoteProviderToString( Repo.Provider );
+      Item.SubItems[ 3 ] := IntToStr( Repo.TrackedFileCount );
+      Item.SubItems[ 4 ] := IntToStr( Repo.ModifiedFileCount );
+      Item.SubItems[ 5 ] := Repo.StatusText;
+      Item.SubItems[ 6 ] := Repo.Version;
+      lvRepos.UpdateItems( iI, iI );
+    finally
+      FUpdatingList := False;
     end;
+
+    Exit;
   end;
 
 end;
@@ -1346,7 +1627,13 @@ begin
     mmoLog.Lines.Delete( 0 );
 
   ScrollLogToEnd;
-  Application.ProcessMessages;
+
+  // Application.ProcessMessages was called here on EVERY logged line. Log is
+  // reached from worker threads through LogSafe and QueueCommitLog, so each
+  // line pumped the message queue from inside a synchronisation callback and
+  // re-entered arbitrary UI handlers while a batch was mid-flight. The batch
+  // loops that genuinely want responsiveness pump explicitly; this one only
+  // created re-entrancy.
 
 end;
 
@@ -1359,19 +1646,47 @@ begin
     TThread.Queue( nil,
       procedure
       begin
+        if FShuttingDown then
+          Exit;
+
         Log( sText );
       end );
 
 end;
 
-procedure TMainForm.QueueCommitLog( const ALog: string; const AIndex: Integer );
+procedure TMainForm.QueueIndexerPathUpdate( const APath: string );
+begin
+
+  // RunPendingReindexes executes on the COMMIT WORKER thread, and this both
+  // writes a plain string field on the manager and persists the config. Both
+  // belong on the UI thread, which owns the settings.
+  TThread.Queue( nil,
+    procedure
+    begin
+      if FShuttingDown or ( not Assigned( FRepoManager ) ) then
+        Exit;
+
+      FRepoManager.DelphiIndexerPath := APath;
+      FRepoManager.SaveConfig;
+    end );
+
+end;
+
+procedure TMainForm.QueueCommitLog( const ALog, ARepoPath: string );
 begin
 
   TThread.Queue( nil,
     procedure
     begin
+      // This closure may run after the form has begun tearing down: the
+      // TThread.Queue( nil, ... ) form cannot be withdrawn, because both
+      // RemoveQueuedEvents overloads match on a non-nil thread or method and
+      // therefore remove nothing.
+      if FShuttingDown then
+        Exit;
+
       Log( ALog );
-      UpdateListItem( AIndex );
+      UpdateListItem( ARepoPath );
     end );
 
 end;
@@ -1385,8 +1700,8 @@ begin
   begin
     iIndex := Integer( lvRepos.Items[ i ].Data );
 
-    if ( iIndex >= 0 ) and ( iIndex < FRepoManager.ReposCount ) then
-      FRepoManager.Repos[ iIndex ].Selected := lvRepos.Items[ i ].Checked;
+    if ( iIndex >= 0 ) and ( iIndex <= High( FRepoCache ) ) then
+      FRepoManager.SetRepoSelected( FRepoCache[ iIndex ].Path, lvRepos.Items[ i ].Checked );
   end;
 
 end;
@@ -1394,7 +1709,11 @@ end;
 function TMainForm.BeginBatch: Boolean;
 begin
 
-  Result := ( not FBatchRunning );
+  // Gate on every kind of Git work, not just on another synchronous batch. A
+  // commit batch runs on a worker thread and never set FBatchRunning, so Force
+  // Push stayed clickable throughout it - two threads running Git in the same
+  // working tree, which reaches the user as an index.lock failure.
+  Result := ( not FBatchRunning ) and ( not FRefreshing ) and ( not FCommitting );
 
   if ( not Result ) then
   begin
@@ -1406,12 +1725,21 @@ begin
   FBatchRunning := True;
   FPopulatePending := False;
 
+  // The flag alone is not a guard - it was only consulted by four of the
+  // handlers that start Git work. Disabling the controls is.
+  SetBatchUIState( True );
+
 end;
 
 procedure TMainForm.EndBatch;
 begin
 
   FBatchRunning := False;
+
+  if FShuttingDown then
+    Exit;
+
+  SetBatchUIState( False );
 
   if FPopulatePending then
   begin
@@ -1508,8 +1836,8 @@ begin
 
       for iRepoIndex in IndicesToRemove do
       begin
-        Log( Format( 'Removed repository: %s', [ FRepoManager.Repos[ iRepoIndex ].Name ] ) );
-        FRepoManager.RemoveRepository( iRepoIndex );
+        Log( Format( 'Removed repository: %s', [ FRepoCache[ iRepoIndex ].Name ] ) );
+        FRepoManager.RemoveRepository( RepoPathAt( iRepoIndex ) );
       end;
 
       PopulateListView;
@@ -1526,7 +1854,7 @@ end;
 procedure TMainForm.mnuRefreshStatusClick( Sender: TObject );
 begin
 
-  Log( Format( 'Refreshing %d repositories...', [ Length( FRepoManager.Repos ) ] ) );
+  Log( Format( 'Refreshing %d repositories...', [ Length( FRepoCache ) ] ) );
   RefreshReposAsync;
 
 end;
@@ -1569,18 +1897,33 @@ begin
   else
     sMessage        := sSummary + sLineBreak + sLineBreak + sDetails;
 
-  // Count selected repositories with modifications
-  var iCount        := 0;
+  // Collect the target repositories ONCE, as paths.
+  //
+  // This used to be two passes with a modal confirmation dialog in between,
+  // filling a fixed-size array sized by the first pass and then iterating to
+  // High( array ). A background refresh publishing a new status while that
+  // dialog was open changed how many rows matched: fewer left trailing ZEROS
+  // in the array, so the loop ran CommitAndPush on repository index 0 - the
+  // wrong repository, with another repository's message - and more overran the
+  // array, which Release builds do not range-check.
+  //
+  // Paths are also immune to the list shifting under a long batch, which
+  // indices are not.
+  var RepoPaths: TArray<string>;
   var Repo: TRepoInfo;
 
-  for var i := 0 to lvRepos.Items.Count - 1 do
-  begin
-    iRepoIndex      := Integer( lvRepos.Items[ i ].Data );
+  SetLength( RepoPaths, 0 );
 
-    if lvRepos.Items[ i ].Checked and FRepoManager.GetRepoSnapshot( iRepoIndex, Repo ) and
+  for var iI := 0 to lvRepos.Items.Count - 1 do
+  begin
+    iRepoIndex      := Integer( lvRepos.Items[ iI ].Data );
+
+    if lvRepos.Items[ iI ].Checked and RepoAt( iRepoIndex, Repo ) and
        ( Repo.Status = rsModified ) then
-      Inc( iCount );
+      RepoPaths := RepoPaths + [ Repo.Path ];
   end;
+
+  var iCount        := Length( RepoPaths );
 
   if iCount = 0 then
   begin
@@ -1592,26 +1935,12 @@ begin
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
-  // Collect indices to commit (must read UI on main thread)
-  var RepoIndices: TArray<Integer>;
-  SetLength( RepoIndices, iCount );
-  var iIdx          := 0;
-
-  for var i := 0 to lvRepos.Items.Count - 1 do
-  begin
-    iRepoIndex      := Integer( lvRepos.Items[ i ].Data );
-
-    if lvRepos.Items[ i ].Checked and FRepoManager.GetRepoSnapshot( iRepoIndex, Repo ) and
-       ( Repo.Status = rsModified ) then
-    begin
-      RepoIndices[ iIdx ] := iRepoIndex;
-      Inc( iIdx );
-    end;
-  end;
+  if ( not BeginBatch ) then
+    Exit;
 
   Screen.Cursor     := crHourGlass;
   FCommitting       := True;
-  btnCommitPush.Enabled := False;
+  SetBatchUIState( True );
   TInterlocked.Increment( FActiveWorkers );
 
   TThread.CreateAnonymousThread(
@@ -1626,26 +1955,30 @@ begin
 
       try
         try
-          for var j := 0 to High( RepoIndices ) do
+          for var iJ := 0 to High( RepoPaths ) do
           begin
-            var iRI   := RepoIndices[ j ];
+            if TInterlocked.CompareExchange( FCancelRefresh, 0, 0 ) <> 0 then
+            begin
+              LogSafe( 'Commit batch cancelled.' );
+              Break;
+            end;
+
+            var sRepoPath := RepoPaths[ iJ ];
             var sCommitLog: string;
-            var Repo: TRepoInfo;
-            var bCommitSuccess := FRepoManager.CommitAndPush( iRI, sMessage, sCommitLog );
+            var bCommitSuccess := FRepoManager.CommitAndPush( sRepoPath, sMessage, sCommitLog );
 
             if bCommitSuccess then
             begin
               Inc( iSuccess );
 
               // Track repo path for reindexing (only if commit succeeded)
-              if FRepoManager.GetRepoSnapshot( iRI, Repo ) and
-                 ( slReindexDirs.IndexOf( Repo.Path ) = -1 ) then
-                slReindexDirs.Add( Repo.Path );
+              if slReindexDirs.IndexOf( sRepoPath ) = -1 then
+                slReindexDirs.Add( sRepoPath );
             end;
 
-            // Via a method call, so this iteration's log and index get their
+            // Via a method call, so this iteration's log and path get their
             // own capture frame — see QueueCommitLog's remarks.
-            QueueCommitLog( sCommitLog, iRI );
+            QueueCommitLog( sCommitLog, sRepoPath );
           end;
 
           LogSafe( Format( 'Completed: %d of %d successful.', [ iSuccess, iCount ] ) );
@@ -1657,16 +1990,23 @@ begin
           RunPendingReindexes( slReindexDirs );
         except
           on E: Exception do
+          begin
             LogSafe( 'Error during commit: ' + E.Message );
+            ReRaiseIfDefect( E );
+          end;
         end;
 
         TThread.Synchronize( nil,
           procedure
           begin
 
+            if FShuttingDown then
+              Exit;
+
             Screen.Cursor := crDefault;
             FCommitting := False;
-            UpdateCommitButtonState;
+            EndBatch;
+            SetBatchUIState( False );
 
             // Clear details after successful commit
             if iSuccess > 0 then
@@ -1705,7 +2045,7 @@ begin
     for var i := 0 to lvRepos.Items.Count - 1 do
     begin
       iRepoIndex    := Integer( lvRepos.Items[ i ].Data );
-      lvRepos.Items[ i ].Checked := FRepoManager.GetRepoSnapshot( iRepoIndex, Repo ) and
+      lvRepos.Items[ i ].Checked := RepoAt( iRepoIndex, Repo ) and
         ( Repo.Status = rsModified );
     end;
   finally
@@ -1779,8 +2119,8 @@ begin
 
   iIndex            := Integer( Item.Data );
 
-  if ( iIndex >= 0 ) and ( iIndex <= High( FRepoManager.Repos ) ) then
-    FRepoManager.Repos[ iIndex ].Selected := Item.Checked;
+  if ( iIndex >= 0 ) and ( iIndex <= High( FRepoCache ) ) then
+    FRepoManager.SetRepoSelected( FRepoCache[ iIndex ].Path, Item.Checked );
 
   UpdateCommitButtonState;
 
@@ -1801,8 +2141,17 @@ begin
   begin
     FRepoManager.CodebergUsername := sUsername;
     FRepoManager.CodebergToken := sToken;
-    FRepoManager.SaveConfig;
-    Log( 'Codeberg credentials updated.' );
+
+    // Report what actually happened. SaveConfig's result was discarded and
+    // "credentials updated" logged either way - including when DPAPI failed
+    // and the token was deliberately NOT written.
+    if FRepoManager.SaveConfig and FRepoManager.LastSaveError.IsEmpty then
+      Log( 'Codeberg credentials updated.' )
+    else
+    begin
+      Log( 'Codeberg credentials NOT fully saved: ' + FRepoManager.LastSaveError );
+      ErrorDlg( FRepoManager.LastSaveError, mtWarning );
+    end;
   end;
 
 end;
@@ -1848,7 +2197,7 @@ begin
   sDescription      := '';
   lPrivate          := False;
 
-  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate ) ) then
+  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate, 'Codeberg' ) ) then
     Exit;
 
   // Confirm operation
@@ -1870,7 +2219,7 @@ begin
     if ( not FRepoManager.InitializeRepository( sFolder, sLog ) ) then
     begin
       Log( 'Error: ' + sLog );
-      StyledMessageDlg(  'Failed to initialize repository: ' + sLog, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to initialize repository: ' + sLog );
       Exit;
     end;
 
@@ -1882,7 +2231,7 @@ begin
     if ( not FRepoManager.CreateCodebergRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) ) then
     begin
       Log( 'Error: ' + sError );
-      StyledMessageDlg(  'Failed to create Codeberg repository: ' + sError, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to create Codeberg repository: ' + sError );
       Exit;
     end;
 
@@ -1894,7 +2243,7 @@ begin
     if ( not FRepoManager.AddRemoteOrigin( sFolder, sRemoteURL, sLog ) ) then
     begin
       Log( 'Error: ' + sLog );
-      StyledMessageDlg(  'Failed to add remote origin: ' + sLog, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to add remote origin: ' + sLog );
       Exit;
     end;
 
@@ -1906,7 +2255,7 @@ begin
     if ( not FRepoManager.InitialCommitAndPush( sFolder, 'Initial commit', sLog ) ) then
     begin
       Log( 'Error: ' + sLog );
-      StyledMessageDlg(  'Failed to commit and push: ' + sLog, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to commit and push: ' + sLog );
       Exit;
     end;
 
@@ -1943,8 +2292,17 @@ begin
   begin
     FRepoManager.GitHubUsername := sUsername;
     FRepoManager.GitHubToken := sToken;
-    FRepoManager.SaveConfig;
-    Log( 'GitHub credentials updated.' );
+
+    // Report what actually happened. SaveConfig's result was discarded and
+    // "credentials updated" logged either way - including when DPAPI failed
+    // and the token was deliberately NOT written.
+    if FRepoManager.SaveConfig and FRepoManager.LastSaveError.IsEmpty then
+      Log( 'GitHub credentials updated.' )
+    else
+    begin
+      Log( 'GitHub credentials NOT fully saved: ' + FRepoManager.LastSaveError );
+      ErrorDlg( FRepoManager.LastSaveError, mtWarning );
+    end;
   end;
 
 end;
@@ -1985,12 +2343,12 @@ begin
     Exit;
   end;
 
-  // Get repository details (reuse Codeberg dialog as it has same fields)
+  // Shared new-repository dialog; the host name gives it the right caption.
   sRepoName         := SanitizeRepoName( ExtractFileName( ExcludeTrailingPathDelimiter( sFolder ) ) );
   sDescription      := '';
   lPrivate          := False;
 
-  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate ) ) then
+  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate, 'GitHub' ) ) then
     Exit;
 
   // Confirm operation
@@ -2015,7 +2373,7 @@ begin
     if ( not FRepoManager.InitializeRepository( sFolder, sLog ) ) then
     begin
       Log( 'Error: ' + sLog );
-      StyledMessageDlg(  'Failed to initialize repository: ' + sLog, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to initialize repository: ' + sLog );
       Exit;
     end;
 
@@ -2027,7 +2385,7 @@ begin
     if ( not FRepoManager.CreateGitHubRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) ) then
     begin
       Log( 'Error: ' + sError );
-      StyledMessageDlg(  'Failed to create GitHub repository: ' + sError, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to create GitHub repository: ' + sError );
       Exit;
     end;
 
@@ -2039,7 +2397,7 @@ begin
     if ( not FRepoManager.AddRemoteOrigin( sFolder, sRemoteURL, sLog ) ) then
     begin
       Log( 'Error: ' + sLog );
-      StyledMessageDlg(  'Failed to add remote origin: ' + sLog, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to add remote origin: ' + sLog );
       Exit;
     end;
 
@@ -2051,7 +2409,7 @@ begin
     if ( not FRepoManager.InitialCommitAndPush( sFolder, 'Initial commit', sLog ) ) then
     begin
       Log( 'Error: ' + sLog );
-      StyledMessageDlg(  'Failed to commit and push: ' + sLog, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to commit and push: ' + sLog );
       Exit;
     end;
 
@@ -2099,10 +2457,10 @@ begin
 
   iIndex            := Integer( lvRepos.Selected.Data );
 
-  if ( iIndex < 0 ) or ( iIndex > High( FRepoManager.Repos ) ) then
+  if ( iIndex < 0 ) or ( iIndex > High( FRepoCache ) ) then
     Exit;
 
-  Repo              := FRepoManager.Repos[ iIndex ];
+  Repo              := FRepoCache[ iIndex ];
 
   case TargetProvider of
     rpCodeberg:
@@ -2155,12 +2513,13 @@ begin
     Exit;
   end;
 
-  // Collect details for the new repository (reuse Codeberg dialog — fields match)
-  sRepoName         := Repo.Name;
+  // Shared new-repository dialog; the TARGET host names it, so migrating to
+  // GitHub no longer announces itself as creating a Codeberg repository.
+  sRepoName         := SanitizeRepoName( Repo.Name );
   sDescription      := '';
   lPrivate          := False;
 
-  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate ) ) then
+  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate, sTargetName ) ) then
     Exit;
 
   if StyledMessageDlg(  Format(
@@ -2183,8 +2542,14 @@ begin
   Screen.Cursor     := crHourGlass;
   Log( Format( '=== Migrating %s from %s to %s ===', [ Repo.Name, sSourceName, sTargetName ] ) );
 
+  // Capture the PATH for the worker. An index would be meaningless by the time
+  // a migration finishes: it does HTTP plus a full push, and the list can be
+  // added to or filtered in the meantime.
+  var sRepoPath     := Repo.Path;
+
   // Run the long-running network + push work off the UI thread so the app
   // stays responsive. Final UI updates are queued back to the main thread.
+  SetBatchUIState( True );
   TInterlocked.Increment( FActiveWorkers );
 
   TThread.CreateAnonymousThread(
@@ -2196,53 +2561,70 @@ begin
       sThreadLog    : string;
     begin
 
-      // MigrateRepository does HTTP *and* Git; without this handler a dropped
-      // connection escaped into TThread's FatalException and was discarded,
-      // leaving no dialog, no log line, and the hourglass cursor stuck on for
-      // the rest of the session.
+      // The worker-count decrement belongs in a finally on the WORKER, not
+      // inside the queued UI closure it used to sit in. There it meant "a UI
+      // callback is pending" rather than "a worker is running", and it was
+      // skipped entirely if that closure raised - leaving the count stuck
+      // above zero so every later shutdown waited for a worker that had
+      // finished long ago.
       try
-        lThreadOK   := FRepoManager.MigrateRepository( iIndex, TargetProvider,
-          sRepoName, sDescription, lPrivate, sThreadURL, sThreadError, sThreadLog );
-      except
-        on E: Exception do
-        begin
-          lThreadOK := False;
-          sThreadError := E.Message;
-          sThreadLog := 'Migration aborted by an unexpected error. The remote may have been ' +
-            'created and origin may already have been repointed - check `git remote -v` before retrying.';
-        end;
-      end;
-
-      TThread.Queue( nil,
-        procedure
-        begin
-
-          Screen.Cursor := crDefault;
-
-          if lThreadOK then
+        // MigrateRepository does HTTP *and* Git; without this handler a dropped
+        // connection escaped into TThread's FatalException and was discarded,
+        // leaving no dialog, no log line, and the hourglass cursor stuck on for
+        // the rest of the session.
+        try
+          lThreadOK   := FRepoManager.MigrateRepository( sRepoPath, TargetProvider,
+            sRepoName, sDescription, lPrivate, sThreadURL, sThreadError, sThreadLog );
+        except
+          on E: Exception do
           begin
-            Log( sThreadLog );
-            Log( '=== Migration Complete ===' );
-            Log( 'New URL: ' + sThreadURL );
-
-            FRepoManager.RefreshStatus( iIndex );
-            PopulateListView;
-
-            StyledMessageDlg(  Format( 'Repository migrated to %s successfully.%s%sNew URL: %s%s%s' +
-                'The old remote still exists on %s — delete it via the web interface once you are satisfied.',
-                [ sTargetName, sLineBreak, sLineBreak, sThreadURL, sLineBreak, sLineBreak, sSourceName ] ),
-              mtInformation, [ mbOK ], 0 );
-          end
-          else
-          begin
-            Log( sThreadLog );
-            Log( 'Error: ' + sThreadError );
-            StyledMessageDlg(  'Migration failed: ' + sThreadError, mtError, [ mbOK ], 0 );
+            lThreadOK := False;
+            sThreadError := E.Message;
+            sThreadLog := 'Migration aborted by an unexpected error. The remote may have been ' +
+              'created and origin may already have been repointed - check `git remote -v` before retrying.';
           end;
+        end;
 
-          TInterlocked.Decrement( FActiveWorkers );
+        // Refresh on the WORKER. Doing it inside the queued closure ran six
+        // blocking Git calls - one of them a network fetch - on the UI thread,
+        // which is precisely the work this thread exists to move off it.
+        if lThreadOK then
+          FRepoManager.RefreshStatus( sRepoPath );
 
-        end );
+        TThread.Queue( nil,
+          procedure
+          begin
+
+            if FShuttingDown then
+              Exit;
+
+            Screen.Cursor := crDefault;
+            SetBatchUIState( False );
+
+            if lThreadOK then
+            begin
+              Log( sThreadLog );
+              Log( '=== Migration Complete ===' );
+              Log( 'New URL: ' + sThreadURL );
+
+              PopulateListView;
+
+              StyledMessageDlg(  Format( 'Repository migrated to %s successfully.%s%sNew URL: %s%s%s' +
+                  'The old remote still exists on %s — delete it via the web interface once you are satisfied.',
+                  [ sTargetName, sLineBreak, sLineBreak, sThreadURL, sLineBreak, sLineBreak, sSourceName ] ),
+                mtInformation, [ mbOK ], 0 );
+            end
+            else
+            begin
+              Log( sThreadLog );
+              Log( 'Error: ' + sThreadError );
+              ErrorDlg( 'Migration failed: ' + sThreadError );
+            end;
+
+          end );
+      finally
+        TInterlocked.Decrement( FActiveWorkers );
+      end;
 
     end ).Start;
 
@@ -2286,7 +2668,7 @@ begin
   end;
 
   iIndex            := Integer( lvRepos.Selected.Data );
-  Provider          := FRepoManager.GetRepoProvider( iIndex );
+  Provider          := FRepoManager.GetRepoProvider( RepoPathAt( iIndex ) );
 
   case Provider of
     rpCodeberg: sProviderName := 'Codeberg';
@@ -2306,23 +2688,23 @@ begin
 
   if StyledMessageDlg(  Format( 'Make repository "%s" PUBLIC on %s?%s%s' +
       'This will make the repository visible to everyone.',
-      [ FRepoManager.Repos[ iIndex ].Name, sProviderName, sLineBreak, sLineBreak ] ),
+      [ FRepoCache[ iIndex ].Name, sProviderName, sLineBreak, sLineBreak ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
   Screen.Cursor     := crHourGlass;
 
   try
-    if FRepoManager.SetRepositoryVisibility( iIndex, False, sError ) then
+    if FRepoManager.SetRepositoryVisibility( RepoPathAt( iIndex ), False, sError ) then
     begin
       Log( Format( 'Repository "%s" set to PUBLIC on %s',
-          [ FRepoManager.Repos[ iIndex ].Name, sProviderName ] ) );
+          [ FRepoCache[ iIndex ].Name, sProviderName ] ) );
       StyledMessageDlg(  'Repository visibility changed to PUBLIC.', mtInformation, [ mbOK ], 0 );
     end
     else
     begin
       Log( 'Error: ' + sError );
-      StyledMessageDlg(  'Failed to change visibility: ' + sError, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to change visibility: ' + sError );
     end;
   finally
     Screen.Cursor   := crDefault;
@@ -2348,7 +2730,7 @@ begin
   end;
 
   iIndex            := Integer( lvRepos.Selected.Data );
-  Provider          := FRepoManager.GetRepoProvider( iIndex );
+  Provider          := FRepoManager.GetRepoProvider( RepoPathAt( iIndex ) );
 
   case Provider of
     rpCodeberg: sProviderName := 'Codeberg';
@@ -2368,23 +2750,23 @@ begin
 
   if StyledMessageDlg(  Format( 'Make repository "%s" PRIVATE on %s?%s%s' +
       'This will make the repository visible only to you.',
-      [ FRepoManager.Repos[ iIndex ].Name, sProviderName, sLineBreak, sLineBreak ] ),
+      [ FRepoCache[ iIndex ].Name, sProviderName, sLineBreak, sLineBreak ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
   Screen.Cursor     := crHourGlass;
 
   try
-    if FRepoManager.SetRepositoryVisibility( iIndex, True, sError ) then
+    if FRepoManager.SetRepositoryVisibility( RepoPathAt( iIndex ), True, sError ) then
     begin
       Log( Format( 'Repository "%s" set to PRIVATE on %s',
-          [ FRepoManager.Repos[ iIndex ].Name, sProviderName ] ) );
+          [ FRepoCache[ iIndex ].Name, sProviderName ] ) );
       StyledMessageDlg(  'Repository visibility changed to PRIVATE.', mtInformation, [ mbOK ], 0 );
     end
     else
     begin
       Log( 'Error: ' + sError );
-      StyledMessageDlg(  'Failed to change visibility: ' + sError, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to change visibility: ' + sError );
     end;
   finally
     Screen.Cursor   := crDefault;
@@ -2484,13 +2866,13 @@ begin
   end;
 
   iIndex            := Integer( lvRepos.Selected.Data );
-  sGitignorePath    := IncludeTrailingPathDelimiter( FRepoManager.Repos[ iIndex ].Path ) + '.gitignore';
+  sGitignorePath    := IncludeTrailingPathDelimiter( FRepoCache[ iIndex ].Path ) + '.gitignore';
 
   // Check if .gitignore exists, offer to create if not
   if ( not FileExists( sGitignorePath ) ) then
   begin
     if StyledMessageDlg(  Format( 'No .gitignore file exists in "%s".%s%sCreate one now?',
-        [ FRepoManager.Repos[ iIndex ].Name, sLineBreak, sLineBreak ] ),
+        [ FRepoCache[ iIndex ].Name, sLineBreak, sLineBreak ] ),
       mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
       Exit;
 
@@ -2503,11 +2885,14 @@ begin
         FileStream.Free;
       end;
 
-      Log( 'Created .gitignore in ' + FRepoManager.Repos[ iIndex ].Name );
+      Log( 'Created .gitignore in ' + FRepoCache[ iIndex ].Name );
     except
-      on E: Exception do
+      // Narrowed from a bare Exception: an access violation here is a defect
+      // in this application, and swallowing it reported the bug to the user as
+      // a file error and hid it from EurekaLog entirely.
+      on E: EStreamError do
       begin
-        StyledMessageDlg(  'Failed to create .gitignore: ' + E.Message, mtError, [ mbOK ], 0 );
+        ErrorDlg( 'Failed to create .gitignore: ' + E.Message );
         Exit;
       end;
     end;
@@ -2571,7 +2956,7 @@ begin
   end;
 
   iIndex            := Integer( lvRepos.Selected.Data );
-  sGitignorePath    := IncludeTrailingPathDelimiter( FRepoManager.Repos[ iIndex ].Path ) + '.gitignore';
+  sGitignorePath    := IncludeTrailingPathDelimiter( FRepoCache[ iIndex ].Path ) + '.gitignore';
 
   slExisting        := TStringList.Create;
   slToAdd           := TStringList.Create;
@@ -2584,9 +2969,9 @@ begin
       try
         slExisting.LoadFromFile( sGitignorePath, TEncoding.UTF8 );
       except
-        on E: Exception do
+        on E: EFileStreamError do
         begin
-          StyledMessageDlg(  'Failed to read .gitignore: ' + E.Message, mtError, [ mbOK ], 0 );
+          ErrorDlg( 'Failed to read .gitignore: ' + E.Message );
           Exit;
         end;
       end;
@@ -2654,19 +3039,31 @@ begin
       // the encoding LoadFromFile settled on, which for a BOM-less file is the
       // ANSI code page — so a UTF-8 .gitignore containing a non-ASCII path was
       // silently rewritten as ANSI and its rules stopped matching.
-      TFile.WriteAllText( sGitignorePath, slExisting.Text );
+      // Only the WRITE is guarded. The handler used to wrap the refresh and
+      // the list update too, so an access violation in either surfaced as
+      // "Failed to save .gitignore" - a message that sent every future
+      // investigation to the wrong place.
+      try
+        TFile.WriteAllText( sGitignorePath, slExisting.Text );
+      except
+        on E: EInOutError do
+        begin
+          ErrorDlg( 'Failed to save .gitignore: ' + E.Message );
+          Exit;
+        end;
+      end;
 
-      Log( Format( 'Added %d Delphi patterns to .gitignore in %s', [ iAddedCount, FRepoManager.Repos[ iIndex ].Name ] ) );
+      Log( Format( 'Added %d Delphi patterns to .gitignore in %s', [ iAddedCount, FRepoCache[ iIndex ].Name ] ) );
       StyledMessageDlg(  Format( 'Added %d patterns to .gitignore.', [ iAddedCount ] ), mtInformation, [ mbOK ], 0 );
 
       // Refresh the repository status
-      FRepoManager.RefreshStatus( iIndex );
-      UpdateListItem( iIndex );
+      FRepoManager.RefreshStatus( RepoPathAt( iIndex ) );
+      UpdateListItem( RepoPathAt( iIndex ) );
 
     except
-      on E: Exception do
+      on E: EInOutError do
       begin
-        StyledMessageDlg(  'Failed to save .gitignore: ' + E.Message, mtError, [ mbOK ], 0 );
+        ErrorDlg( 'Failed to save .gitignore: ' + E.Message );
         Exit;
       end;
     end;
@@ -2738,15 +3135,15 @@ var
   Status            : TRepoStatus;
 begin
 
-  if Item = nil then
+  if ( Item = nil ) or FShuttingDown then
     Exit;
 
   iIndex            := Integer( Item.Data );
 
-  if ( iIndex < 0 ) or ( iIndex > High( FRepoManager.Repos ) ) then
+  if ( iIndex < 0 ) or ( iIndex > High( FRepoCache ) ) then
     Exit;
 
-  Status            := FRepoManager.Repos[ iIndex ].Status;
+  Status            := FRepoCache[ iIndex ].Status;
 
   // Set background colour based on status
   case Status of
@@ -2795,9 +3192,9 @@ begin
     Exit;
 
   iIndex            := Integer( lvRepos.Selected.Data );
-  if ShellExecute( Handle, 'explore', PChar( FRepoManager.Repos[ iIndex ].Path ), nil, nil, SW_SHOWNORMAL ) <= 32 then
+  if ShellExecute( Handle, 'explore', PChar( FRepoCache[ iIndex ].Path ), nil, nil, SW_SHOWNORMAL ) <= 32 then
     StyledMessageDlg( 'Could not open the folder in Explorer:' + sLineBreak + sLineBreak +
-      FRepoManager.Repos[ iIndex ].Path, mtWarning, [ mbOK ], 0 );
+      FRepoCache[ iIndex ].Path, mtWarning, [ mbOK ], 0 );
 
 end;
 
@@ -2815,7 +3212,7 @@ begin
     Exit;
 
   iIndex            := Integer( lvRepos.Selected.Data );
-  sRepoPath         := FRepoManager.Repos[ iIndex ].Path;
+  sRepoPath         := FRepoCache[ iIndex ].Path;
   sClientPath       := FRepoManager.GitClientPath;
 
   if sClientPath.IsEmpty then
@@ -2857,7 +3254,7 @@ begin
   // Strong warning about local code being modified
   if StyledMessageDlg(
     'WARNING: Pull will merge remote changes into your LOCAL code.' + sLineBreak + sLineBreak +
-    'Your local files for "' + FRepoManager.Repos[ iIndex ].Name + '" MAY BE MODIFIED.' + sLineBreak + sLineBreak +
+    'Your local files for "' + FRepoCache[ iIndex ].Name + '" MAY BE MODIFIED.' + sLineBreak + sLineBreak +
     'A backup branch will be created before pulling.' + sLineBreak + sLineBreak +
     'Do you want to continue?',
     mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
@@ -2869,7 +3266,7 @@ begin
     // Preview incoming changes
     Log( 'Fetching and previewing incoming changes...' );
 
-    if not FRepoManager.GetIncomingChanges( iIndex, sChanges, sLog ) then
+    if not FRepoManager.GetIncomingChanges( RepoPathAt( iIndex ), sChanges, sLog ) then
       // Previously this failure had no else branch at all and sLog was
       // discarded, so an offline remote or an expired token went straight on
       // to pull with no preview and no warning.
@@ -2895,7 +3292,7 @@ begin
     end;
 
     // Create backup branch
-    lHasBackup      := FRepoManager.CreateBackupBranch( iIndex, sBranchName, sLog );
+    lHasBackup      := FRepoManager.CreateBackupBranch( RepoPathAt( iIndex ), sBranchName, sLog );
 
     if lHasBackup then
       Log( sLog )
@@ -2915,9 +3312,9 @@ begin
     end;
 
     // Now pull
-    Log( 'Pulling ' + FRepoManager.Repos[ iIndex ].Name + '...' );
+    Log( 'Pulling ' + FRepoCache[ iIndex ].Name + '...' );
 
-    if FRepoManager.PullRepository( iIndex, sLog ) then
+    if FRepoManager.PullRepository( RepoPathAt( iIndex ), sLog ) then
     begin
       Log( sLog );
       Log( 'Pull complete.' );
@@ -2928,13 +3325,13 @@ begin
       // there and handing them a `git branch -d` with no branch name.
       if lHasBackup then
         Log( 'Backup branch "' + sBranchName + '" was created. Delete with: git branch -d ' + sBranchName );
-      FRepoManager.RefreshStatus( iIndex );
-      UpdateListItem( iIndex );
+      FRepoManager.RefreshStatus( RepoPathAt( iIndex ) );
+      UpdateListItem( RepoPathAt( iIndex ) );
     end
     else
     begin
       Log( 'Pull failed: ' + sLog );
-      StyledMessageDlg(  'Pull failed: ' + sLog, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Pull failed: ' + sLog );
     end;
   finally
     Screen.Cursor   := crDefault;
@@ -3023,12 +3420,15 @@ begin
   sIndexerPath      := FRepoManager.DelphiIndexerPath;
 
   // Use separate InputQuery calls since the multi-value version has issues
-  if InputQuery( 'Settings', 'Git Client Path (e.g., C:\Program Files\Fork\Fork.exe):', sClientPath ) then
+  if InputQuery( 'Settings', 'Git Client Path - git.exe, or a GUI client for "Open in Git Client":', sClientPath ) then
   begin
     if InputQuery( 'Settings', 'File Pattern (e.g., *.pas or empty for all):', sFilePattern ) then
     begin
-      // Reject shell metacharacters — the pattern is passed to git via cmd.exe,
-      // so anything outside a glob whitelist could inject commands.
+      // Restrict the pattern to a glob whitelist. Git is launched through
+      // CreateProcess with no shell involved, so this is not about shell
+      // metacharacters - it is about a pattern that begins with '-' being
+      // taken as an OPTION to `git add` rather than as a pathspec. The
+      // invocation also passes '--' before the pattern.
       if ( not TGitRepoManager.IsSafeFilePattern( sFilePattern ) ) then
       begin
         StyledMessageDlg(  'File pattern contains characters that are not allowed.' + sLineBreak + sLineBreak +
@@ -3047,7 +3447,7 @@ begin
           OpenDialog.Title := 'Locate delphi-indexer.exe';
           OpenDialog.Filter := 'Delphi Indexer|delphi-indexer.exe|Executable Files|*.exe|All Files|*.*';
           OpenDialog.FilterIndex := 1;
-          OpenDialog.Options := [ ofFileMustExist, ofPathMustExist ];
+          OpenDialog.Options := [ ofFileMustExist, ofPathMustExist, ofNoChangeDir ];
 
           if not sIndexerPath.IsEmpty and FileExists( sIndexerPath ) then
             OpenDialog.InitialDir := ExtractFileDir( sIndexerPath );
@@ -3293,7 +3693,7 @@ begin
   iCount            := Length( Indices );
 
   for iRepoIndex in Indices do
-    FRepoManager.SetRepoGroup( iRepoIndex, sGroup );
+    FRepoManager.SetRepoGroup( RepoPathAt( iRepoIndex ), sGroup );
 
   if iCount > 0 then
   begin
@@ -3352,6 +3752,12 @@ begin
     mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
+  // Take the batch guard BEFORE the preview, not after it. The preview runs
+  // GetIncomingChanges - a network fetch - over every selected repository and
+  // logs as it goes, and the buttons were all still live throughout.
+  if ( not BeginBatch ) then
+    Exit;
+
   // Fetch and preview incoming changes
   Log( 'Fetching and previewing incoming changes...' );
   Screen.Cursor     := crHourGlass;
@@ -3360,17 +3766,19 @@ begin
 
   // One owner, one try..finally. Previously the list was freed at two separate
   // exit points and leaked whenever GetIncomingChanges or the dialog raised.
+  var bProceed: Boolean;
+
   try
     try
-      for var iRepo in CheckedRepoIndices do
+      for var iRepo in Indices do
       begin
         var RepoInfo: TRepoInfo;
 
-        if FRepoManager.GetIncomingChanges( iRepo, sChanges, sLog ) then
+        if FRepoManager.GetIncomingChanges( RepoPathAt( iRepo ), sChanges, sLog ) then
         begin
           if not sChanges.IsEmpty then
           begin
-            if FRepoManager.GetRepoSnapshot( iRepo, RepoInfo ) then
+            if RepoAt( iRepo, RepoInfo ) then
               slPreview.Add( '=== ' + RepoInfo.Name + ' ===' );
 
             slPreview.Add( sChanges );
@@ -3378,7 +3786,7 @@ begin
             bHasChanges := True;
           end;
         end
-        else if FRepoManager.GetRepoSnapshot( iRepo, RepoInfo ) then
+        else if RepoAt( iRepo, RepoInfo ) then
           Log( Format( 'Warning: could not preview %s: %s', [ RepoInfo.Name, sLog ] ) );
       end;
     finally
@@ -3387,26 +3795,26 @@ begin
 
     // Show preview and confirm
     if bHasChanges then
-    begin
-      if StyledMessageDlg(
+      bProceed := StyledMessageDlg(
         'The following files will be MODIFIED by the pull:' + sLineBreak + sLineBreak +
         slPreview.Text + sLineBreak +
         'Do you want to proceed? (Backup branches will be created)',
-        mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
-      begin
-        Log( 'Pull cancelled by user.' );
-        Exit;
-      end;
-    end
+        mtWarning, [ mbYes, mbNo ], 0 ) = mrYes
     else
+    begin
       Log( 'No incoming changes detected (or could not determine changes).' );
+      bProceed := True;
+    end;
   finally
     slPreview.Free;
   end;
 
-  // Now perform the actual pull with backup
-  if ( not BeginBatch ) then
+  if ( not bProceed ) then
+  begin
+    Log( 'Pull cancelled by user.' );
+    EndBatch;
     Exit;
+  end;
 
   Screen.Cursor     := crHourGlass;
   iSuccess          := 0;
@@ -3418,11 +3826,11 @@ begin
       begin
         var Repo: TRepoInfo;
 
-        if FRepoManager.GetRepoSnapshot( iRepoIndex, Repo ) then
+        if RepoAt( iRepoIndex, Repo ) then
           Log( Format( '=== Pulling %s ===', [ Repo.Name ] ) );
 
         // Create backup branch first
-        if FRepoManager.CreateBackupBranch( iRepoIndex, sBranchName, sLog ) then
+        if FRepoManager.CreateBackupBranch( RepoPathAt( iRepoIndex ), sBranchName, sLog ) then
         begin
           Log( sLog );
           lAnyBackup := True;
@@ -3431,7 +3839,7 @@ begin
           Log( 'Warning: Could not create backup branch: ' + sLog );
 
         // Now pull
-        if FRepoManager.PullRepository( iRepoIndex, sLog ) then
+        if FRepoManager.PullRepository( RepoPathAt( iRepoIndex ), sLog ) then
         begin
           Log( sLog );
           Inc( iSuccess );
@@ -3439,8 +3847,8 @@ begin
         else
           Log( 'Pull failed: ' + sLog );
 
-        FRepoManager.RefreshStatus( iRepoIndex );
-        UpdateListItem( iRepoIndex );
+        FRepoManager.RefreshStatus( RepoPathAt( iRepoIndex ) );
+        UpdateListItem( RepoPathAt( iRepoIndex ) );
         Application.ProcessMessages;
       end;
     finally
@@ -3513,7 +3921,7 @@ begin
       for iRepoIndex in Indices do
       begin
         var Repo: TRepoInfo;
-        var bResolveSuccess := FRepoManager.ResolveConflictsKeepLocal( iRepoIndex, sLog );
+        var bResolveSuccess := FRepoManager.ResolveConflictsKeepLocal( RepoPathAt( iRepoIndex ), sLog );
 
         Log( sLog );
 
@@ -3522,13 +3930,13 @@ begin
           Inc( iSuccess );
 
           // Track repo path for reindexing after loop completes
-          if FRepoManager.GetRepoSnapshot( iRepoIndex, Repo ) and
+          if RepoAt( iRepoIndex, Repo ) and
              ( slReindexDirs.IndexOf( Repo.Path ) = -1 ) then
             slReindexDirs.Add( Repo.Path );
         end;
 
-        FRepoManager.RefreshStatus( iRepoIndex );
-        UpdateListItem( iRepoIndex );
+        FRepoManager.RefreshStatus( RepoPathAt( iRepoIndex ) );
+        UpdateListItem( RepoPathAt( iRepoIndex ) );
         Application.ProcessMessages;
       end;
     finally
@@ -3592,10 +4000,10 @@ begin
       begin
         var Repo: TRepoInfo;
 
-        if FRepoManager.GetRepoSnapshot( iRepoIndex, Repo ) then
+        if RepoAt( iRepoIndex, Repo ) then
           Log( Format( '=== Pushing %s ===', [ Repo.Name ] ) );
 
-        var bPushSuccess := FRepoManager.PushRepository( iRepoIndex, sLog );
+        var bPushSuccess := FRepoManager.PushRepository( RepoPathAt( iRepoIndex ), sLog );
 
         Log( sLog );
 
@@ -3608,8 +4016,8 @@ begin
             slReindexDirs.Add( Repo.Path );
         end;
 
-        FRepoManager.RefreshStatus( iRepoIndex );
-        UpdateListItem( iRepoIndex );
+        FRepoManager.RefreshStatus( RepoPathAt( iRepoIndex ) );
+        UpdateListItem( RepoPathAt( iRepoIndex ) );
         Application.ProcessMessages;
       end;
     finally
@@ -3685,10 +4093,10 @@ begin
       begin
         var Repo: TRepoInfo;
 
-        if FRepoManager.GetRepoSnapshot( iRepoIndex, Repo ) then
+        if RepoAt( iRepoIndex, Repo ) then
           Log( Format( '=== Force Pushing %s ===', [ Repo.Name ] ) );
 
-        var bPushSuccess := FRepoManager.ForcePushRepository( iRepoIndex, sLog );
+        var bPushSuccess := FRepoManager.ForcePushRepository( RepoPathAt( iRepoIndex ), sLog );
 
         Log( sLog );
 
@@ -3701,8 +4109,8 @@ begin
             slReindexDirs.Add( Repo.Path );
         end;
 
-        FRepoManager.RefreshStatus( iRepoIndex );
-        UpdateListItem( iRepoIndex );
+        FRepoManager.RefreshStatus( RepoPathAt( iRepoIndex ) );
+        UpdateListItem( RepoPathAt( iRepoIndex ) );
         Application.ProcessMessages;
       end;
     finally
@@ -3873,7 +4281,7 @@ begin
     TFile.WriteAllText( sGitIgnorePath, sContent );
     Log( Format( 'Created .gitignore for %s project', [ sProjectType ] ) );
   except
-    on E: Exception do
+    on E: EInOutError do
       Log( 'Warning: Failed to create .gitignore: ' + E.Message );
   end;
 
@@ -3935,7 +4343,8 @@ begin
   lPrivate          := True;
   sProjectType      := 'Delphi / Pascal';
 
-  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate, sProjectType ) ) then
+  if ( not TCodebergDialog.Execute( sRepoName, sDescription, lPrivate, sProjectType,
+    IfThen( iChoice = mrYes, 'Codeberg', 'GitHub' ) ) ) then
     Exit;
 
   // Write .gitignore based on project type before init
@@ -3950,7 +4359,7 @@ begin
     if not FRepoManager.InitializeRepository( sFolder, sLog ) then
     begin
       Log( 'Error: ' + sLog );
-      StyledMessageDlg(  'Failed to initialise repository: ' + sLog, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to initialise repository: ' + sLog );
       Exit;
     end;
 
@@ -3964,7 +4373,7 @@ begin
       if not FRepoManager.CreateCodebergRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) then
       begin
         Log( 'Error: ' + sError );
-        StyledMessageDlg(  'Failed to create Codeberg repository: ' + sError, mtError, [ mbOK ], 0 );
+        ErrorDlg( 'Failed to create Codeberg repository: ' + sError );
         Exit;
       end;
     end
@@ -3975,7 +4384,7 @@ begin
       if not FRepoManager.CreateGitHubRepository( sRepoName, sDescription, lPrivate, sRemoteURL, sError ) then
       begin
         Log( 'Error: ' + sError );
-        StyledMessageDlg(  'Failed to create GitHub repository: ' + sError, mtError, [ mbOK ], 0 );
+        ErrorDlg( 'Failed to create GitHub repository: ' + sError );
         Exit;
       end;
     end;
@@ -3986,7 +4395,7 @@ begin
     if not FRepoManager.AddRemoteOrigin( sFolder, sRemoteURL, sLog ) then
     begin
       Log( 'Error: ' + sLog );
-      StyledMessageDlg(  'Failed to add remote origin: ' + sLog, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to add remote origin: ' + sLog );
       Exit;
     end;
 
@@ -3996,7 +4405,7 @@ begin
     if not FRepoManager.InitialCommitAndPush( sFolder, 'Initial commit', sLog ) then
     begin
       Log( 'Error: ' + sLog );
-      StyledMessageDlg(  'Failed to commit and push: ' + sLog, mtError, [ mbOK ], 0 );
+      ErrorDlg( 'Failed to commit and push: ' + sLog );
       Exit;
     end;
 
@@ -4060,8 +4469,7 @@ begin
     if ( iFound > 0 ) and ( iFound < Cardinal( Length( SearchBuffer ) ) ) then
     begin
       sIndexerPath  := SearchBuffer;
-      FRepoManager.DelphiIndexerPath := sIndexerPath;
-      FRepoManager.SaveConfig;
+      QueueIndexerPathUpdate( sIndexerPath );
     end;
   end;
 
@@ -4069,8 +4477,7 @@ begin
   if sIndexerPath.IsEmpty and FileExists( DEFAULT_INSTALL_PATH ) then
   begin
     sIndexerPath    := DEFAULT_INSTALL_PATH;
-    FRepoManager.DelphiIndexerPath := sIndexerPath;
-    FRepoManager.SaveConfig;
+    QueueIndexerPathUpdate( sIndexerPath );
   end;
 
   // 4. Not found - skip reindexing silently
@@ -4097,8 +4504,14 @@ begin
           LogSafe( 'Error: ' + sOutput.Trim );
       end;
     except
+      // One repository must never abandon the rest of the batch, so this stays
+      // a catch-all - but a defect in our own code is re-raised so EurekaLog
+      // still sees it.
       on E: Exception do
+      begin
         LogSafe( Format( 'delphi-lookup reindex FAILED for %s: %s', [ sPath, E.Message ] ) );
+        ReRaiseIfDefect( E );
+      end;
     end;
   end;
 

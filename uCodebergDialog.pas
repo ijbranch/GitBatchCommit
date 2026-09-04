@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.0.0
+  Version: 1.6.0
 
   Part of GitBatchCommit Application
 
@@ -55,6 +55,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
+  Vcl.StyledTaskDialog,
   System.SysUtils, System.Variants, System.Classes, System.UITypes;
 
 type
@@ -79,16 +80,42 @@ type
     /// <param name="sRepoName">Pre-filled and returned repository name.</param>
     /// <param name="sDescription">Returned repository description.</param>
     /// <param name="lPrivate">Returned private flag.</param>
-    /// <returns>True if user clicked OK, False if cancelled.</returns>
+    /// <param name="sHostName">
+    ///   Name of the host the repository will be created on, used for the
+    ///   dialog caption. This dialog is shared by the Codeberg and GitHub
+    ///   flows and by migration in both directions, and its DFM caption said
+    ///   "Create Codeberg Repository" in every one of them — so creating a
+    ///   GitHub repository announced itself as a Codeberg one.
+    /// </param>
     /// <returns>True if the user confirmed the dialog.</returns>
-    class function Execute( var sRepoName, sDescription: string; var lPrivate: Boolean ): Boolean; overload;
+    class function Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
+      const sHostName: string ): Boolean; overload;
 
     /// <summary>
     ///   Shows the dialog with project type selection and returns the entered values.
     /// </summary>
+    /// <param name="sRepoName">Pre-filled and returned repository name.</param>
+    /// <param name="sDescription">Returned repository description.</param>
+    /// <param name="lPrivate">Returned private flag.</param>
+    /// <param name="sProjectType">Pre-selected and returned project type.</param>
+    /// <param name="sHostName">Name of the host, used for the dialog caption.</param>
     /// <returns>True if the user confirmed the dialog.</returns>
     class function Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
-      var sProjectType: string ): Boolean; overload;
+      var sProjectType: string; const sHostName: string ): Boolean; overload;
+  private
+    /// <summary>
+    ///   Blocks OK while the repository name is blank.
+    /// </summary>
+    /// <remarks>
+    ///   Validating after ShowModal returned meant a blank name produced a
+    ///   warning and then a False result, which every caller reads as
+    ///   "cancelled" — so a typo silently threw away the description and the
+    ///   private flag the user had just filled in, and dropped them out of the
+    ///   whole flow.
+    /// </remarks>
+    /// <param name="Sender">The form being closed.</param>
+    /// <param name="CanClose">Set False to keep the dialog open.</param>
+    procedure DialogCloseQuery( Sender: TObject; var CanClose: Boolean );
   end;
 
 var
@@ -98,7 +125,25 @@ implementation
 
 {$R *.dfm}
 
-class function TCodebergDialog.Execute( var sRepoName, sDescription: string; var lPrivate: Boolean ): Boolean;
+procedure TCodebergDialog.DialogCloseQuery( Sender: TObject; var CanClose: Boolean );
+begin
+
+  CanClose := True;
+
+  if ModalResult <> mrOK then
+    Exit;
+
+  if Trim( edtRepoName.Text ).IsEmpty then
+  begin
+    StyledMessageDlg( 'Repository name is required.', mtWarning, [ mbOK ], 0 );
+    edtRepoName.SetFocus;
+    CanClose := False;
+  end;
+
+end;
+
+class function TCodebergDialog.Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
+  const sHostName: string ): Boolean;
 var
   Dlg               : TCodebergDialog;
 begin
@@ -107,6 +152,8 @@ begin
   Dlg := TCodebergDialog.Create( nil );
 
   try
+    Dlg.Caption := Format( 'Create %s Repository', [ sHostName ] );
+    Dlg.OnCloseQuery := Dlg.DialogCloseQuery;
     Dlg.edtRepoName.Text := sRepoName;
     Dlg.edtDescription.Text := sDescription;
     Dlg.chkPrivate.Checked := lPrivate;
@@ -120,16 +167,11 @@ begin
 
     if Dlg.ShowModal = mrOK then
     begin
+      // The name is guaranteed non-blank: OnCloseQuery refuses to let the
+      // dialog close otherwise.
       sRepoName := Trim( Dlg.edtRepoName.Text );
       sDescription := Trim( Dlg.edtDescription.Text );
       lPrivate := Dlg.chkPrivate.Checked;
-
-      if sRepoName.IsEmpty then
-      begin
-        MessageDlg( 'Repository name is required.', mtWarning, [ mbOK ], 0 );
-        Exit;
-      end;
-
       Result := True;
     end;
   finally
@@ -139,7 +181,7 @@ begin
 end;
 
 class function TCodebergDialog.Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
-  var sProjectType: string ): Boolean;
+  var sProjectType: string; const sHostName: string ): Boolean;
 var
   Dlg               : TCodebergDialog;
 begin
@@ -148,6 +190,8 @@ begin
   Dlg := TCodebergDialog.Create( nil );
 
   try
+    Dlg.Caption := Format( 'Create %s Repository', [ sHostName ] );
+    Dlg.OnCloseQuery := Dlg.DialogCloseQuery;
     Dlg.edtRepoName.Text := sRepoName;
     Dlg.edtDescription.Text := sDescription;
     Dlg.chkPrivate.Checked := lPrivate;
@@ -184,13 +228,6 @@ begin
       sDescription := Trim( Dlg.edtDescription.Text );
       lPrivate := Dlg.chkPrivate.Checked;
       sProjectType := Dlg.cboProjectType.Text;
-
-      if sRepoName.IsEmpty then
-      begin
-        MessageDlg( 'Repository name is required.', mtWarning, [ mbOK ], 0 );
-        Exit;
-      end;
-
       Result := True;
     end;
   finally
