@@ -93,6 +93,10 @@ Force Push additionally refuses if the remote has moved on since the list was la
 
 If you close the window while Git work is running, you are asked whether to cancel it. The window normally closes within a second or two of answering **Yes**, because cancellation is checked between repositories. If a Git call is stuck on a network timeout the window stays open and asks you to try again shortly - it will not free anything out from under a running operation.
 
+### What the Remote Column Means
+
+It shows the provider of the remote your branch actually **tracks**, which is the one a push or pull will contact - not necessarily `origin`. If a branch tracks a different remote, the column names that one. So if it says Codeberg on a repository you believe is on GitHub, the branch is tracking the wrong remote; check with `git rev-parse --abbrev-ref @{u}`.
+
 ### Refreshing Status
 
 This happens by itself when you start the application. The list appears straight away with the Branch, Remote, Tracked Files, Modified, Status and Version columns blank, and they fill in over the next few seconds as each repository is checked. The log panel finishes with `Refresh complete.`

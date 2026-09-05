@@ -437,6 +437,25 @@ type
     function GetRemoteOriginURL( const sRepoPath: string ): string;
 
     /// <summary>
+    ///   Gets the URL of the remote that the CURRENT BRANCH tracks, falling
+    ///   back to origin when the branch has no upstream.
+    /// </summary>
+    /// <remarks>
+    ///   This is the remote a plain <c>git push</c> or <c>git pull</c> will
+    ///   actually contact, and the one <c>GetAheadBehind</c> compares against
+    ///   via <c>@{upstream}</c>. It is NOT always origin: a branch can track
+    ///   any remote. Displaying origin's provider while pushing to a different
+    ///   remote is how a repository came to be shown as GitHub while its
+    ///   pushes went to a dead Codeberg URL.
+    /// </remarks>
+    /// <param name="sRepoPath">Path to the repository.</param>
+    /// <returns>
+    ///   The upstream remote's URL; origin's URL when there is no upstream;
+    ///   an empty string when there is no remote at all.
+    /// </returns>
+    function GetUpstreamRemoteURL( const sRepoPath: string ): string;
+
+    /// <summary>
     ///   Detects the remote provider from an origin URL.
     /// </summary>
     /// <param name="sOriginURL">The remote origin URL.</param>
@@ -2931,7 +2950,12 @@ begin
     Status := rsError;
 
   iTracked   := GetTrackedFileCount( sRepoPath );
-  Provider   := DetectRemoteProvider( GetRemoteOriginURL( sRepoPath ) );
+  // Report the remote that push and pull will ACTUALLY use, not origin. These
+  // differ whenever a branch tracks something else, and the column claiming
+  // GitHub while `git push` went to Codeberg hid a dead remote completely - it
+  // also meant the ahead/behind counts, which come from @{upstream}, were being
+  // measured against a remote the user was never shown.
+  Provider   := DetectRemoteProvider( GetUpstreamRemoteURL( sRepoPath ) );
   sVersion   := GetProjectVersion( sRepoPath );
 
   // Capture where the upstream stands as the user is being shown this row.
@@ -3303,6 +3327,40 @@ begin
 
   if ExecuteGitCommand( sRepoPath, 'remote get-url origin', sOutput ) then
     Result := Trim( sOutput );
+
+end;
+
+function TGitRepoManager.GetUpstreamRemoteURL( const sRepoPath: string ): string;
+var
+  sBranch           : string;
+  sRemoteName       : string;
+  sOutput           : string;
+begin
+
+  Result := '';
+  sRemoteName := '';
+  sBranch := GetCurrentBranch( sRepoPath );
+
+  // branch.<name>.remote is what a bare push/pull follows. Asked this way it
+  // stays quiet on a detached HEAD or an unconfigured branch, where the config
+  // key simply does not exist.
+  if ( not sBranch.IsEmpty ) and
+     ExecuteGitCommand( sRepoPath, Format( 'config --get branch.%s.remote', [ sBranch ] ), sOutput ) then
+    sRemoteName := Trim( sOutput );
+
+  // A URL rather than a name is legal in branch.<name>.remote, and
+  // `remote get-url` would reject it. Take it as the answer.
+  if sRemoteName.Contains( '://' ) or sRemoteName.Contains( '@' ) then
+    Exit( sRemoteName );
+
+  if ( not sRemoteName.IsEmpty ) and
+     ExecuteGitCommand( sRepoPath, Format( 'remote get-url %s', [ sRemoteName ] ), sOutput ) then
+    Result := Trim( sOutput );
+
+  // No upstream configured - fall back to origin, which is what the user would
+  // reasonably assume the repository points at.
+  if Result.IsEmpty then
+    Result := GetRemoteOriginURL( sRepoPath );
 
 end;
 

@@ -152,6 +152,16 @@ git push origin vX.X.X.X      (pushes the tag)
 | **Caveats** | Only creates tag if it doesn't already exist. Prefers the root `.dproj`, scanning subdirectories only when there is none. Only works with Delphi projects |
 | **Linkages** | Version displayed in Version column. Tags appear in remote's Tags/Releases |
 
+### Remote Column
+
+| Aspect | Details |
+|--------|---------|
+| **What** | The provider of the remote this branch tracks - GitHub, Codeberg, Other or None |
+| **Where** | Repository list, Remote column |
+| **Why** | It is the remote a push or pull will contact, and the one the ahead/behind counts are measured against |
+| **How** | Read from `branch.<name>.remote`, resolved to a URL and classified by host. Falls back to `origin` when the branch has no upstream |
+| **Caveats** | Deliberately NOT always `origin`. A branch tracking a different remote is reported as that remote, so the column can never claim one host while Git contacts another |
+
 ---
 
 ## Push Operations
