@@ -72,12 +72,14 @@ Rows are colour-coded:
 | Colour | Status | Meaning |
 |--------|--------|---------|
 | Light green | Clean | No local changes, up to date with remote |
-| Light yellow | Modified | You have uncommitted changes |
+| Light yellow | Modified | You have uncommitted changes. Reads `Modified - n to pull` when the remote is ahead as well |
 | Strong red | Conflicted | Unmerged paths, or an unfinished merge/rebase |
 | Light orange | Pull Required | The remote has new commits you don't have locally |
 | Pale green | Push Required | Committed work that has not been pushed |
 | Light purple | Diverged | Commits on both sides - ahead AND behind |
 | Light red | Error | Path doesn't exist, or Git command failed |
+
+A repository that is modified **and** behind its remote has **" - n to pull"** appended. Commit & Push refuses it before staging anything, so the changes stay uncommitted and Pull Selected is enough to make it pushable - far better than committing and then having the push rejected.
 
 A repository whose only changes are build output (`.dcu`, `.map`, `Win64\Release\` and so on) has **" - build output only"** appended to its status. Such a repository does not count as Modified, so Commit & Push deliberately skips it - the status text says so rather than leaving it out silently.
 
@@ -293,8 +295,8 @@ The remote has commits you don't have locally. Either:
 
 ### Repository Shows Error (Red)
 
-- Check the folder path still exists
-- Verify the `.git` subfolder is present
+- Check the folder path still exists — a folder that has been renamed, moved or deleted stays in the list and shows Error on every refresh. Remove Selected clears it (the list entry only; no files are touched)
+- Verify the folder is actually a Git repository — one that was never `git init`'d looks identical to a broken one from the list
 - Check Git is installed and on your PATH
 
 ### Version Column Is Empty

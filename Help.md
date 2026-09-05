@@ -127,11 +127,12 @@ A comprehensive reference for all GitBatchCommit capabilities.
 | **When** | When you have local changes to share with the remote repository |
 | **Why** | Core function - batch commit and push multiple repos with one click |
 | **How** | 1) Check desired repos, 2) Enter commit message, 3) Optionally add details, 4) Click "Commit & Push Selected", 5) Confirm |
-| **Caveats** | Button disabled until repos are selected AND commit message is entered. Same message used for all repos. Will fail if remote is ahead (use Pull first or Force Push) |
+| **Caveats** | Button disabled until repos are selected AND commit message is entered. Same message used for all repos. A repository whose branch is **behind** its upstream is refused before anything is staged - Pull Selected first. It is also refused on an unfinished merge/rebase/cherry-pick/revert/bisect, unresolved conflicts, a detached or unborn HEAD, or a `git status` that failed |
 | **Linkages** | Uses File Pattern from Settings if configured. Creates version tags for Delphi projects. Adds message to history |
 
 **Git Commands Executed:**
 ```
+git rev-list --left-right --count @{upstream}...HEAD   (refuses if behind)
 git add -A                    (or pattern-based if configured)
 git commit -F <temp message file>
 git push
@@ -435,6 +436,7 @@ git push
 |--------|---------|------------|
 | Clean | No local changes, and level with the upstream | Light green |
 | Modified | Local uncommitted changes present | Light yellow |
+| Modified - n to pull | Local changes AND n commits owed from the upstream. Commit & Push refuses it - pull first | Light yellow |
 | Conflicted | Unmerged paths, or an unfinished merge/rebase/cherry-pick/revert/bisect | Strong red |
 | Pull Required (n) | Upstream has n commits this clone lacks | Light orange |
 | Push Required (n) | This clone has n commits the upstream lacks | Pale green |

@@ -18,14 +18,14 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Parallel Status Refresh** - Repository status checks run in parallel on background threads, keeping the UI responsive
 - **Status Detection** - Automatically detects repository status:
   - **Clean** - No local changes, and level with the remote
-  - **Modified** - Local uncommitted changes present (modified, staged, untracked, or deleted files)
+  - **Modified** - Local uncommitted changes present (modified, staged, untracked, or deleted files). A repository that is *also* behind its upstream reads `Modified - n to pull`, and Commit & Push refuses it until the pull is done
   - **Conflicted** - Unmerged paths, or an unfinished merge/rebase/cherry-pick/revert/bisect. Commit & Push refuses to act on these
   - **Pull Required** - The upstream has commits this clone does not, shown with the count
   - **Push Required** - This clone has commits the upstream does not, shown with the count
   - **Diverged** - Both of the above, shown as `(+ahead/-behind)`
   - **Error** - Repository not accessible or not a valid Git repo
 
-  The working tree is assessed with `git status --porcelain`, which covers modified, staged, untracked, deleted and renamed files as well as dirty submodules. Unmerged paths are identified from the porcelain `XY` codes (`DD`, `AU`, `UD`, `UA`, `DU`, `AA`, `UU`) and take priority over everything else, because staging them with `add -A` would commit the conflict markers. Changes that are only build output (`.dcu`, `.map`, platform build folders and so on; `.exe` and `.hpp` are deliberately NOT treated as build output, since plenty of repositories track tooling binaries and C/C++ headers on purpose) do not count as modifications. The relationship to the remote is measured with `git rev-list --left-right --count @{upstream}...HEAD`, which is locale-independent and reports both directions at once.
+  The working tree is assessed with `git status --porcelain`, which covers modified, staged, untracked, deleted and renamed files as well as dirty submodules. Unmerged paths are identified from the porcelain `XY` codes (`DD`, `AU`, `UD`, `UA`, `DU`, `AA`, `UU`) and take priority over everything else, because staging them with `add -A` would commit the conflict markers. Changes that are only build output (`.dcu`, `.map`, platform build folders and so on; `.exe` and `.hpp` are deliberately NOT treated as build output, since plenty of repositories track tooling binaries and C/C++ headers on purpose) do not count as modifications. The relationship to the remote is measured with `git rev-list --left-right --count @{upstream}...HEAD`, which is locale-independent and reports both directions at once. It is measured for **every** repository, whatever the state of the working tree: a repository can be modified and behind at once, and the single status slot can only name one of the two, so the pull it owes is carried in the status text instead.
 - **Branch Display** - Shows the current branch for each repository
 - **Remote Provider Display** - Shows the remote provider (GitHub, Codeberg, Other, None) for each repository
 - **Version Display** - Shows the project version extracted from Delphi `.dproj` files (reads the root `.dproj`, falling back to a subdirectory scan)
