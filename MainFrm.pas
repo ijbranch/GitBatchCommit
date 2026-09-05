@@ -798,7 +798,12 @@ begin
     if ( not FRepoManager.LoadConfig ) then
       mmoLog.Lines.Add( 'Warning: Failed to load configuration file' );
 
-    iCount          := Length( FRepoCache );
+    // FRepoCache is the UI-side snapshot and is not filled until
+    // PopulateListView below, so reading its length here saw 0 on a cold
+    // start and silently skipped the initial refresh - every row drew with
+    // no branch, no remote and 0/0 counts. Ask the manager for the live
+    // count instead.
+    iCount          := FRepoManager.ReposCount;
     mmoLog.Lines.Add( Format( 'Found %d repositories', [ iCount ] ) );
     ScrollLogToEnd;
 
@@ -1854,7 +1859,7 @@ end;
 procedure TMainForm.mnuRefreshStatusClick( Sender: TObject );
 begin
 
-  Log( Format( 'Refreshing %d repositories...', [ Length( FRepoCache ) ] ) );
+  Log( Format( 'Refreshing %d repositories...', [ FRepoManager.ReposCount ] ) );
   RefreshReposAsync;
 
 end;

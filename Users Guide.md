@@ -93,7 +93,9 @@ If you close the window while Git work is running, you are asked whether to canc
 
 ### Refreshing Status
 
-Press **F5** or use **File > Refresh Status**. This runs in the background — the UI stays responsive while repositories are checked in parallel.
+This happens by itself when you start the application. The list appears straight away with the Branch, Remote, Tracked Files, Modified, Status and Version columns blank, and they fill in over the next few seconds as each repository is checked. The log panel finishes with `Refresh complete.`
+
+To refresh again later, press **F5** or use **File > Refresh Status**. This runs in the background — the UI stays responsive while repositories are checked in parallel.
 
 ## Daily Workflow
 

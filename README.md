@@ -115,7 +115,9 @@ Note: This only removes the repository from the list - it does not delete any fi
 
 ### Refreshing Status
 
-Select **File > Refresh Status** (or press **F5**) to update the branch and status information for all repositories. This operation:
+All repositories are refreshed automatically when the application starts: the list appears immediately with the status columns empty, and they fill in as each repository is checked in the background. The log panel reports `Refresh complete.` when every repository has been checked.
+
+To refresh again at any time, select **File > Refresh Status** (or press **F5**). Either way, the operation:
 
 - Runs `git fetch` to check for remote updates
 - Runs `git status` to detect local modifications

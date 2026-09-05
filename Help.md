@@ -56,9 +56,9 @@ A comprehensive reference for all GitBatchCommit capabilities.
 |--------|---------|
 | **What** | Updates status information for all repositories |
 | **Where** | File > Refresh Status, or press F5 |
-| **When** | After making changes outside GitBatchCommit, or to check for remote updates |
+| **When** | Automatically once at startup, then on demand - after making changes outside GitBatchCommit, or to check for remote updates |
 | **Why** | To see current state of all repositories (modified files, remote changes, etc.) |
-| **How** | Press F5 or select File > Refresh Status. Runs in parallel for fast completion |
+| **How** | Runs by itself when the application starts; otherwise press F5 or select File > Refresh Status. Runs in parallel for fast completion |
 | **Caveats** | Performs `git fetch` which contacts remote servers - requires internet connection. May take time with many repositories |
 | **Linkages** | Updates Status column, Branch column, Version column, and row colours |
 
