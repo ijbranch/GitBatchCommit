@@ -281,6 +281,10 @@ This file is outside the project directory and is never committed to Git.
 
 If your repository list is empty after restarting, the configuration file may have been reset. Re-add your repositories via drag-and-drop.
 
+### A Repository Says "- 3 to pull"
+
+The working tree has changes AND the remote has commits you don't. Commit & Push will refuse it rather than commit and then fail at the push — **Pull Selected** first, then commit.
+
 ### Push Fails — "Rejected" or "Non-Fast-Forward"
 
 The remote has commits you don't have locally. Either:

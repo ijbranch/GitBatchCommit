@@ -60,7 +60,7 @@ A comprehensive reference for all GitBatchCommit capabilities.
 | **Why** | To see current state of all repositories (modified files, remote changes, etc.) |
 | **How** | Runs by itself when the application starts; otherwise press F5 or select File > Refresh Status. Runs in parallel for fast completion |
 | **Caveats** | Performs `git fetch` which contacts remote servers - requires internet connection. May take time with many repositories |
-| **Linkages** | Updates Status column, Branch column, Version column, and row colours |
+| **Linkages** | Updates Status column, Branch column, Version column, and row colours. Ahead/behind is measured for every repository, so a modified row that is also behind reads `Modified - N to pull` |
 
 ---
 

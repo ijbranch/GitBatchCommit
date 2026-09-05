@@ -134,6 +134,18 @@ type
     ///   can say the repository was skipped rather than silently omitting it.
     /// </summary>
     ArtifactOnlyChanges: Boolean;
+    /// <summary>
+    ///   Commits the upstream has that this branch lacks, as counted when the
+    ///   status was last determined. Carried on the record because a repository
+    ///   can be BOTH modified and behind, and the single Status slot can only
+    ///   report one of the two.
+    /// </summary>
+    BehindCount: Integer;
+    /// <summary>
+    ///   Commits this branch has that the upstream lacks, counted alongside
+    ///   <c>BehindCount</c>.
+    /// </summary>
+    AheadCount: Integer;
   end;
 
   TRepoInfoArray = TArray<TRepoInfo>;
@@ -2881,6 +2893,14 @@ begin
     // Order matters. An unmerged path outranks everything: staging it with
     // `add -A` and committing would write conflict markers into history, so it
     // must never be presented as an ordinary modification ready to commit.
+    // Ask how the branch stands against its upstream BEFORE deciding the
+    // status. This used to live inside the clean-tree branch below, so a
+    // repository that was both modified and behind could only ever report
+    // "Modified" - Commit & Push then committed and drove straight into a
+    // non-fast-forward rejection, with nothing in the list having warned that
+    // a pull was owed.
+    GetAheadBehind( sRepoPath, iAhead, iBehind );
+
     if HasUnmergedPaths( sStatusOutput ) or HasOperationInProgress( sRepoPath ) then
       Status := rsConflicted
     else if ( not sStatusOutput.IsEmpty ) and ( not AllChangesAreBuildArtifacts( sStatusOutput ) ) then
@@ -2895,9 +2915,8 @@ begin
       // Working tree is clean (or only build output changed). The branch may
       // still differ from its upstream in either direction — a repository whose
       // work is committed but not pushed used to report as Clean, with nothing
-      // anywhere in the UI saying the remote was behind.
-      GetAheadBehind( sRepoPath, iAhead, iBehind );
-
+      // anywhere in the UI saying the remote was behind. The counts are taken
+      // above now, for every repository rather than only the clean ones.
       if ( iAhead > 0 ) and ( iBehind > 0 ) then
         Status := rsDiverged
       else if iBehind > 0 then
@@ -2939,6 +2958,12 @@ begin
   if bArtifactOnly then
     sStatusText := sStatusText + ' - build output only';
 
+  // A modified or conflicted repository still carries the Status slot for its
+  // working tree, so the pull it owes has nowhere else to appear. Say it in the
+  // text, or the row looks ready to commit when it is not.
+  if ( Status in [ rsModified, rsConflicted ] ) and ( iBehind > 0 ) then
+    sStatusText := Format( '%s - %d to pull', [ sStatusText, iBehind ] );
+
   // Publish. Re-locate by path rather than trusting the index: the array may
   // have been reordered or shortened while the Git calls above were running.
   FReposLock.Enter;
@@ -2957,6 +2982,8 @@ begin
         FRepos[ j ].Version := sVersion;
         FRepos[ j ].RemoteSHA := sRemoteSHA;
         FRepos[ j ].ArtifactOnlyChanges := bArtifactOnly;
+        FRepos[ j ].BehindCount := iBehind;
+        FRepos[ j ].AheadCount := iAhead;
         Break;
       end;
     end;
@@ -2982,6 +3009,8 @@ var
   sTagName          : string;
   sBranch           : string;
   Repo              : TRepoInfo;
+  iAhead            : Integer;
+  iBehind           : Integer;
 begin
 
   Result := False;
@@ -3034,6 +3063,21 @@ begin
   begin
     sLog := sLog + 'Refused to commit - HEAD is detached or the branch is unborn. ' +
       'Check out a branch first.' + sLineBreak;
+    Exit;
+  end;
+
+  // Refuse while the branch is behind its upstream. Committing first and
+  // discovering it at the push is far worse than refusing: the push is rejected
+  // non-fast-forward, the work is already committed, and the repository is left
+  // DIVERGED - which then has to be rebased or merged by hand, once per
+  // repository. Refusing here leaves the changes uncommitted and the repository
+  // exactly as it was, so Pull Selected is enough to make it pushable.
+  GetAheadBehind( Repo.Path, iAhead, iBehind );
+
+  if iBehind > 0 then
+  begin
+    sLog := sLog + Format( 'Refused to commit - the branch is %d commit(s) behind %s. ' +
+      'Pull first (Pull Selected), then commit.%s', [ iBehind, sBranch, sLineBreak ] );
     Exit;
   end;
 

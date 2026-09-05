@@ -41,7 +41,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Help System** - Press F1 to view `Users Guide.md`; Help > About for version info
 - **Colour-Coded Status** - Repository rows are colour-coded by status (light green=Clean, light yellow=Modified, light orange=Pull Required, pale green=Push Required, light purple=Diverged, strong red=Conflicted, light red=Error)
 - **Open in Git Client** - Right-click to open repository in configured external Git client (e.g., Fork)
-- **Safe Refusals** - Declines rather than guessing when a repository's state cannot be established: an unfinished merge, rebase, cherry-pick, revert or bisect; unresolved conflicts; a detached or unborn HEAD; or a `git status` that failed or timed out. Force Push additionally refuses when the remote has moved since the last refresh
+- **Safe Refusals** - Declines rather than guessing when a repository's state cannot be established: an unfinished merge, rebase, cherry-pick, revert or bisect; unresolved conflicts; a detached or unborn HEAD; a branch that is behind its upstream and owes a pull; or a `git status` that failed or timed out. Force Push additionally refuses when the remote has moved since the last refresh
 - **Worktree and Submodule Support** - The real Git directory is resolved with `git rev-parse`, so linked worktrees and submodules (where `.git` is a file, not a folder) are handled like any other repository
 - **Open in Explorer** - Right-click to open repository folder in Windows Explorer
 - **Pull Operation** - Right-click to pull changes from remote for a single repository (fast-forward only — refuses to create a merge commit on diverged history)
