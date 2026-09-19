@@ -128,8 +128,8 @@
   <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     <VerInfo_Locale>1033</VerInfo_Locale>
-    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.108;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.6.0.0</VerInfo_Keys>
-    <VerInfo_Build>108</VerInfo_Build>
+    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.6.0.116;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.6.0.0</VerInfo_Keys>
+    <VerInfo_Build>116</VerInfo_Build>
     <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
     <VerInfo_MinorVer>6</VerInfo_MinorVer>
   </PropertyGroup>
@@ -168,6 +168,9 @@
     <DCCReference Include="uGitRepoManager.pas" />
     <DCCReference Include="uNewRepositoryDialog.pas">
       <Form>NewRepositoryDialog</Form>
+    </DCCReference>
+    <DCCReference Include="uDeleteRepositoryDialog.pas">
+      <Form>DeleteRepositoryDialog</Form>
     </DCCReference>
     <DCCReference Include="uCodebergSettings.pas">
       <Form>CodebergSettingsDialog</Form>

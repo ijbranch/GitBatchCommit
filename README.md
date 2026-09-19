@@ -9,6 +9,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 ## Features
 
 - **Repository Management** - Add and remove Git repositories from a persistent list
+- **Delete Repositories** - Dispose of finished repositories rather than merely forgetting them: File > Delete Selected... (or the list's right-click menu) deletes any combination of the list entry, the remote repository on GitHub or Codeberg, and the local folder. Irreversible options require the word `DELETE` to be typed; the local folder goes to the Recycle Bin
 - **Drag and Drop** - Drag repository folders from Windows Explorer directly onto the application. Dropping a non-Git folder offers to initialise it, create a remote repo, and push in one step
 - **New Repository Initialisation** - Automatic project type detection with `.gitignore` generation for Delphi, C/C++, C#, Java, Python, JavaScript, TypeScript, Go, Rust, and HTML
 - **GitHub Integration** - Create new GitHub repositories and push directly from the application. GitHub is the default host
@@ -112,6 +113,31 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 3. Confirm the removal
 
 Note: This only removes the repository from the list - it does not delete any files.
+
+### Deleting Repositories
+
+**File > Delete Selected...**, or **Delete Selected...** on the list's right-click menu, deletes the checked repositories. Like Remove Selected it acts on the **checked** rows, not on the highlighted one.
+
+The dialog lists every repository it is about to act on - name, folder and the exact remote it resolved, as `GitHub: owner/name` - and offers three independent choices:
+
+| Option | Effect |
+|--------|--------|
+| Remove the entry from this list | The list entry only. Nothing on disk or on the host is touched |
+| Delete the remote repository on its host | Deletes the repository on GitHub or Codeberg through the provider's API, with its issues, releases and history. **Permanent** |
+| Delete the local folder | Sends the working-tree folder to the **Recycle Bin**, so it can be restored from there |
+
+Either of the last two requires the word `DELETE` to be typed, exactly and in capitals, before the dialog's Delete button becomes available. Removing list entries alone needs no typed confirmation.
+
+Deleting the local folder forces the entry removal as well - the tick is applied and locked - because an entry whose folder has gone can only ever show Error.
+
+The remote is resolved from the branch's **upstream** remote, the same one the Remote column reports and that push and pull contact, not from whatever happens to be called `origin`.
+
+Caveats:
+
+- Deleting a remote on GitHub needs an access token carrying the **`delete_repo`** scope. That scope is not part of `repo`, so a token that creates repositories, pushes and changes visibility perfectly well will still be refused here
+- When a step fails for a repository, the remaining steps for that repository are skipped and it is left exactly as it was: a failed remote deletion does not go on to delete the local folder, and a failed local deletion keeps the list entry so the deletion can be retried
+- A local folder cannot be deleted while a file in it is open in an editor, a Git client or an indexer
+- Windows deletes permanently instead of recycling when the folder will not fit in the Recycle Bin or the bin is disabled for that drive. The application asks before that happens rather than letting it happen silently
 
 ### Refreshing Status
 
@@ -307,7 +333,7 @@ GitBatchCommit can move a repository's remote from one host to the other in a si
 
 **Important:**
 
-- The old remote repository is **not** deleted. Once you have confirmed the migration succeeded, remove it manually via the web interface on the source host.
+- The old remote repository is **not** deleted by the migration. Once you have confirmed the migration succeeded, delete it with **File > Delete Selected...** (ticking only *Delete the remote repository*), or manually via the web interface on the source host. Note that the deletion resolves the remote from the branch's **upstream**, which migration has already repointed at the new host - so check the target the dialog names before confirming.
 - Target-host credentials must be configured first (**GitHub > Settings...** or **Codeberg > Settings...**). If missing, the settings dialog opens automatically.
 - If a local remote of that alias name already exists, it is **left alone** and a numbered suffix is used instead — a mirror remote you set up yourself is never destroyed, along with its refspecs and push URL.
 - Branches that exist only on the old remote are recovered locally before the push, so nothing is left behind on the host you are migrating away from.

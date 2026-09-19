@@ -312,6 +312,10 @@ object MainForm: TMainForm
         Caption = '&Remove Selected'
         OnClick = mnuRemoveSelectedClick
       end
+      object mnuDeleteSelected: TMenuItem
+        Caption = '&Delete Selected...'
+        OnClick = mnuDeleteSelectedClick
+      end
       object mnuFileSep1: TMenuItem
         Caption = '-'
       end
@@ -483,6 +487,13 @@ object MainForm: TMainForm
     end
     object pmSetGroup: TMenuItem
       Caption = 'Set &Group'
+    end
+    object pmSep5: TMenuItem
+      Caption = '-'
+    end
+    object pmDeleteSelected: TMenuItem
+      Caption = '&Delete Selected...'
+      OnClick = mnuDeleteSelectedClick
     end
   end
   object pmHistory: TPopupMenu

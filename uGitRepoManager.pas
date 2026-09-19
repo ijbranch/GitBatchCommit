@@ -54,7 +54,7 @@ unit uGitRepoManager;
 interface
 
 uses
-  Winapi.Windows,
+  Winapi.Windows, Winapi.ShellAPI,
 
   System.SysUtils, System.StrUtils, System.Classes, System.IOUtils, System.JSON,
   System.Generics.Collections, System.Net.HttpClient, System.Net.HttpClientComponent,
@@ -416,6 +416,44 @@ type
       out iStatusCode: Integer ): Boolean;
 
     /// <summary>
+    ///   Makes an HTTP DELETE request to the Codeberg API.
+    /// </summary>
+    /// <param name="sEndpoint">Endpoint path, appended to the API base URL.</param>
+    /// <param name="sResponse">Receives the response body, or the error text.</param>
+    /// <param name="iStatusCode">Receives the HTTP status code, or 0 when the request never completed.</param>
+    /// <returns>True when the response status is in the 2xx range.</returns>
+    function ExecuteCodebergApiDelete( const sEndpoint: string; out sResponse: string;
+      out iStatusCode: Integer ): Boolean;
+
+    /// <summary>
+    ///   Makes an HTTP DELETE request to the GitHub API.
+    /// </summary>
+    /// <param name="sEndpoint">Endpoint path, appended to the API base URL.</param>
+    /// <param name="sResponse">Receives the response body, or the error text.</param>
+    /// <param name="iStatusCode">Receives the HTTP status code, or 0 when the request never completed.</param>
+    /// <returns>True when the response status is in the 2xx range.</returns>
+    function ExecuteGitHubApiDelete( const sEndpoint: string; out sResponse: string;
+      out iStatusCode: Integer ): Boolean;
+
+    /// <summary>
+    ///   Resolves the remote repository that a deletion would act on.
+    /// </summary>
+    /// <remarks>
+    ///   Resolved from the UPSTREAM remote, not from origin — the same remote
+    ///   the Remote column reports and that push and pull actually contact. A
+    ///   branch can track any remote, and deleting whatever happens to be
+    ///   called origin would delete a repository the user was never shown.
+    /// </remarks>
+    /// <param name="sRepoPath">Working-tree path of the repository.</param>
+    /// <param name="Provider">Receives the detected provider.</param>
+    /// <param name="sOwner">Receives the owner (user or organisation) segment.</param>
+    /// <param name="sRepo">Receives the repository name.</param>
+    /// <param name="sReason">Receives why the remote cannot be deleted, when the result is False.</param>
+    /// <returns>True when the remote can be deleted through the provider's API.</returns>
+    function ResolveRemoteDeleteTarget( const sRepoPath: string; out Provider: TRemoteProvider;
+      out sOwner, sRepo, sReason: string ): Boolean;
+
+    /// <summary>
     ///   Makes an HTTP PATCH request to the Codeberg API.
     /// </summary>
     /// <returns>True when the response status is in the 2xx range.</returns>
@@ -673,6 +711,69 @@ type
     /// <param name="sError">Returns error message if failed.</param>
     /// <returns>True if the operation succeeded.</returns>
     function SetRepositoryVisibility( const sRepoPath: string; const lPrivate: Boolean;
+      out sError: string ): Boolean;
+
+    /// <summary>
+    ///   Describes the remote repository that <see cref="DeleteRemoteRepository"/>
+    ///   would delete, so the confirmation dialog can name it.
+    /// </summary>
+    /// <remarks>
+    ///   The user is being asked to authorise an irreversible deletion, so the
+    ///   dialog must state the exact <c>owner/name</c> on the exact host rather
+    ///   than "the remote" — the list's own Remote column shows only a provider
+    ///   name, and two entries can point at repositories of the same name under
+    ///   different owners.
+    /// </remarks>
+    /// <param name="sRepoPath">Working-tree path of the repository.</param>
+    /// <param name="sDescription">
+    ///   Receives <c>Host: owner/name</c> when deletable, or the reason it is
+    ///   not when the result is False.
+    /// </param>
+    /// <returns>True when the remote can be deleted through the provider's API.</returns>
+    function DescribeRemoteDeleteTarget( const sRepoPath: string; out sDescription: string ): Boolean;
+
+    /// <summary>
+    ///   Deletes the repository's remote counterpart on its hosting provider.
+    /// </summary>
+    /// <remarks>
+    ///   Irreversible on both hosts: neither GitHub nor Codeberg keeps a
+    ///   deleted repository recoverable from the API, and the issues, releases
+    ///   and pull requests go with it. Nothing here asks for confirmation —
+    ///   that is the caller's job, and the caller must have named the exact
+    ///   target from <see cref="DescribeRemoteDeleteTarget"/>.
+    /// </remarks>
+    /// <param name="sRepoPath">Working-tree path of the repository.</param>
+    /// <param name="sError">Receives the failure reason when the result is False.</param>
+    /// <returns>True when the provider reported the repository deleted.</returns>
+    /// <exception cref="Exception">
+    ///   Not raised: transport failures are reported through <paramref name="sError"/>.
+    /// </exception>
+    function DeleteRemoteRepository( const sRepoPath: string; out sError: string ): Boolean;
+
+    /// <summary>
+    ///   Sends the repository's working-tree folder to the Recycle Bin.
+    /// </summary>
+    /// <remarks>
+    ///   The Recycle Bin rather than an outright delete, so that the wrong
+    ///   repository is recoverable. Windows silently deletes permanently when
+    ///   the tree will not fit in the bin or the bin is disabled for the drive,
+    ///   so <c>FOF_WANTNUKEWARNING</c> is set: the user is asked in that case
+    ///   instead of losing the folder without being told.
+    ///   <para>
+    ///   Refuses anything that is not the ROOT of a Git working tree, a drive
+    ///   root, or a folder containing this application — the guard exists
+    ///   because the path comes from a saved configuration file and the
+    ///   operation is recursive.
+    ///   </para>
+    /// </remarks>
+    /// <param name="sRepoPath">Working-tree path of the repository.</param>
+    /// <param name="AOwnerHandle">
+    ///   Window to own the shell's progress and confirmation dialogs; pass 0
+    ///   for none.
+    /// </param>
+    /// <param name="sError">Receives the failure reason when the result is False.</param>
+    /// <returns>True when the folder is gone from disk.</returns>
+    function DeleteLocalRepository( const sRepoPath: string; const AOwnerHandle: HWND;
       out sError: string ): Boolean;
 
     /// <summary>
@@ -3252,6 +3353,10 @@ begin
         Response := HttpClient.Post( sBaseURL + sEndpoint, RequestStream, nil, aHeaders )
       else if SameText( sVerb, 'PATCH' ) then
         Response := HttpClient.Patch( sBaseURL + sEndpoint, RequestStream, nil, aHeaders )
+      else if SameText( sVerb, 'DELETE' ) then
+        // No request body: both providers take the repository from the path,
+        // and GitHub rejects a DELETE that carries one.
+        Response := HttpClient.Delete( sBaseURL + sEndpoint, nil, aHeaders )
       else
       begin
         sResponse := 'Unsupported HTTP verb: ' + sVerb;
@@ -3313,6 +3418,27 @@ begin
   Result := ExecuteApiRequest( 'PATCH', GITHUB_API_URL, sEndpoint, sBody,
     [ TNameValuePair.Create( 'Authorization', 'Bearer ' + FGitHubToken ),
       TNameValuePair.Create( 'Content-Type', 'application/json' ),
+      TNameValuePair.Create( 'Accept', 'application/vnd.github+json' ) ],
+    sResponse, iStatusCode );
+
+end;
+
+function TGitRepoManager.ExecuteCodebergApiDelete( const sEndpoint: string; out sResponse: string;
+  out iStatusCode: Integer ): Boolean;
+begin
+
+  Result := ExecuteApiRequest( 'DELETE', CODEBERG_API_URL, sEndpoint, '',
+    [ TNameValuePair.Create( 'Authorization', 'token ' + FCodebergToken ) ],
+    sResponse, iStatusCode );
+
+end;
+
+function TGitRepoManager.ExecuteGitHubApiDelete( const sEndpoint: string; out sResponse: string;
+  out iStatusCode: Integer ): Boolean;
+begin
+
+  Result := ExecuteApiRequest( 'DELETE', GITHUB_API_URL, sEndpoint, '',
+    [ TNameValuePair.Create( 'Authorization', 'Bearer ' + FGitHubToken ),
       TNameValuePair.Create( 'Accept', 'application/vnd.github+json' ) ],
     sResponse, iStatusCode );
 
@@ -3895,6 +4021,252 @@ function TGitRepoManager.HasGitHubCredentials: Boolean;
 begin
 
   Result := ( not FGitHubUsername.Trim.IsEmpty ) and ( not FGitHubToken.Trim.IsEmpty );
+
+end;
+
+function TGitRepoManager.ResolveRemoteDeleteTarget( const sRepoPath: string; out Provider: TRemoteProvider;
+  out sOwner, sRepo, sReason: string ): Boolean;
+var
+  sRemoteURL        : string;
+  Repo              : TRepoInfo;
+begin
+
+  Result   := False;
+  Provider := rpNone;
+  sOwner   := '';
+  sRepo    := '';
+  sReason  := '';
+
+  if ( not GetRepoSnapshotByPath( sRepoPath, Repo ) ) then
+  begin
+    sReason := 'Repository is no longer in the list';
+    Exit;
+  end;
+
+  // The UPSTREAM remote, not origin. This is the remote the Remote column
+  // names and the one push and pull contact; deleting whatever is called
+  // origin would delete a repository the user was never shown.
+  sRemoteURL := GetUpstreamRemoteURL( Repo.Path );
+  Provider   := DetectRemoteProvider( sRemoteURL );
+
+  case Provider of
+    rpNone:
+      begin
+        sReason := 'No remote configured';
+        Exit;
+      end;
+
+    rpOther:
+      begin
+        sReason := 'Remote is not GitHub or Codeberg';
+        Exit;
+      end;
+  end;
+
+  if ( not ParseOwnerRepo( sRemoteURL, sOwner, sRepo ) ) then
+  begin
+    sReason := 'Could not read owner/repository from the remote URL';
+    Exit;
+  end;
+
+  if ( Provider = rpCodeberg ) and ( not HasCodebergCredentials ) then
+  begin
+    sReason := 'Codeberg credentials not configured';
+    Exit;
+  end;
+
+  if ( Provider = rpGitHub ) and ( not HasGitHubCredentials ) then
+  begin
+    sReason := 'GitHub credentials not configured';
+    Exit;
+  end;
+
+  Result := True;
+
+end;
+
+function TGitRepoManager.DescribeRemoteDeleteTarget( const sRepoPath: string; out sDescription: string ): Boolean;
+var
+  Provider          : TRemoteProvider;
+  sOwner, sRepo     : string;
+  sReason           : string;
+begin
+
+  Result := ResolveRemoteDeleteTarget( sRepoPath, Provider, sOwner, sRepo, sReason );
+
+  if Result then
+    sDescription := Format( '%s: %s/%s',
+      [ IfThen( Provider = rpCodeberg, 'Codeberg', 'GitHub' ), sOwner, sRepo ] )
+  else
+    sDescription := sReason;
+
+end;
+
+function TGitRepoManager.DeleteRemoteRepository( const sRepoPath: string; out sError: string ): Boolean;
+var
+  Provider          : TRemoteProvider;
+  sOwner, sRepo     : string;
+  sResponse         : string;
+  sProviderName     : string;
+  iStatusCode       : Integer;
+  lOK               : Boolean;
+begin
+
+  Result := False;
+
+  if ( not ResolveRemoteDeleteTarget( sRepoPath, Provider, sOwner, sRepo, sError ) ) then
+    Exit;
+
+  if Provider = rpCodeberg then
+  begin
+    sProviderName := 'Codeberg';
+    lOK := ExecuteCodebergApiDelete( Format( '/repos/%s/%s', [ sOwner, sRepo ] ), sResponse, iStatusCode );
+  end
+  else
+  begin
+    sProviderName := 'GitHub';
+    lOK := ExecuteGitHubApiDelete( Format( '/repos/%s/%s', [ sOwner, sRepo ] ), sResponse, iStatusCode );
+  end;
+
+  if ( not lOK ) then
+  begin
+    case iStatusCode of
+      401: sError := Format( 'Invalid %s credentials', [ sProviderName ] );
+
+      // Authenticated, but the token may not delete. A GitHub fine-grained or
+      // classic PAT needs the delete_repo scope, which is NOT included in repo
+      // and is not needed by anything else this application does — so a token
+      // that creates, pushes and changes visibility perfectly well still fails
+      // here, and saying "no permission" alone would send the user looking at
+      // the repository instead of at the token.
+      403: sError := Format( '%s refused the deletion (%d). The access token needs the ' +
+             'delete_repo scope, and you must own the repository: %s',
+             [ sProviderName, iStatusCode, sResponse ] );
+
+      404: sError := Format( 'Repository %s/%s not found on %s, or the token cannot see it',
+             [ sOwner, sRepo, sProviderName ] );
+    else
+      sError := Format( '%s API error (%d): %s', [ sProviderName, iStatusCode, sResponse ] );
+    end;
+
+    Exit;
+  end;
+
+  Result := True;
+
+end;
+
+function TGitRepoManager.DeleteLocalRepository( const sRepoPath: string; const AOwnerHandle: HWND;
+  out sError: string ): Boolean;
+var
+  sFolder           : string;
+  sExeFolder        : string;
+  FileOp            : TSHFileOpStruct;
+  iResult           : Integer;
+begin
+
+  Result := False;
+  sError := '';
+
+  sFolder := ExcludeTrailingPathDelimiter( Trim( sRepoPath ) );
+
+  if sFolder.IsEmpty then
+  begin
+    sError := 'No path recorded for this repository';
+    Exit;
+  end;
+
+  if ( not TDirectory.Exists( sFolder ) ) then
+  begin
+    sError := 'Folder does not exist: ' + sFolder;
+    Exit;
+  end;
+
+  sFolder := TPath.GetFullPath( sFolder );
+
+  // Guards. The path is read back from a configuration file and the delete is
+  // recursive, so each of these is the difference between removing a
+  // repository and removing a drive.
+  if SameText( IncludeTrailingPathDelimiter( sFolder ), TPath.GetPathRoot( sFolder ) ) then
+  begin
+    sError := 'Refusing to delete a drive root: ' + sFolder;
+    Exit;
+  end;
+
+  // Must be the repository ROOT. A .git entry — folder in an ordinary clone,
+  // FILE in a worktree or submodule — proves it, and proves too that a
+  // configured path which has since been re-pointed at some parent folder is
+  // not deleted wholesale.
+  if ( not TDirectory.Exists( TPath.Combine( sFolder, '.git' ) ) ) and
+     ( not TFile.Exists( TPath.Combine( sFolder, '.git' ) ) ) then
+  begin
+    sError := 'Not the root of a Git repository (no .git entry): ' + sFolder;
+    Exit;
+  end;
+
+  sExeFolder := IncludeTrailingPathDelimiter( TPath.GetFullPath( ExtractFilePath( ParamStr( 0 ) ) ) );
+
+  if StartsText( IncludeTrailingPathDelimiter( sFolder ), sExeFolder ) then
+  begin
+    sError := 'Refusing to delete the folder this application is running from: ' + sFolder;
+    Exit;
+  end;
+
+  FillChar( FileOp, SizeOf( FileOp ), 0 );
+  FileOp.Wnd    := AOwnerHandle;
+  FileOp.wFunc  := FO_DELETE;
+
+  // pFrom is a double-null-terminated list, so the terminating #0 of the last
+  // entry is followed by another. A plain PChar of the path ends the list one
+  // character early and the call fails with DE_INVALIDFILES (0x74).
+  FileOp.pFrom  := PChar( sFolder + #0 );
+
+  // FOF_WANTNUKEWARNING is the load-bearing flag: Windows falls back to a
+  // PERMANENT delete when the tree will not fit in the Recycle Bin or the bin
+  // is off for that drive, and without it that happens silently. With it, the
+  // user is asked — FOF_NOCONFIRMATION suppresses the ordinary "are you sure",
+  // not this one.
+  FileOp.fFlags := FOF_ALLOWUNDO or FOF_NOCONFIRMATION or FOF_NOCONFIRMMKDIR or
+    FOF_WANTNUKEWARNING or FOF_NOERRORUI;
+
+  iResult := SHFileOperation( FileOp );
+
+  if iResult <> 0 then
+  begin
+    // SHFileOperation returns its OWN DE_* codes, not Win32 ones, and they are
+    // not in GetLastError — so the raw number has to be translated here or the
+    // user is told nothing. The ones named are those a repository actually
+    // produces: a file held open by an editor, a Git client or an indexer, and
+    // the deep paths that .git and node_modules trees reach.
+    case iResult of
+      $78:  sError := 'Access denied — a file in the folder is read-only or open in ' +
+              'another application (an editor, a Git client or an indexer)';
+      $79:  sError := 'The folder tree is nested too deeply for the shell to delete: ' + sFolder;
+      $7C:  sError := 'The shell rejected the path as invalid: ' + sFolder;
+      $81:  sError := 'A path inside the folder is too long for the shell to delete: ' + sFolder;
+      $402: sError := 'The shell reported an unknown error, usually an invalid path: ' + sFolder;
+      $10000: sError := 'The shell could not write to the Recycle Bin for this drive';
+    else
+      sError := Format( 'Delete failed with shell error 0x%x: %s', [ iResult, sFolder ] );
+    end;
+
+    Exit;
+  end;
+
+  if FileOp.fAnyOperationsAborted then
+  begin
+    sError := 'Deletion was cancelled';
+    Exit;
+  end;
+
+  // The shell reports success for a folder it only partly emptied, so confirm.
+  if TDirectory.Exists( sFolder ) then
+  begin
+    sError := 'Folder still exists after the delete reported success: ' + sFolder;
+    Exit;
+  end;
+
+  Result := True;
 
 end;
 

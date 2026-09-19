@@ -78,6 +78,7 @@ uses
   MainFrm in 'MainFrm.pas' {MainForm},
   uGitRepoManager in 'uGitRepoManager.pas',
   uNewRepositoryDialog in 'uNewRepositoryDialog.pas' {NewRepositoryDialog},
+  uDeleteRepositoryDialog in 'uDeleteRepositoryDialog.pas' {DeleteRepositoryDialog},
   uCodebergSettings in 'uCodebergSettings.pas' {CodebergSettingsDialog},
   uGitHubSettings in 'uGitHubSettings.pas' {GitHubSettingsDialog},
   uTemplateSettings in 'uTemplateSettings.pas' {TemplateSettingsDialog};

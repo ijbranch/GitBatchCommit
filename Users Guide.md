@@ -46,6 +46,28 @@ This is the quickest way to get a new project under version control and hosted r
 
 Select repositories in the list, then use **File > Remove Selected**. This only removes them from the app's list. No files are deleted from disk.
 
+### Deleting Repositories
+
+Check the repositories you want gone, then use **File > Delete Selected...** (or **Delete Selected...** on the right-click menu). Like Remove Selected, it acts on the **checked** rows.
+
+The dialog names every repository it is about to act on, and asks which of three things to delete. You can pick any combination:
+
+- **Remove the entry from this list** — the harmless one. Nothing on disk or on the host is touched
+- **Delete the remote repository on its host** — deletes it on GitHub or Codeberg, with its issues, releases and history. This is permanent; the app cannot get it back
+- **Delete the local folder** — sends the folder to the Recycle Bin, so you can restore it from there
+
+Either of the last two needs the word `DELETE` typed in capitals before the Delete button will work. Just removing entries does not.
+
+Ticking the local folder automatically ticks and locks the entry removal — an entry whose folder is gone can only ever show Error, so it goes with the folder.
+
+The remote it deletes is the one your branch actually tracks, which is what the Remote column shows — not necessarily `origin`. The dialog spells it out as `GitHub: owner/name` so you can see exactly which repository on the host is about to go.
+
+Things that will stop it:
+
+- **GitHub refuses the deletion.** Your access token needs the `delete_repo` scope. It is not included in `repo`, so a token that has worked for everything else here can still be refused. Add the scope under GitHub > Settings
+- **A file in the folder is open.** Close the editor, Git client or indexer holding it and try again
+- **A step fails part-way.** The repository is left exactly as it was — a failed remote deletion does not go on to delete your local folder, and a failed folder deletion keeps the list entry so you can retry. The log gives the reason for each one
+
 ## Understanding the Display
 
 ### The Repository List
@@ -202,7 +224,7 @@ For complex merges requiring manual review, use an external Git client instead.
 
 ### GitHub
 
-- **GitHub > Settings** — enter your username and personal access token (generate at github.com/settings/tokens, needs `repo` scope)
+- **GitHub > Settings** — enter your username and personal access token (generate at github.com/settings/tokens, needs `repo` scope, plus `delete_repo` if you want Delete Selected to remove GitHub repositories)
 - **GitHub > Initialize & Push** — creates a new GitHub repo and pushes your local code to it
 - **GitHub > Migrate Selected Repository to GitHub** — moves the selected repository from Codeberg (or another host) onto GitHub
 
@@ -214,7 +236,7 @@ For complex merges requiring manual review, use an external Git client instead.
 
 ### Migrating Between Hosts
 
-Select a repository, then pick **Migrate Selected Repository to GitHub** (under the GitHub menu) or **Migrate Selected Repository to Codeberg** (under the Codeberg menu). The target repo is created, `origin` is repointed to it, and all branches and tags are pushed. The previous origin URL is kept as a secondary remote (named `codeberg`, `github`, or `old-origin` when the previous host was neither) so it can be restored. The old remote repository is not deleted — remove it via the web UI once you are satisfied with the migration.
+Select a repository, then pick **Migrate Selected Repository to GitHub** (under the GitHub menu) or **Migrate Selected Repository to Codeberg** (under the Codeberg menu). The target repo is created, `origin` is repointed to it, and all branches and tags are pushed. The previous origin URL is kept as a secondary remote (named `codeberg`, `github`, or `old-origin` when the previous host was neither) so it can be restored. The old remote repository is not deleted by the migration. Once you are satisfied with it, you can delete the old one with **File > Delete Selected...** (ticking only the remote option) or via the web UI — but note that the deletion targets the remote your branch now **tracks**, which migration has already repointed at the new host, so check the target the dialog names before confirming.
 
 ### Changing Visibility
 
@@ -233,6 +255,7 @@ Right-click any repository in the list for:
 | **Open in Git Client** | Opens in your configured external Git client |
 | **Pull** | Pulls changes from remote |
 | **Set Group** | Assigns the repo to a group for filtering |
+| **Delete Selected...** | Deletes the **checked** repositories - list entry, remote repository and/or local folder. See [Deleting Repositories](#deleting-repositories) |
 
 ## Delphi-Specific Features
 
@@ -311,7 +334,17 @@ The `.dproj` file either doesn't exist or doesn't contain a `FileVersion` entry.
 
 Generate a new token and update it via the respective Settings dialog (**Codeberg > Settings** or **GitHub > Settings**).
 
+### Delete Selected Could Not Delete the Remote
+
+Your GitHub token almost certainly lacks the **`delete_repo`** scope. It is not part of `repo`, and nothing else in this application needs it, so a token that has been working fine for everything else is still refused. Add the scope at github.com/settings/tokens, re-enter the token under **GitHub > Settings**, and try again. Nothing was deleted — the local folder and the list entry are left untouched when the remote deletion fails.
+
+### Delete Selected Could Not Delete the Local Folder
+
+Something has a file in it open — an editor, a Git client, an indexer, or a program you built from that project and are still running. Close it and try again. The list entry is kept so you can retry.
+
+If you deleted the wrong repository's folder, it is in the **Recycle Bin**. Restore it from there and add it back with **File > Add Repository**.
+
 ---
 
 *GitBatchCommit Users Guide - Version 1.6.0*
-*Last Updated: 5 September 2026*
+*Last Updated: 19 September 2026*

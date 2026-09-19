@@ -50,6 +50,18 @@ A comprehensive reference for all GitBatchCommit capabilities.
 | **Caveats** | Only removes from the list - does NOT delete any files on disk. The repository and all its contents remain intact |
 | **Linkages** | Removal is saved to configuration file immediately |
 
+### Delete Repository
+
+| Aspect | Details |
+|--------|---------|
+| **What** | Deletes the checked repositories: the list entry, the remote repository on its host, the local folder, or any combination of the three |
+| **Where** | File > Delete Selected..., or Delete Selected... on the repository list's right-click menu |
+| **When** | When a project is finished with, was created by mistake, or has been superseded and should not survive anywhere |
+| **Why** | Remove Selected leaves the folder and the remote in place; this is the command that actually disposes of them |
+| **How** | Check one or more repositories > File > Delete Selected... > tick which of the three to delete > type `DELETE` in capitals when a destructive option is ticked > Delete |
+| **Caveats** | Acts on the **checked** rows, not the highlighted one - the dialog lists exactly what it will act on. Deleting a GitHub remote needs a token with the **`delete_repo`** scope, which is NOT part of `repo`. Remote deletion is permanent. The local folder goes to the Recycle Bin, and Windows is allowed to ask before permanently deleting one too large for the bin. A folder whose files are open in an editor, Git client or indexer cannot be deleted. Ticking the local folder forces the entry removal too |
+| **Linkages** | The remote is resolved from the branch's upstream remote - the same one the Remote column reports and that push and pull contact - not from `origin`. A failure stops the remaining steps for that repository, leaving it as it was, and the log carries a reason per repository |
+
 ### Refresh Status
 
 | Aspect | Details |
@@ -385,7 +397,7 @@ git push
 | **When** | When you want to create new GitHub repos or manage existing ones |
 | **Why** | Direct integration without leaving the application |
 | **How** | First: GitHub > Settings (enter credentials). Then: GitHub > Initialize & Push |
-| **Caveats** | Requires personal access token with `repo` scope from github.com/settings/tokens. Token encrypted at rest with DPAPI (current user, this machine) |
+| **Caveats** | Requires personal access token with `repo` scope from github.com/settings/tokens, plus **`delete_repo`** if you intend to use Delete Selected on GitHub remotes - that scope is NOT part of `repo` and is needed by nothing else here. Token encrypted at rest with DPAPI (current user, this machine) |
 | **Linkages** | Created repos automatically added to managed list |
 
 ### Codeberg Integration
@@ -421,7 +433,7 @@ git push
 | **When** | When you want to change which host a repository lives on — works in both directions |
 | **Why** | One-click migration instead of creating the remote, renaming, and re-pushing manually |
 | **How** | Select repo > choose destination menu > confirm name/description/visibility > confirm summary. The target repo is created; the previous origin is preserved locally as a `codeberg` / `github` secondary remote; `origin` is swapped; branches that existed only on the old remote are recovered locally first, then all branches (`git push -u origin --all`) and tags (`git push origin --tags`) are pushed |
-| **Caveats** | The old remote repository is NOT deleted — remove it manually via the web UI once you have verified the migration. Target host credentials must be configured first (settings dialog opens automatically if missing). An existing local remote of the alias name is **left alone** — a numbered suffix is used instead, so a mirror remote you already had is never destroyed. If any step fails, the original remotes are restored |
+| **Caveats** | The old remote repository is NOT deleted by the migration — once verified, delete it with File > Delete Selected... (ticking only the remote option) or via the web UI. Note the deletion resolves the remote from the branch's **upstream**, which migration has already repointed at the NEW host. Target host credentials must be configured first (settings dialog opens automatically if missing). An existing local remote of the alias name is **left alone** — a numbered suffix is used instead, so a mirror remote you already had is never destroyed. If any step fails, the original remotes are restored |
 | **Linkages** | Uses stored credentials from GitHub/Codeberg Settings. Provider column updates after migration |
 
 ---
@@ -685,7 +697,26 @@ This confirms which indexed directory is being updated and whether the operation
 | **Symptom** | API calls fail, "unauthorized" errors |
 | **Cause** | Invalid or expired access token |
 | **Solutions** | 1) Generate new token, 2) Update in respective Settings dialog |
-| **Recommendation** | Ensure token has required scopes (GitHub needs `repo` scope) |
+| **Recommendation** | Ensure token has required scopes (GitHub needs `repo`, plus `delete_repo` for Delete Selected) |
+
+### Delete Selected Will Not Delete the Remote
+
+| Problem | Delete Selected reports that the remote deletion failed |
+|---------|---------------------------------------------------------|
+| **Symptom** | The log reads `Remote deletion FAILED: GitHub refused the deletion (403). The access token needs the delete_repo scope...`, and the local folder and list entry are deliberately left untouched |
+| **Cause** | The GitHub personal access token lacks the `delete_repo` scope. It is not part of `repo`, and nothing else in this application needs it - so a token that has created repositories, pushed and changed visibility perfectly well is still refused here |
+| **Solutions** | 1) Add `delete_repo` to the token at github.com/settings/tokens, 2) Re-enter it under GitHub > Settings, 3) Run Delete Selected again |
+| **Other causes** | The dialog line reads `[no deletable remote - ...]` when there is no remote, the remote is neither GitHub nor Codeberg, or credentials are not configured. A 404 means the token cannot see the repository, usually because it belongs to another owner or organisation |
+
+### Delete Selected Will Not Delete the Local Folder
+
+| Problem | Delete Selected reports that the folder could not be deleted |
+|---------|--------------------------------------------------------------|
+| **Symptom** | The log reads `Local folder deletion FAILED: Access denied - a file in the folder is read-only or open in another application`, and the list entry is kept so the deletion can be retried |
+| **Cause** | A file in the tree is held open - an editor, a Git client, a running executable built from the project, or an indexer |
+| **Solutions** | 1) Close the application holding it, 2) Run Delete Selected again |
+| **Other causes** | A path too long or a tree too deeply nested for the shell to delete; a folder that is not the root of a Git working tree, a drive root, or the folder this application runs from - all of which are refused before anything is touched |
+| **Recommendation** | The folder goes to the Recycle Bin, so a deletion of the wrong repository is recoverable from there. Windows deletes permanently instead when the tree will not fit in the bin or the bin is off for that drive, and asks first when that is about to happen |
 
 ---
 
@@ -727,4 +758,4 @@ Option B - Overwrite Remote:
 ---
 
 *GitBatchCommit Help Guide - Version 1.6.0*
-*Last Updated: 5 September 2026*
+*Last Updated: 19 September 2026*

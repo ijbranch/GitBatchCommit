@@ -63,7 +63,8 @@ uses
   System.SysUtils, System.StrUtils, System.Variants, System.Classes, System.Types, System.UITypes, System.Generics.Collections, System.Generics.Defaults,
   System.Threading, System.SyncObjs, System.IOUtils,
   VCL.StyledTaskDialog,
-  uGitRepoManager, uNewRepositoryDialog, uCodebergSettings, uGitHubSettings, uTemplateSettings;
+  uGitRepoManager, uNewRepositoryDialog, uDeleteRepositoryDialog, uCodebergSettings, uGitHubSettings,
+  uTemplateSettings;
 
 type
   /// <summary>
@@ -90,6 +91,7 @@ type
     mnuFile: TMenuItem;
     mnuAddRepository: TMenuItem;
     mnuRemoveSelected: TMenuItem;
+    mnuDeleteSelected: TMenuItem;
     mnuFileSep1: TMenuItem;
     mnuRefreshStatus: TMenuItem;
     mnuFileSep2: TMenuItem;
@@ -130,6 +132,8 @@ type
     pmSep3: TMenuItem;
     pmPull: TMenuItem;
     pmSep4: TMenuItem;
+    pmSep5: TMenuItem;
+    pmDeleteSelected: TMenuItem;
     pmHistory: TPopupMenu;
     btnHistory: TButton;
     mnuSettings: TMenuItem;
@@ -200,6 +204,11 @@ type
     ///   Removes every checked repository from the managed list.
     /// </summary>
     procedure mnuRemoveSelectedClick( Sender: TObject );
+    /// <summary>
+    ///   Deletes every checked repository, asking first which of the list
+    ///   entry, the remote repository and the local folder to delete.
+    /// </summary>
+    procedure mnuDeleteSelectedClick( Sender: TObject );
     /// <summary>
     ///   Starts an asynchronous refresh of every repository status.
     /// </summary>
@@ -714,6 +723,23 @@ type
     ///   repository is currently selected in the list view.
     /// </summary>
     procedure UpdateMenuSelectionState;
+
+    /// <summary>
+    ///   Runs the Delete Selected command over every checked repository.
+    /// </summary>
+    /// <remarks>
+    ///   Shared by the File menu item and the list's context menu, and — like
+    ///   Remove Selected — it acts on the CHECKED rows, not on the highlighted
+    ///   one. The dialog lists every repository it is about to act on by name,
+    ///   path and resolved remote, so the two cannot be confused.
+    ///   <para>
+    ///   When any step fails for a repository the remaining steps for that
+    ///   repository are skipped, leaving it exactly as it was. Deleting the
+    ///   local folder after the remote deletion had already failed would leave
+    ///   the user with neither the outcome they asked for nor a clear way back.
+    ///   </para>
+    /// </remarks>
+    procedure DeleteSelectedRepositories;
   public
   end;
 
@@ -1090,6 +1116,7 @@ begin
   btnSelectNone.Enabled       := not bBusy;
   mnuAddRepository.Enabled    := not bBusy;
   mnuRemoveSelected.Enabled   := not bBusy;
+  mnuDeleteSelected.Enabled   := not bBusy;
   mnuRefreshStatus.Enabled    := not bBusy;
   mnuSettings.Enabled         := not bBusy;
   pmRepos.AutoPopup           := not bBusy;
@@ -1850,6 +1877,146 @@ begin
   finally
     IndicesToRemove.Free;
   end;
+
+end;
+
+procedure TMainForm.mnuDeleteSelectedClick( Sender: TObject );
+begin
+
+  DeleteSelectedRepositories;
+
+end;
+
+procedure TMainForm.DeleteSelectedRepositories;
+var
+  Indices           : TArray<Integer>;
+  Paths             : TArray<string>;
+  Names             : TArray<string>;
+  Lines             : TArray<string>;
+  Options           : TDeleteRepositoryOptions;
+  sRemoteTarget     : string;
+  sError            : string;
+  iCount            : Integer;
+  iSuccess          : Integer;
+  i                 : Integer;
+begin
+
+  // Resolved once, as paths. RemoveRepository shifts the manager's array down,
+  // so an index held across a single iteration of this loop already refers to
+  // a different repository.
+  Indices           := CheckedRepoIndices;
+  iCount            := Length( Indices );
+
+  if iCount = 0 then
+  begin
+    StyledMessageDlg( 'Please check one or more repositories to delete.', mtInformation, [ mbOK ], 0 );
+    Exit;
+  end;
+
+  SetLength( Paths, iCount );
+  SetLength( Names, iCount );
+  SetLength( Lines, iCount );
+
+  // Resolving each remote runs a pair of quick local Git calls, so a large
+  // selection is a visible pause before the dialog appears.
+  Screen.Cursor     := crHourGlass;
+
+  try
+    for i := 0 to iCount - 1 do
+    begin
+      var Repo: TRepoInfo;
+
+      if ( not RepoAt( Indices[ i ], Repo ) ) then
+      begin
+        ErrorDlg( 'The repository list changed while the selection was being read. ' +
+          'Please refresh and try again.' );
+        Exit;
+      end;
+
+      Paths[ i ]    := Repo.Path;
+      Names[ i ]    := Repo.Name;
+
+      // Name the exact remote, not just its provider. The user is authorising
+      // an irreversible deletion, and two entries can point at repositories of
+      // the same name under different owners.
+      if ( not FRepoManager.DescribeRemoteDeleteTarget( Repo.Path, sRemoteTarget ) ) then
+        sRemoteTarget := '[no deletable remote - ' + sRemoteTarget + ']';
+
+      Lines[ i ]    := Format( '%s  -  %s  -  %s', [ Repo.Name, Repo.Path, sRemoteTarget ] );
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+
+  if ( not TDeleteRepositoryDialog.Execute( Lines, Options ) ) then
+    Exit;
+
+  if ( not BeginBatch ) then
+    Exit;
+
+  try
+    Screen.Cursor   := crHourGlass;
+    iSuccess        := 0;
+
+    try
+      for i := 0 to iCount - 1 do
+      begin
+        Log( Format( '=== Deleting %s ===', [ Names[ i ] ] ) );
+
+        if Options.DeleteRemote then
+        begin
+          if FRepoManager.DeleteRemoteRepository( Paths[ i ], sError ) then
+            Log( '  Remote repository deleted.' )
+          else
+          begin
+            // Stop here for this repository. Going on to delete the local
+            // folder would destroy the working copy while the remote the user
+            // asked to remove is still there.
+            Log( '  Remote deletion FAILED: ' + sError );
+            Log( '  Local folder and list entry left untouched.' );
+            Continue;
+          end;
+        end;
+
+        if Options.DeleteLocal then
+        begin
+          if FRepoManager.DeleteLocalRepository( Paths[ i ], Handle, sError ) then
+            Log( '  Local folder sent to the Recycle Bin.' )
+          else
+          begin
+            // The entry is deliberately kept: it is the only record of where
+            // the folder was, and the user needs it to retry.
+            Log( '  Local folder deletion FAILED: ' + sError );
+            Log( '  List entry kept so the deletion can be retried.' );
+            Continue;
+          end;
+        end;
+
+        if Options.RemoveEntry then
+        begin
+          FRepoManager.RemoveRepository( Paths[ i ] );
+          Log( '  Removed from the list.' );
+        end;
+
+        Inc( iSuccess );
+        Application.ProcessMessages;
+      end;
+    finally
+      Screen.Cursor := crDefault;
+    end;
+
+    Log( Format( 'Delete completed: %d of %d repository(ies) fully processed.', [ iSuccess, iCount ] ) );
+
+    if iSuccess < iCount then
+      ErrorDlg( Format( '%d of %d repository(ies) could not be deleted. See the log for each reason.',
+        [ iCount - iSuccess, iCount ] ), mtWarning );
+
+    PopulateListView;
+  finally
+    EndBatch;
+  end;
+
+  ScrollLogToEnd;
 
 end;
 
@@ -2790,6 +2957,12 @@ begin
   lHasSelection     := ( lvRepos.Selected <> nil );
 
   mnuRemoveSelected.Enabled := lHasSelection;
+
+  // Deliberately NOT gated on the highlight: Delete Selected acts on the
+  // checked rows, and nothing calls this method when a tick changes. Gating it
+  // here would grey out the command whenever rows are checked but none is
+  // highlighted - which is the normal state after Select All. The handler
+  // reports an empty selection instead.
   mnuMigrateToCodeberg.Enabled := lHasSelection;
   mnuMigrateToGitHub.Enabled := lHasSelection;
 
@@ -2814,6 +2987,10 @@ begin
   pmOpenInGitClient.Enabled := lHasSelection;
   pmPull.Enabled    := lHasSelection;
   pmSetGroup.Enabled := lHasSelection;
+
+  // Delete acts on the CHECKED rows, exactly as Remove Selected does, so it is
+  // enabled by a tick rather than by the highlight the rest of this menu uses.
+  pmDeleteSelected.Enabled := ( Length( CheckedRepoIndices ) > 0 );
 
   // Build the Set Group submenu
   pmSetGroup.Clear;
