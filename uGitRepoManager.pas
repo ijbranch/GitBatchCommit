@@ -538,6 +538,19 @@ type
     function ResolveActiveFileVersion( const sContent: string ): string;
 
     /// <summary>
+    ///   Returns True when <paramref name="sCandidate"/> is a higher version
+    ///   than <paramref name="sCurrent"/>, comparing part by part.
+    /// </summary>
+    /// <remarks>
+    ///   Handles differing lengths ( "1.5.0" against "1.5.0.38" ) by treating
+    ///   a missing part as zero, and an empty current as always beaten.
+    /// </remarks>
+    /// <param name="sCandidate">Version being considered.</param>
+    /// <param name="sCurrent">Version currently held; may be empty.</param>
+    /// <returns>True if the candidate should replace the current value.</returns>
+    function IsHigherVersion( const sCandidate, sCurrent: string ): Boolean;
+
+    /// <summary>
     ///   Checks if a filename is a known build artifact (e.g., .dcu, .exe, Win32/).
     /// </summary>
     /// <param name="sFileName">The filename to check (may include path).</param>
@@ -3609,6 +3622,40 @@ begin
 
 end;
 
+function TGitRepoManager.IsHigherVersion( const sCandidate, sCurrent: string ): Boolean;
+var
+  CandidateParts    : TArray<string>;
+  CurrentParts      : TArray<string>;
+begin
+
+  if sCurrent.IsEmpty then
+    Exit( not sCandidate.IsEmpty );
+
+  CandidateParts := sCandidate.Split( [ '.' ] );
+  CurrentParts := sCurrent.Split( [ '.' ] );
+
+  for var i := 0 to Max( High( CandidateParts ), High( CurrentParts ) ) do
+  begin
+    var iNew := 0;
+    var iOld := 0;
+
+    if i <= High( CandidateParts ) then
+      iNew := StrToIntDef( CandidateParts[ i ], 0 );
+
+    if i <= High( CurrentParts ) then
+      iOld := StrToIntDef( CurrentParts[ i ], 0 );
+
+    if iNew > iOld then
+      Exit( True );
+
+    if iNew < iOld then
+      Exit( False );
+  end;
+
+  Result := False;
+
+end;
+
 function TGitRepoManager.ResolveActiveFileVersion( const sContent: string ): string;
 var
   Lines             : TArray<string>;
@@ -3797,9 +3844,6 @@ var
   iEndPos           : Integer;
   sVersion          : string;
   sBestVersion      : string;
-  VersionParts      : TArray<string>;
-  BestParts         : TArray<string>;
-  lIsBetter         : Boolean;
   sKey              : string;
   CachedStamp       : TDateTime;
   CachedVersion     : string;
@@ -3906,96 +3950,77 @@ begin
     end;
   end;
 
-  // Process each .dproj file found
+  // Pass 1 - the version each project's ACTIVE configuration builds.
+  //
+  // This runs to completion BEFORE the fallback below, and that ordering is
+  // the point: a resolved answer must never be beaten by the old
+  // highest-anywhere scan of some other file in the same repository. Written
+  // as one interleaved loop, an unresolvable sibling carrying a larger number
+  // silently overrode the correctly resolved value.
+  //
+  // Across several .dproj FILES the highest still wins, which is the
+  // long-standing behaviour and a different question from which group within
+  // one file is active.
   for sDprojPath in DprojFiles do
   begin
-    // Read and parse the .dproj file
     try
       sContent := TFile.ReadAllText( sDprojPath, TEncoding.UTF8 );
     except
       Continue;
     end;
 
-    // Prefer the version the ACTIVE configuration will actually build. Only
-    // when the file does not say enough to resolve one do we fall through to
-    // the old scan below, which takes the highest FileVersion anywhere in the
-    // file - a different question, and one that picked a version no binary had
-    // ever carried on GITLAKMCP.
     sVersion := ResolveActiveFileVersion( sContent );
 
-    if ( not sVersion.IsEmpty ) then
+    if IsHigherVersion( sVersion, sBestVersion ) then
+      sBestVersion := sVersion;
+  end;
+
+  // Pass 2 - only when NOTHING resolved. A project file that does not declare
+  // a default Config and Platform cannot be resolved, and returning no version
+  // at all would be worse than the old heuristic.
+  if sBestVersion.IsEmpty then
+  begin
+    for sDprojPath in DprojFiles do
     begin
-      if sBestVersion.IsEmpty then
-        sBestVersion := sVersion;
+      try
+        sContent := TFile.ReadAllText( sDprojPath, TEncoding.UTF8 );
+      except
+        Continue;
+      end;
 
-      Continue;
-    end;
+      Lines := sContent.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
 
-    // Search for FileVersion= in VerInfo_Keys
-    Lines := sContent.Split( [ #10, #13 ], TStringSplitOptions.ExcludeEmpty );
-
-    for sLine in Lines do
-    begin
-      if sLine.Contains( 'VerInfo_Keys' ) and sLine.Contains( 'FileVersion=' ) then
+      for sLine in Lines do
       begin
-        // Extract FileVersion value
+        if ( not sLine.Contains( 'VerInfo_Keys' ) ) or ( not sLine.Contains( 'FileVersion=' ) ) then
+          Continue;
+
         iPos := sLine.IndexOf( 'FileVersion=' );
 
-        if iPos >= 0 then
-        begin
-          iPos := iPos + Length( 'FileVersion=' );
-          iEndPos := sLine.IndexOf( ';', iPos );
+        if iPos < 0 then
+          Continue;
 
-          if iEndPos < 0 then
-            iEndPos := sLine.IndexOf( '<', iPos );
+        Inc( iPos, Length( 'FileVersion=' ) );
+        iEndPos := sLine.IndexOf( ';', iPos );
 
-          if iEndPos > iPos then
-          begin
-            sVersion := Trim( sLine.Substring( iPos, iEndPos - iPos ) );
+        if iEndPos < 0 then
+          iEndPos := sLine.IndexOf( '<', iPos );
 
-            // Reject anything that is not a plain dotted number. This value
-            // comes verbatim out of a .dproj belonging to the repository being
-            // committed, and CommitAndPush interpolates it into `git tag` and
-            // `git push` command lines — where an embedded quote closes the
-            // quoting and the remainder becomes extra arguments to Git.
-            if ( not IsValidVersionString( sVersion ) ) then
-              Continue;
+        if iEndPos <= iPos then
+          Continue;
 
-            // Compare versions to find the highest
-            if sBestVersion.IsEmpty then
-              sBestVersion := sVersion
-            else
-            begin
-              // Compare version numbers (handle different-length strings e.g. "1.5.0" vs "1.5.0.38")
-              VersionParts := sVersion.Split( [ '.' ] );
-              BestParts := sBestVersion.Split( [ '.' ] );
-              lIsBetter := False;
+        sVersion := Trim( sLine.Substring( iPos, iEndPos - iPos ) );
 
-              for var i := 0 to Max( High( VersionParts ), High( BestParts ) ) do
-              begin
-                var iNew := 0;
-                var iOld := 0;
+        // Reject anything that is not a plain dotted number. This value comes
+        // verbatim out of a .dproj belonging to the repository being
+        // committed, and CommitAndPush interpolates it into `git tag` and
+        // `git push` command lines - where an embedded quote closes the
+        // quoting and the remainder becomes extra arguments to Git.
+        if ( not IsValidVersionString( sVersion ) ) then
+          Continue;
 
-                if i <= High( VersionParts ) then
-                  iNew := StrToIntDef( VersionParts[ i ], 0 );
-
-                if i <= High( BestParts ) then
-                  iOld := StrToIntDef( BestParts[ i ], 0 );
-
-                if iNew > iOld then
-                begin
-                  lIsBetter := True;
-                  Break;
-                end
-                else if iNew < iOld then
-                  Break;
-              end;
-
-              if lIsBetter then
-                sBestVersion := sVersion;
-            end;
-          end;
-        end;
+        if IsHigherVersion( sVersion, sBestVersion ) then
+          sBestVersion := sVersion;
       end;
     end;
   end;
