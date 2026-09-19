@@ -1879,7 +1879,7 @@ begin
       Exit;
     end;
 
-    if StyledMessageDlg( Format( 'Remove %d repository(ies) from the list?', [ IndicesToRemove.Count ] ),
+    if StyledMessageDlg( Format( 'Remove %s from the list?', [ RepositoryCountText( IndicesToRemove.Count ) ] ),
       mtConfirmation, [ mbYes, mbNo ], 0 ) = mrYes then
     begin
       // Sort descending so we remove from highest index first (avoids index shifting issues)
@@ -2135,7 +2135,7 @@ begin
     Exit;
   end;
 
-  if StyledMessageDlg( Format( 'Commit and push %d repository(ies)?', [ iCount ] ),
+  if StyledMessageDlg( Format( 'Commit and push %s?', [ RepositoryCountText( iCount ) ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
@@ -3912,9 +3912,9 @@ begin
   if iCount > 0 then
   begin
     if MenuItem.Tag = -1 then
-      Log( Format( 'Cleared group for %d repository(ies)', [ iCount ] ) )
+      Log( Format( 'Cleared group for %s', [ RepositoryCountText( iCount ) ] ) )
     else
-      Log( Format( 'Set group "%s" for %d repository(ies)', [ sGroup, iCount ] ) );
+      Log( Format( 'Set group "%s" for %s', [ sGroup, RepositoryCountText( iCount ) ] ) );
   end
   else
     Log( 'No repositories selected' );
@@ -4111,14 +4111,14 @@ begin
     Exit;
   end;
 
-  if StyledMessageDlg(  Format( 'Resolve conflicts for %d repository(ies) by keeping LOCAL versions?' + sLineBreak +
+  if StyledMessageDlg(  Format( 'Resolve conflicts for %s by keeping LOCAL versions?' + sLineBreak +
       sLineBreak + 'This will:' + sLineBreak +
       '- Keep your local version of every conflicted file' + sLineBreak +
       '- DISCARD the incoming remote version of those files' + sLineBreak +
       '- Commit the merge resolution' + sLineBreak +
       '- Push the result to the remote' + sLineBreak + sLineBreak +
       'The remote side of each conflicted file is lost. Repositories with no merge ' +
-      'in progress are skipped.', [ iCount ] ),
+      'in progress are skipped.', [ RepositoryCountText( iCount ) ] ),
     mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
@@ -4196,7 +4196,7 @@ begin
     Exit;
   end;
 
-  if StyledMessageDlg(  Format( 'Push %d repository(ies) without committing?', [ iCount ] ),
+  if StyledMessageDlg(  Format( 'Push %s without committing?', [ RepositoryCountText( iCount ) ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
@@ -4279,7 +4279,7 @@ begin
     'WARNING: Force Push will OVERWRITE the remote repository history!' + sLineBreak + sLineBreak +
     'This makes your local code the definitive version.' + sLineBreak +
     'Any commits on the remote that are not in your local will be LOST.' + sLineBreak + sLineBreak +
-    'This operation affects ' + IntToStr( iCount ) + ' repository(ies).' + sLineBreak + sLineBreak +
+    'This operation affects ' + RepositoryCountText( iCount ) + '.' + sLineBreak + sLineBreak +
     'Are you ABSOLUTELY sure you want to continue?',
     mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
@@ -4287,7 +4287,7 @@ begin
   // Second confirmation for safety
   if StyledMessageDlg(
     'FINAL CONFIRMATION' + sLineBreak + sLineBreak +
-    'You are about to force push ' + IntToStr( iCount ) + ' repository(ies).' + sLineBreak + sLineBreak +
+    'You are about to force push ' + RepositoryCountText( iCount ) + '.' + sLineBreak + sLineBreak +
     'Remote history will be overwritten. This cannot be undone.' + sLineBreak + sLineBreak +
     'Proceed with force push?',
     mtWarning, [ mbYes, mbNo ], 0 ) <> mrYes then
