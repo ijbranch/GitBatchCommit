@@ -267,7 +267,7 @@ For Delphi projects, the Version column shows the `FileVersion` from the `.dproj
 
 Within that file it works out the version the project's **active configuration** actually builds — its default Config and Platform — rather than simply taking the biggest number it can find. That matters because a `.dproj` can carry a version on a configuration that is never built: GITLAKMCP had `2.0.0.0` on a group that loses and `1.0.0.347` on the one that wins, and every binary it produced said 1.0.0.x. Taking the biggest number would have tagged a release `v2.0.0.0`, a version that never existed.
 
-Where several separate `.dproj` files are found, the highest of those still wins.
+Where several separate `.dproj` files are found, the highest of the resolved versions wins. A file the app cannot make sense of is ignored rather than allowed to win with a bigger number.
 
 ### Automatic Version Tagging
 
