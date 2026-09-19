@@ -118,7 +118,7 @@ Note: This only removes the repository from the list - it does not delete any fi
 
 **File > Delete Selected...**, or **Delete Selected...** on the list's right-click menu, deletes the checked repositories. Like Remove Selected it acts on the **checked** rows, not on the highlighted one.
 
-The dialog lists every repository it is about to act on - name, folder and the exact remote it resolved, as `GitHub: owner/name` - and offers three independent choices:
+The dialog lists every repository it is about to act on - name, the exact remote it resolved (as `GitHub: owner/name`), then the folder - and offers three independent choices. The remote comes before the path because a path is long and unbounded; the list scrolls horizontally when one runs past the edge:
 
 | Option | Effect |
 |--------|--------|
@@ -134,6 +134,7 @@ The remote is resolved from the branch's **upstream** remote, the same one the R
 
 Caveats:
 
+- The remote option is disabled, with the reason in its caption, when not one of the checked repositories has a remote this application can delete
 - Deleting a remote on GitHub needs an access token carrying the **`delete_repo`** scope. That scope is not part of `repo`, so a token that creates repositories, pushes and changes visibility perfectly well will still be refused here
 - When a step fails for a repository, the remaining steps for that repository are skipped and it is left exactly as it was: a failed remote deletion does not go on to delete the local folder, and a failed local deletion keeps the list entry so the deletion can be retried
 - A local folder cannot be deleted while a file in it is open in an editor, a Git client or an indexer

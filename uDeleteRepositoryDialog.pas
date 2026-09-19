@@ -54,7 +54,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
-  System.SysUtils, System.Classes, System.UITypes;
+  System.SysUtils, System.Classes, System.UITypes, System.Math;
 
 type
   /// <summary>
@@ -121,6 +121,20 @@ type
     ///   state of the Delete button to the current option selection.
     /// </summary>
     procedure UpdateState;
+
+    /// <summary>
+    ///   Gives the list a horizontal scroll bar wide enough for its longest
+    ///   entry.
+    /// </summary>
+    /// <remarks>
+    ///   A <c>TListBox</c> silently CLIPS text wider than its client area, and
+    ///   these lines carry a full working-tree path, so the tail of every line
+    ///   was being cut off - taking the resolved remote with it. That is the
+    ///   one detail the user most needs before authorising an irreversible
+    ///   deletion, so it cannot be allowed to fall off the right-hand edge with
+    ///   nothing to say it had.
+    /// </remarks>
+    procedure SizeListToContent;
   public
     /// <summary>
     ///   Shows the dialog for a set of repositories and returns what to delete.
@@ -130,9 +144,14 @@ type
     ///   name, path and remote target. These are what the user is authorising,
     ///   so they must name the remote exactly rather than just its provider.
     /// </param>
+    /// <param name="bAnyRemoteDeletable">
+    ///   False when not one of the repositories has a remote this application
+    ///   can delete. The remote option is then disabled rather than left to be
+    ///   ticked, confirmed and then fail for every repository in the batch.
+    /// </param>
     /// <param name="AOptions">Receives the chosen options when the result is True.</param>
     /// <returns>True when the user confirmed the deletion.</returns>
-    class function Execute( const aRepoLines: TArray<string>;
+    class function Execute( const aRepoLines: TArray<string>; const bAnyRemoteDeletable: Boolean;
       out AOptions: TDeleteRepositoryOptions ): Boolean;
   end;
 
@@ -178,8 +197,33 @@ begin
     lblWarning.Caption := 'The local folder will be sent to the Recycle Bin, so it can be ' +
       'restored from there. The remote repository is left alone.';
 
+  // The greyed check box says the option is unavailable; this says why.
+  if ( not chkDeleteRemote.Enabled ) then
+    lblWarning.Caption := lblWarning.Caption + ' None of these has a remote on GitHub or ' +
+      'Codeberg that this application can delete.';
+
   btnDelete.Enabled := ( chkRemoveEntry.Checked or lDestructive ) and
     ( ( not lDestructive ) or SameStr( Trim( edtConfirm.Text ), CONFIRM_WORD ) );
+
+end;
+
+procedure TDeleteRepositoryDialog.SizeListToContent;
+var
+  iWidest           : Integer;
+begin
+
+  iWidest           := 0;
+
+  lstRepos.Canvas.Font := lstRepos.Font;
+
+  for var i := 0 to lstRepos.Items.Count - 1 do
+    iWidest         := Max( iWidest, lstRepos.Canvas.TextWidth( lstRepos.Items[ i ] ) );
+
+  // ScrollWidth sends LB_SETHORIZONTALEXTENT. Zero - the default - means no
+  // horizontal scroll bar at all, which is why the clipped text had no way of
+  // being read.
+  if iWidest > 0 then
+    lstRepos.ScrollWidth := iWidest + ScaleValue( 12 );
 
 end;
 
@@ -198,7 +242,7 @@ begin
 end;
 
 class function TDeleteRepositoryDialog.Execute( const aRepoLines: TArray<string>;
-  out AOptions: TDeleteRepositoryOptions ): Boolean;
+  const bAnyRemoteDeletable: Boolean; out AOptions: TDeleteRepositoryOptions ): Boolean;
 var
   Dlg               : TDeleteRepositoryDialog;
 begin
@@ -209,11 +253,30 @@ begin
   Dlg               := TDeleteRepositoryDialog.Create( nil );
 
   try
-    Dlg.lblIntro.Caption := Format( 'These %d repository(ies) are about to be deleted:',
-      [ Length( aRepoLines ) ] );
+    if Length( aRepoLines ) = 1 then
+      Dlg.lblIntro.Caption := 'This repository is about to be deleted:'
+    else
+      Dlg.lblIntro.Caption := Format( 'These %d repositories are about to be deleted:',
+        [ Length( aRepoLines ) ] );
 
     for var sLine in aRepoLines do
       Dlg.lstRepos.Items.Add( sLine );
+
+    Dlg.SizeListToContent;
+
+    // Offering an option that cannot do anything is worse than not offering
+    // it: the user would tick it, type the confirmation word, and get nothing
+    // but a failure per repository.
+    if ( not bAnyRemoteDeletable ) then
+    begin
+      Dlg.chkDeleteRemote.Enabled := False;
+
+      // Short enough to leave real margin. A check box CLIPS its caption
+      // silently, exactly as the list clipped its items, and the full
+      // explanation at this width overflows - so that goes in the warning
+      // label below, which word-wraps and therefore cannot clip at any DPI.
+      Dlg.chkDeleteRemote.Caption := 'Delete the &remote repository on its host (no deletable remote)';
+    end;
 
     // Entry removal alone is the harmless default; both irreversible options
     // start unticked so that neither can be taken by pressing Enter.

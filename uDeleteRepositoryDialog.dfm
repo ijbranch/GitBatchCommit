@@ -3,7 +3,7 @@ object DeleteRepositoryDialog: TDeleteRepositoryDialog
   Top = 0
   BorderStyle = bsDialog
   Caption = 'Delete Repositories'
-  ClientHeight = 437
+  ClientHeight = 455
   ClientWidth = 490
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -26,7 +26,7 @@ object DeleteRepositoryDialog: TDeleteRepositoryDialog
     Left = 16
     Top = 318
     Width = 458
-    Height = 40
+    Height = 56
     AutoSize = False
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clMaroon
@@ -38,7 +38,7 @@ object DeleteRepositoryDialog: TDeleteRepositoryDialog
   end
   object lblConfirm: TLabel
     Left = 16
-    Top = 364
+    Top = 382
     Width = 122
     Height = 15
     Caption = 'Type DELETE to confirm:'
@@ -88,7 +88,7 @@ object DeleteRepositoryDialog: TDeleteRepositoryDialog
   end
   object edtConfirm: TEdit
     Left = 150
-    Top = 361
+    Top = 379
     Width = 120
     Height = 23
     TabOrder = 2
@@ -96,7 +96,7 @@ object DeleteRepositoryDialog: TDeleteRepositoryDialog
   end
   object btnDelete: TButton
     Left = 296
-    Top = 396
+    Top = 414
     Width = 85
     Height = 25
     Caption = 'Delete'
@@ -106,7 +106,7 @@ object DeleteRepositoryDialog: TDeleteRepositoryDialog
   end
   object btnCancel: TButton
     Left = 389
-    Top = 396
+    Top = 414
     Width = 85
     Height = 25
     Cancel = True

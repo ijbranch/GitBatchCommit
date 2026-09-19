@@ -1896,6 +1896,7 @@ var
   Options           : TDeleteRepositoryOptions;
   sRemoteTarget     : string;
   sError            : string;
+  lAnyRemote        : Boolean;
   iCount            : Integer;
   iSuccess          : Integer;
   i                 : Integer;
@@ -1916,6 +1917,8 @@ begin
   SetLength( Paths, iCount );
   SetLength( Names, iCount );
   SetLength( Lines, iCount );
+
+  lAnyRemote        := False;
 
   // Resolving each remote runs a pair of quick local Git calls, so a large
   // selection is a visible pause before the dialog appears.
@@ -1939,16 +1942,21 @@ begin
       // Name the exact remote, not just its provider. The user is authorising
       // an irreversible deletion, and two entries can point at repositories of
       // the same name under different owners.
-      if ( not FRepoManager.DescribeRemoteDeleteTarget( Repo.Path, sRemoteTarget ) ) then
+      if FRepoManager.DescribeRemoteDeleteTarget( Repo.Path, sRemoteTarget ) then
+        lAnyRemote  := True
+      else
         sRemoteTarget := '[no deletable remote - ' + sRemoteTarget + ']';
 
-      Lines[ i ]    := Format( '%s  -  %s  -  %s', [ Repo.Name, Repo.Path, sRemoteTarget ] );
+      // Remote BEFORE the path. A working-tree path is long and unbounded -
+      // whatever comes after it is what gets pushed off the right-hand edge of
+      // the list, and the remote is the detail the user most needs to check.
+      Lines[ i ]    := Format( '%s  -  %s  -  %s', [ Repo.Name, sRemoteTarget, Repo.Path ] );
     end;
   finally
     Screen.Cursor := crDefault;
   end;
 
-  if ( not TDeleteRepositoryDialog.Execute( Lines, Options ) ) then
+  if ( not TDeleteRepositoryDialog.Execute( Lines, lAnyRemote, Options ) ) then
     Exit;
 
   if ( not BeginBatch ) then

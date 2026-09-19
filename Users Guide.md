@@ -58,6 +58,8 @@ The dialog names every repository it is about to act on, and asks which of three
 
 Either of the last two needs the word `DELETE` typed in capitals before the Delete button will work. Just removing entries does not.
 
+Each line reads name, then the resolved remote, then the folder - scroll the list sideways if a path runs past the edge. If none of the checked repositories has a remote the app can delete, that option is greyed out and says so.
+
 Ticking the local folder automatically ticks and locks the entry removal — an entry whose folder is gone can only ever show Error, so it goes with the folder.
 
 The remote it deletes is the one your branch actually tracks, which is what the Remote column shows — not necessarily `origin`. The dialog spells it out as `GitHub: owner/name` so you can see exactly which repository on the host is about to go.
