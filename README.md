@@ -29,7 +29,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
   The working tree is assessed with `git status --porcelain`, which covers modified, staged, untracked, deleted and renamed files as well as dirty submodules. Unmerged paths are identified from the porcelain `XY` codes (`DD`, `AU`, `UD`, `UA`, `DU`, `AA`, `UU`) and take priority over everything else, because staging them with `add -A` would commit the conflict markers. Changes that are only build output (`.dcu`, `.map`, platform build folders and so on; `.exe` and `.hpp` are deliberately NOT treated as build output, since plenty of repositories track tooling binaries and C/C++ headers on purpose) do not count as modifications. The relationship to the remote is measured with `git rev-list --left-right --count @{upstream}...HEAD`, which is locale-independent and reports both directions at once. It is measured for **every** repository, whatever the state of the working tree: a repository can be modified and behind at once, and the single status slot can only name one of the two, so the pull it owes is carried in the status text instead.
 - **Branch Display** - Shows the current branch for each repository
 - **Remote Provider Display** - Shows the remote provider (GitHub, Codeberg, Other, None) for each repository. This is the provider of the remote the branch actually **tracks** (`branch.<name>.remote`), falling back to `origin` when a branch has no upstream - not always `origin`, because that is the remote a push or pull will contact and the one the ahead/behind counts are measured against
-- **Version Display** - Shows the project version extracted from Delphi `.dproj` files (reads the root `.dproj`, falling back to a subdirectory scan)
+- **Version Display** - Shows the project version extracted from Delphi `.dproj` files (reads the root `.dproj`, falling back to a subdirectory scan) - resolving the version the project's **active configuration** builds, not the highest number in the file
 - **Automatic Version Tagging** - For Delphi projects, automatically creates and pushes Git tags based on the version number in the `.dproj` file when committing
 - **Batch Operations** - Commit and push to multiple repositories with one click
 - **Quick Selection** - Buttons to select all, none, or only modified repositories
@@ -174,7 +174,7 @@ git push
 
 If the repository contains a Delphi project file (`.dproj`) with version information, GitBatchCommit will automatically:
 
-1. Extract the `FileVersion` from the `.dproj` file (e.g., `1.0.1.25`)
+1. Extract the `FileVersion` the project's **active configuration** builds, from the `.dproj` file (e.g., `1.0.1.25`)
 2. Create an annotated Git tag with `v` prefix (e.g., `v1.0.1.25`)
 3. Push the tag to the remote repository
 

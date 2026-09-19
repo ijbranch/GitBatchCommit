@@ -4,6 +4,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Version detection took the HIGHEST `FileVersion` anywhere in a `.dproj`, which is not the same question as "what does this project build" - and it tagged a release that never existed.** Measured on GITLAKMCP: `Base_Win64` carried `FileVersion=2.0.0.0` while `Cfg_1_Win64` carried `1.0.0.347`. MSBuild evaluates `Cfg_1_Win64` last, so it wins and every binary ever produced reported 1.0.0.x - but "highest" picked `2.0.0.0`, and that is the value that would have reached `git tag` and `git push`. A new `ResolveActiveFileVersion` layers the property groups the way MSBuild does - `Base`, `Base_<Platform>`, `Cfg_N`, `Cfg_N_<Platform>`, each overriding the last - for the project's default `Config` and `Platform`, and returns the LAST one that defines a `FileVersion` rather than the largest (2026-09-19) - `uGitRepoManager.pas`
+  - The `Cfg_N` number is read from the declaring group's **condition** (`Condition="'$(Config)'=='Release' or '$(Cfg_1)'!=''"`), not from the `<Cfg_1>` element inside it, and not assumed to be `Cfg_1` - the numbering is per project, so Release is not reliably 1. The first attempt parsed the element instead of the condition and could never have matched a real file; it compiled perfectly and was caught only by testing against `GitBatchCommit.dproj` itself.
+  - Resolution **falls back** to the previous highest-anywhere scan when a project file does not declare a default `Config` and `Platform`, so an unusual or hand-written `.dproj` still yields a version rather than none. Where several separate `.dproj` FILES are found, the highest of those still wins - that part is unchanged.
+  - The same `IsValidVersionString` guard applies on this path: the value reaches `git tag` and `git push`, so anything that is not a plain dotted number is refused.
+  - `GetProjectVersion` moves from `private` to `public`. It is a read-only query about a repository exactly like `GetRepoProvider` beside it, and the Version column displays what it returns.
+  - Covered by 10 tests, including the GITLAKMCP shape, Debug-as-default selecting `Cfg_2`, a Win32 default not taking the Win64 group, platform-specific overriding platform-less, the fallback path, a rejected non-numeric version, and both real project files. Mutation-proved: forcing the resolver to return nothing turns exactly three of them red, one of them reproducing the original `2.0.0.0`.
+
 ## [1.7.0] - 2026-09-19
 
 ### Fixed

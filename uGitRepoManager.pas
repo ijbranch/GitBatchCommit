@@ -510,18 +510,32 @@ type
     function ParseOwnerRepo( const sOriginURL: string; out sOwner, sRepo: string ): Boolean;
 
     /// <summary>
-    ///   Gets the project version from a .dproj file in the repository.
+    ///   Resolves the <c>FileVersion</c> that a project's ACTIVE configuration
+    ///   will actually build, by layering its property groups the way MSBuild
+    ///   does.
     /// </summary>
-    /// <param name="sRepoPath">Path to the repository.</param>
-    /// <param name="bForceRescan">
-    ///   True to ignore the scan TTL and re-read the project file. Commit &amp; Push
-    ///   passes True: the cached value decides the Git tag that gets pushed, and
-    ///   a version bumped seconds before the commit would otherwise be tagged
-    ///   with the previous release number — or not tagged at all, because the
-    ///   old tag already exists.
-    /// </param>
-    /// <returns>Version string (e.g., "1.0.1.25") or empty if not found.</returns>
-    function GetProjectVersion( const sRepoPath: string; const bForceRescan: Boolean = False ): string;
+    /// <remarks>
+    ///   This replaces taking the HIGHEST <c>FileVersion</c> found anywhere in
+    ///   the file, which is not the same question and was measurably wrong.
+    ///   GITLAKMCP carried <c>FileVersion=2.0.0.0</c> on its <c>Base_Win64</c>
+    ///   group and <c>1.0.0.347</c> on <c>Cfg_1_Win64</c>; the latter is
+    ///   evaluated last and so wins, and every binary ever built reported
+    ///   1.0.0.x - but "highest" picked <c>2.0.0.0</c>, a version nothing had
+    ///   ever produced, and that is what would have been tagged and pushed.
+    ///   <para>
+    ///   MSBuild layers the groups <c>Base</c>, <c>Base_&lt;Platform&gt;</c>,
+    ///   <c>Cfg_N</c>, <c>Cfg_N_&lt;Platform&gt;</c>, each overriding the last,
+    ///   so the ACTIVE value is the final one in that order that defines a
+    ///   <c>FileVersion</c> - not the largest.
+    ///   </para>
+    /// </remarks>
+    /// <param name="sContent">Full text of the .dproj file.</param>
+    /// <returns>
+    ///   The active configuration's FileVersion, or an empty string when the
+    ///   file does not say enough to resolve one - in which case the caller
+    ///   falls back to the old scan rather than reporting no version at all.
+    /// </returns>
+    function ResolveActiveFileVersion( const sContent: string ): string;
 
     /// <summary>
     ///   Checks if a filename is a known build artifact (e.g., .dcu, .exe, Win32/).
@@ -702,6 +716,29 @@ type
     /// <param name="sRepoPath">Working-tree path of the repository.</param>
     /// <returns>The detected remote provider.</returns>
     function GetRepoProvider( const sRepoPath: string ): TRemoteProvider;
+
+    /// <summary>
+    ///   Gets the version the repository's ACTIVE project configuration builds,
+    ///   read from its .dproj.
+    /// </summary>
+    /// <remarks>
+    ///   Public because it is a read-only query about a repository, exactly
+    ///   like <see cref="GetRepoProvider"/> beside it, and the Version column
+    ///   displays what it returns. It resolves the value MSBuild would use for
+    ///   the project's default configuration and platform - NOT the highest
+    ///   number in the file; see <c>ResolveActiveFileVersion</c> for why that
+    ///   distinction cost a wrong tag.
+    /// </remarks>
+    /// <param name="sRepoPath">Path to the repository.</param>
+    /// <param name="bForceRescan">
+    ///   True to ignore the scan TTL and re-read the project file. Commit &amp; Push
+    ///   passes True: the cached value decides the Git tag that gets pushed, and
+    ///   a version bumped seconds before the commit would otherwise be tagged
+    ///   with the previous release number — or not tagged at all, because the
+    ///   old tag already exists.
+    /// </param>
+    /// <returns>Version string (e.g., "1.0.1.25") or empty if not found.</returns>
+    function GetProjectVersion( const sRepoPath: string; const bForceRescan: Boolean = False ): string;
 
     /// <summary>
     ///   Changes the visibility of a remote repository.
@@ -3572,6 +3609,182 @@ begin
 
 end;
 
+function TGitRepoManager.ResolveActiveFileVersion( const sContent: string ): string;
+var
+  Lines             : TArray<string>;
+  sLine             : string;
+  sTrimmed          : string;
+  sCondition        : string;
+  sConfig           : string;
+  sPlatform         : string;
+  sCfgToken         : string;
+  Candidates        : TArray<string>;
+  iRank             : Integer;
+  iBestRank         : Integer;
+  iPos              : Integer;
+  iEndPos           : Integer;
+  sVersion          : string;
+
+  /// Returns the value of an attribute on a single element line, or ''.
+  function AttributeValue( const sElement, sAttr: string ): string;
+  var
+    iStart, iStop   : Integer;
+  begin
+    Result := '';
+    iStart := sElement.IndexOf( sAttr + '="' );
+
+    if iStart < 0 then
+      Exit;
+
+    Inc( iStart, Length( sAttr ) + 2 );
+    iStop := sElement.IndexOf( '"', iStart );
+
+    if iStop > iStart then
+      Result := sElement.Substring( iStart, iStop - iStart );
+  end;
+
+  /// Returns the text of a single-line element, or ''.
+  function ElementText( const sElement: string ): string;
+  var
+    iStart, iStop   : Integer;
+  begin
+    Result := '';
+    iStart := sElement.IndexOf( '>' );
+    iStop := sElement.LastIndexOf( '</' );
+
+    if ( iStart >= 0 ) and ( iStop > iStart ) then
+      Result := sElement.Substring( iStart + 1, iStop - iStart - 1 ).Trim;
+  end;
+
+begin
+
+  Result := '';
+  Lines := sContent.Split( [ #13, #10 ], TStringSplitOptions.ExcludeEmpty );
+
+  // Pass 1 - the project's default configuration and platform. These are what
+  // the IDE builds when nobody chooses otherwise, so they are what "active"
+  // means for a repository we are merely tagging.
+  sConfig := '';
+  sPlatform := '';
+
+  for sLine in Lines do
+  begin
+    sTrimmed := sLine.Trim;
+
+    if sTrimmed.StartsWith( '<Config ' ) and sTrimmed.Contains( '$(Config)' ) then
+      sConfig := ElementText( sTrimmed )
+    else if sTrimmed.StartsWith( '<Platform ' ) and sTrimmed.Contains( '$(Platform)' ) then
+      sPlatform := ElementText( sTrimmed );
+  end;
+
+  if sConfig.IsEmpty or sPlatform.IsEmpty then
+    Exit;
+
+  // Pass 2 - which Cfg_N token corresponds to that configuration name. The
+  // numbering is per project, so Release is not reliably Cfg_1.
+  //
+  // The mapping lives on the declaring group's CONDITION, not on the <Cfg_N>
+  // element inside it:
+  //
+  //   <PropertyGroup Condition="'$(Config)'=='Release' or '$(Cfg_1)'!=''">
+  //     <Cfg_1>true</Cfg_1>
+  //
+  // so the token has to be read out of the condition string.
+  sCfgToken := '';
+
+  for sLine in Lines do
+  begin
+    sTrimmed := sLine.Trim;
+
+    if ( not sTrimmed.StartsWith( '<PropertyGroup' ) ) then
+      Continue;
+
+    sCondition := AttributeValue( sTrimmed, 'Condition' );
+
+    if ( not sCondition.Contains( '''$(Config)''==''' + sConfig + '''' ) ) then
+      Continue;
+
+    iPos := sCondition.IndexOf( '''$(Cfg_' );
+
+    if iPos < 0 then
+      Continue;
+
+    Inc( iPos, Length( '''$(' ) );
+    iEndPos := sCondition.IndexOf( ')', iPos );
+
+    if iEndPos > iPos then
+    begin
+      sCfgToken := sCondition.Substring( iPos, iEndPos - iPos );
+      Break;
+    end;
+  end;
+
+  if sCfgToken.IsEmpty then
+    Exit;
+
+  // The layering order MSBuild applies. Later entries override earlier ones,
+  // so the LAST match wins - which is the whole point of this routine.
+  Candidates := [
+    '''$(Base)''!=''''',
+    Format( '''$(Base_%s)''!=''''', [ sPlatform ] ),
+    Format( '''$(%s)''!=''''', [ sCfgToken ] ),
+    Format( '''$(%s_%s)''!=''''', [ sCfgToken, sPlatform ] ) ];
+
+  // Pass 3 - walk the groups, remembering the highest-ranked FileVersion seen.
+  iBestRank := -1;
+  sCondition := '';
+
+  for sLine in Lines do
+  begin
+    sTrimmed := sLine.Trim;
+
+    if sTrimmed.StartsWith( '<PropertyGroup' ) then
+      sCondition := AttributeValue( sTrimmed, 'Condition' )
+    else if sTrimmed.StartsWith( '</PropertyGroup>' ) then
+      sCondition := '';
+
+    if ( not sTrimmed.Contains( 'VerInfo_Keys' ) ) or ( not sTrimmed.Contains( 'FileVersion=' ) ) then
+      Continue;
+
+    iRank := -1;
+
+    for var i := 0 to High( Candidates ) do
+      if sCondition = Candidates[ i ] then
+      begin
+        iRank := i;
+        Break;
+      end;
+
+    if iRank < iBestRank then
+      Continue;
+
+    iPos := sTrimmed.IndexOf( 'FileVersion=' );
+
+    if iPos < 0 then
+      Continue;
+
+    Inc( iPos, Length( 'FileVersion=' ) );
+    iEndPos := sTrimmed.IndexOf( ';', iPos );
+
+    if iEndPos < 0 then
+      iEndPos := sTrimmed.IndexOf( '<', iPos );
+
+    if iEndPos <= iPos then
+      Continue;
+
+    sVersion := sTrimmed.Substring( iPos, iEndPos - iPos ).Trim;
+
+    // Same guard as the caller: this value reaches `git tag` and `git push`,
+    // so anything that is not a plain dotted number is refused outright.
+    if ( iRank >= 0 ) and IsValidVersionString( sVersion ) then
+    begin
+      Result := sVersion;
+      iBestRank := iRank;
+    end;
+  end;
+
+end;
+
 function TGitRepoManager.GetProjectVersion( const sRepoPath: string; const bForceRescan: Boolean ): string;
 var
   DprojFiles        : TArray<string>;
@@ -3700,6 +3913,21 @@ begin
     try
       sContent := TFile.ReadAllText( sDprojPath, TEncoding.UTF8 );
     except
+      Continue;
+    end;
+
+    // Prefer the version the ACTIVE configuration will actually build. Only
+    // when the file does not say enough to resolve one do we fall through to
+    // the old scan below, which takes the highest FileVersion anywhere in the
+    // file - a different question, and one that picked a version no binary had
+    // ever carried on GITLAKMCP.
+    sVersion := ResolveActiveFileVersion( sContent );
+
+    if ( not sVersion.IsEmpty ) then
+    begin
+      if sBestVersion.IsEmpty then
+        sBestVersion := sVersion;
+
       Continue;
     end;
 

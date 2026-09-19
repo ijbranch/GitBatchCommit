@@ -141,8 +141,8 @@
     <VerInfo_MajorVer>1</VerInfo_MajorVer>
     <VerInfo_MinorVer>7</VerInfo_MinorVer>
     <VerInfo_Release>0</VerInfo_Release>
-    <VerInfo_Build>127</VerInfo_Build>
-    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.7.0.127;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.7.0.127</VerInfo_Keys>
+    <VerInfo_Build>131</VerInfo_Build>
+    <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.7.0.131;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.7.0.131</VerInfo_Keys>
     <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_2)'!=''">

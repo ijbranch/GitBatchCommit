@@ -527,8 +527,8 @@ If a Git call is stuck on a network timeout, the drain gives up after 90 seconds
 | **Where** | Main list: "Version" column |
 | **When** | For Delphi projects with version information |
 | **Why** | Quick reference for project versions without opening IDE |
-| **How** | Automatic - reads the root `.dproj`, scanning subdirectories only when there is none; the highest version wins |
-| **Caveats** | Only works for Delphi projects. Where several are found, the highest version wins |
+| **How** | Automatic - reads the root `.dproj`, scanning subdirectories only when there is none, then resolves the `FileVersion` that project's **active configuration** builds |
+| **Caveats** | Only works for Delphi projects. Within a project file the value is resolved the way MSBuild layers it - `Base`, `Base_<Platform>`, `Cfg_N`, `Cfg_N_<Platform>`, each overriding the last - for the project's default Config and Platform, so a stale or higher number on a group that is not built is correctly ignored. Only where several separate `.dproj` FILES are found does the highest still win. A project file that does not declare a default Config and Platform cannot be resolved that way, and falls back to the old highest-anywhere scan |
 | **Linkages** | Used for automatic version tagging during commit |
 
 ---

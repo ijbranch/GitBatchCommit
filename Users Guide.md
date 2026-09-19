@@ -263,7 +263,11 @@ Right-click any repository in the list for:
 
 ### Version Display
 
-For Delphi projects, the Version column shows the `FileVersion` from the `.dproj` file. The app reads the `.dproj` in the repository root, and only scans subdirectories when there is none. Where several are found the highest version wins.
+For Delphi projects, the Version column shows the `FileVersion` from the `.dproj` file. The app reads the `.dproj` in the repository root, and only scans subdirectories when there is none.
+
+Within that file it works out the version the project's **active configuration** actually builds — its default Config and Platform — rather than simply taking the biggest number it can find. That matters because a `.dproj` can carry a version on a configuration that is never built: GITLAKMCP had `2.0.0.0` on a group that loses and `1.0.0.347` on the one that wins, and every binary it produced said 1.0.0.x. Taking the biggest number would have tagged a release `v2.0.0.0`, a version that never existed.
+
+Where several separate `.dproj` files are found, the highest of those still wins.
 
 ### Automatic Version Tagging
 
