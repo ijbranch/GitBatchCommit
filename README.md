@@ -565,6 +565,13 @@ This project is provided as-is for personal use only.
 > Full detail lives in `CHANGELOG.md`, which is the authoritative record of changes.
 > This section is a short summary only.
 
+### 1.7.0
+
+- **Added** Delete Selected - deletes any combination of the list entry, the remote repository on GitHub or Codeberg, and the local folder. Irreversible options need the word `DELETE` typed; the local folder goes to the Recycle Bin
+- **Fixed** the confirmation dialog clipping the resolved remote off the right-hand edge with no scroll bar - the one detail it exists to state before an irreversible deletion
+- **Changed** every repository count from `%d repository(ies)` to `1 repository` / `N repositories`, which also uncovered a latent `EConvertError` in the Resolve Conflicts confirmation
+- **Fixed** `ProductVersion` reporting `1.6.0.0` while `FileVersion` read `1.6.0.121`; they now carry the same value, kept in step by a pre-commit hook
+
 ### 1.6.0
 
 - **Fixed** a batch abort with `No mapping for the Unicode character exists in the target multi-byte code page` - captured process output was decoded one pipe read at a time, so a multi-byte character split across a read boundary raised
@@ -641,4 +648,4 @@ This project is provided as-is for personal use only.
 *Version: 1.5 – 26 January 2026*
 *Version: 1.5.1 – 28 July 2026*
 *Version: 1.6.0 – 30 August 2026*
-*Revised: 1.6.0 – 5 September 2026*
+*Version: 1.7.0 – 19 September 2026*

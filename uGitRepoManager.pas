@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.6.0
+  Version: 1.7.0
 
   Part of GitBatchCommit Application
 
@@ -66,7 +66,7 @@ const
   ///   Canonical application version. Update here and only here; surface
   ///   everywhere else ( About dialog, User-Agent header, docs ) by referencing.
   /// </summary>
-  APP_VERSION         = '1.6.0';
+  APP_VERSION         = '1.7.0';
 
   /// <summary>
   ///   Default timeout for Git operations in milliseconds (60 seconds).

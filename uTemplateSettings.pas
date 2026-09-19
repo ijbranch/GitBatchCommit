@@ -68,7 +68,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.6.0
+  Version: 1.7.0
 
   Part of GitBatchCommit Application
 

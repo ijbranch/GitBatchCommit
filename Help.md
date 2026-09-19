@@ -757,5 +757,5 @@ Option B - Overwrite Remote:
 
 ---
 
-*GitBatchCommit Help Guide - Version 1.6.0*
+*GitBatchCommit Help Guide - Version 1.7.0*
 *Last Updated: 19 September 2026*
