@@ -618,6 +618,19 @@ type
     function RepoPathAt( const iIndex: Integer ): string;
 
     /// <summary>
+    ///   Renders a repository count as "1 repository" or "N repositories".
+    /// </summary>
+    /// <remarks>
+    ///   Every count in this form was written as <c>%d repository(ies)</c>,
+    ///   which reads as boilerplate in the one case that matters most - the
+    ///   single repository the user is about to act on destructively. Text that
+    ///   looks machine-generated invites the reader to skim it.
+    /// </remarks>
+    /// <param name="iCount">Number of repositories.</param>
+    /// <returns>The count and its correctly pluralised noun.</returns>
+    function RepositoryCountText( const iCount: Integer ): string;
+
+    /// <summary>
     ///   Shows an error dialog with credentials masked.
     /// </summary>
     /// <remarks>
@@ -1083,6 +1096,16 @@ begin
 
   if ( iIndex >= 0 ) and ( iIndex <= High( FRepoCache ) ) then
     Result := FRepoCache[ iIndex ].Path;
+
+end;
+
+function TMainForm.RepositoryCountText( const iCount: Integer ): string;
+begin
+
+  if iCount = 1 then
+    Result := '1 repository'
+  else
+    Result := Format( '%d repositories', [ iCount ] );
 
 end;
 
@@ -2013,11 +2036,12 @@ begin
       Screen.Cursor := crDefault;
     end;
 
-    Log( Format( 'Delete completed: %d of %d repository(ies) fully processed.', [ iSuccess, iCount ] ) );
+    Log( Format( 'Delete completed: %d of %s fully processed.',
+      [ iSuccess, RepositoryCountText( iCount ) ] ) );
 
     if iSuccess < iCount then
-      ErrorDlg( Format( '%d of %d repository(ies) could not be deleted. See the log for each reason.',
-        [ iCount - iSuccess, iCount ] ), mtWarning );
+      ErrorDlg( Format( '%s could not be deleted. See the log for the reason in each case.',
+        [ RepositoryCountText( iCount - iSuccess ) ] ), mtWarning );
 
     PopulateListView;
   finally
