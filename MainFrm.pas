@@ -53,6 +53,13 @@
 04/01/2026 - Fixed issue with Remove Selected option.
 }
 
+{
+Requires to be built with Delphi v 13 or higher.
+Additional 3rd Party libraries used are...
+FastMM5 v 5.07 - Updated 23/07/2026
+EurekaLog v 7.16.2.0 - 04/10/2026
+ETHEA Styled Components v 4.3.1 - 03/10/2026
+}
 unit MainFrm;
 
 interface

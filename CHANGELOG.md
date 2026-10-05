@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **3rd-party library header added** (2026-10-06) - `MainFrm.pas`. The "Additional 3rd Party libraries used are..." block lists only the libraries this project's own units name in their uses clauses, at the installed version and date, and is written from `D:\Tools\ThirdPartyHeaders\ThirdPartyLibraries.txt` by `D:\Tools\ThirdPartyHeaders\Sync-ThirdPartyHeaders.py`.
+
 ### Fixed
 - **Version detection took the HIGHEST `FileVersion` anywhere in a `.dproj`, which is not the same question as "what does this project build" - and it tagged a release that never existed.** Measured on GITLAKMCP: `Base_Win64` carried `FileVersion=2.0.0.0` while `Cfg_1_Win64` carried `1.0.0.347`. MSBuild evaluates `Cfg_1_Win64` last, so it wins and every binary ever produced reported 1.0.0.x - but "highest" picked `2.0.0.0`, and that is the value that would have reached `git tag` and `git push`. A new `ResolveActiveFileVersion` layers the property groups the way MSBuild does - `Base`, `Base_<Platform>`, `Cfg_N`, `Cfg_N_<Platform>`, each overriding the last - for the project's default `Config` and `Platform`, and returns the LAST one that defines a `FileVersion` rather than the largest (2026-09-19) - `uGitRepoManager.pas`
   - The `Cfg_N` number is read from the declaring group's **condition** (`Condition="'$(Config)'=='Release' or '$(Cfg_1)'!=''"`), not from the `<Cfg_1>` element inside it, and not assumed to be `Cfg_1` - the numbering is per project, so Release is not reliably 1. The first attempt parsed the element instead of the condition and could never have matched a real file; it compiled perfectly and was caught only by testing against `GitBatchCommit.dproj` itself.
