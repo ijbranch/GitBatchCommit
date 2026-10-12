@@ -169,6 +169,10 @@ type
     FGitClientPath: string;
     FFilePattern: string;
     FDelphiIndexerPath: string;
+    /// <summary>
+    ///   Name of the VCL style the user chose; empty means the default style.
+    /// </summary>
+    FStyleName: string;
     FCommitHistory: TArray<string>;
     FCommitTemplates: TArray<string>;
     FReposLock: TCriticalSection;
@@ -1048,6 +1052,11 @@ type
     ///   push. Empty means fall back to PATH and then the default location.
     /// </summary>
     property DelphiIndexerPath: string read FDelphiIndexerPath write FDelphiIndexerPath;
+    /// <summary>
+    ///   Name of the VCL style chosen from View > Style, as registered with
+    ///   TStyleManager. Empty means the application's default style.
+    /// </summary>
+    property StyleName: string read FStyleName write FStyleName;
     /// <summary>
     ///   Most-recently-used commit messages, newest first. Reading this yields a
     ///   private copy taken under the lock: the array is re-sized from the
@@ -2588,6 +2597,7 @@ begin
   FGitClientPath := '';
   FFilePattern := '';
   FDelphiIndexerPath := '';
+  FStyleName := '';
 
   if ( not TFile.Exists( FConfigPath ) ) then
   begin
@@ -2663,6 +2673,7 @@ begin
       FGitClientPath := JSONRoot.GetValue<string>( 'git_client_path', '' );
       FFilePattern := JSONRoot.GetValue<string>( 'file_pattern', '' );
       FDelphiIndexerPath := JSONRoot.GetValue<string>( 'delphi_indexer_path', '' );
+      FStyleName := JSONRoot.GetValue<string>( 'vcl_style', '' );
 
       // Drop any file pattern that contains shell metacharacters — config
       // files can be hand-edited, so never trust them blindly.
@@ -2817,6 +2828,7 @@ begin
     JSONRoot.AddPair( 'git_client_path', FGitClientPath );
     JSONRoot.AddPair( 'file_pattern', FFilePattern );
     JSONRoot.AddPair( 'delphi_indexer_path', FDelphiIndexerPath );
+    JSONRoot.AddPair( 'vcl_style', FStyleName );
 
     // Save commit history
     JSONHistoryArray := TJSONArray.Create;

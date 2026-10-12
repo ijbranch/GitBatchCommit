@@ -507,6 +507,18 @@ If a Git call is stuck on a network timeout, the drain gives up after 90 seconds
 | **Caveats** | Selection buttons only affect visible repos |
 | **Linkages** | Works with Group filter |
 
+### Visual Style
+
+| Aspect | Details |
+|--------|---------|
+| **What** | Changes the application's VCL style (colours, borders, controls) |
+| **Where** | View > Style menu |
+| **When** | Any time; the change applies immediately |
+| **Why** | Personal preference, or a dark style for low-light work |
+| **How** | View > Style > Select a style (Aqua Light Slate, Carbon, Glow, Windows, Windows10 Dark, Windows11 Modern Light) |
+| **Caveats** | Saved as `vcl_style` in `repositories.json`; empty means the Aqua Light Slate default. A saved style that is no longer linked into the program is ignored, with a warning in the log |
+| **Linkages** | The list comes from the styles linked into the executable (`Custom_Styles` in `GitBatchCommit.dproj`) |
+
 ### Column Sorting
 
 | Aspect | Details |
@@ -565,7 +577,7 @@ If a Git call is stuck on a network timeout, the drain gives up after 90 seconds
 | **Why** | Persist settings, repos, credentials between sessions |
 | **How** | Automatic - no manual editing required |
 | **Caveats** | Credentials are DPAPI-encrypted (current user, this machine) and appear as opaque `dpapi:` values; the rest of the file is plain JSON |
-| **Linkages** | Stores: Repository list, groups, credentials, settings, history, templates |
+| **Linkages** | Stores: Repository list, groups, credentials, settings, history, templates, visual style |
 
 ### Edit .gitignore
 

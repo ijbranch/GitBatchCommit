@@ -424,6 +424,9 @@ object MainForm: TMainForm
           OnClick = mnuFilterClick
         end
       end
+      object mnuStyle: TMenuItem
+        Caption = '&Style'
+      end
     end
     object mnuHelp: TMenuItem
       Caption = '&Help'

@@ -179,6 +179,10 @@ Use the **Group** dropdown in the toolbar. Groups let you organise repos into ca
 
 To assign a group: right-click a repository and choose **Set Group**.
 
+## Appearance
+
+Use **View > Style** to change the look of the application: Aqua Light Slate (the default), Carbon, Glow, Windows, Windows10 Dark or Windows11 Modern Light. The change applies at once and is remembered the next time you start the program.
+
 ## Pull Operations
 
 ### Pulling Changes
@@ -292,7 +296,7 @@ If [delphi-indexer](https://github.com/JavierusTk/delphi-lookup) is installed, t
 
 ### Configuration File
 
-Settings, credentials, repositories, commit history, and templates are stored in:
+Settings, credentials, repositories, commit history, templates, and the chosen visual style are stored in:
 
 ```
 %APPDATA%\GitBatchCommit\repositories.json

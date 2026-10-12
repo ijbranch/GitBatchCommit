@@ -123,6 +123,7 @@ type
     mnuFilterDiverged: TMenuItem;
     mnuFilterConflicted: TMenuItem;
     mnuFilterError: TMenuItem;
+    mnuStyle: TMenuItem;
     mnuHelp: TMenuItem;
     mnuHelpContents: TMenuItem;
     mnuHelpSep1: TMenuItem;
@@ -360,6 +361,13 @@ type
     /// <param name="Key">Virtual key code; set to 0 to swallow the keystroke.</param>
     /// <param name="Shift">Modifier keys held down.</param>
     procedure mmoLogKeyDown( Sender: TObject; var Key: Word; Shift: TShiftState );
+  protected
+    /// <summary>
+    ///   Registers the window for folder drag-and-drop. Done here rather than in
+    ///   FormCreate because changing the VCL style can recreate the handle, which
+    ///   would silently drop the registration.
+    /// </summary>
+    procedure CreateWnd; override;
   private
     const
       WM_LOAD_REPOS = WM_USER + 100;
@@ -393,6 +401,14 @@ type
       WORKER_SHUTDOWN_TIMEOUT_MS = 90000;
     var
       FRepoManager  : TGitRepoManager;
+      /// <summary>
+      ///   Style names behind the View > Style items, indexed by each item's Tag.
+      /// </summary>
+      FStyleNames   : TArray<string>;
+      /// <summary>
+      ///   Index into FStyleNames of the style waiting for ApplyPendingStyle, or -1.
+      /// </summary>
+      FPendingStyle : Integer;
       FUpdatingList : Boolean;
       FSortColumn   : Integer;
       FSortAscending: Boolean;
@@ -463,6 +479,14 @@ type
     procedure WMLoadRepos( var Msg: TMessage ); message WM_USER + 100;
 
     /// <summary>
+    ///   One-shot Application.OnIdle handler: applies and saves the style chosen
+    ///   from View > Style, then unhooks itself.
+    /// </summary>
+    /// <param name="Sender">The application.</param>
+    /// <param name="Done">Left True so the application waits for the next message.</param>
+    procedure ApplyPendingStyle( Sender: TObject; var Done: Boolean );
+
+    /// <summary>
     ///   Refreshes all repositories asynchronously in background threads.
     /// </summary>
     procedure RefreshReposAsync;
@@ -518,6 +542,33 @@ type
     ///   Updates the filter menu checkmarks.
     /// </summary>
     procedure UpdateFilterMenuChecks;
+
+    /// <summary>
+    ///   Fills View > Style with one radio item per VCL style linked into the
+    ///   executable, in alphabetical order.
+    /// </summary>
+    procedure BuildStyleMenu;
+
+    /// <summary>
+    ///   Ticks the View > Style item for the style currently active.
+    /// </summary>
+    procedure UpdateStyleMenuChecks;
+
+    /// <summary>
+    ///   Queues the chosen style for <see cref="ApplyPendingStyle"/>. Never switches
+    ///   style directly: that frees the styled menu bar's hook while its menu
+    ///   loop is still on the stack, and the loop then touches the freed hook.
+    /// </summary>
+    /// <param name="Sender">The View > Style item clicked.</param>
+    procedure mnuStyleItemClick( Sender: TObject );
+
+    /// <summary>
+    ///   Activates a VCL style by name and redraws what a style change does not
+    ///   restore by itself.
+    /// </summary>
+    /// <param name="sStyleName">Registered style name; unknown names are ignored.</param>
+    /// <returns>True when the style is now active.</returns>
+    function ApplyStyle( const sStyleName: string ): Boolean;
 
     /// <summary>
     ///   Updates the enabled state of the Commit & Push button.
@@ -768,6 +819,9 @@ var
 
 implementation
 
+uses
+  Vcl.Themes;
+
 {$R *.dfm}
 
 /// <summary>
@@ -789,11 +843,9 @@ begin
   FCommitting       := False;
   FBatchRunning     := False;
   FPopulatePending  := False;
+  FPendingStyle     := -1;
   FFilteredIndices  := TList<Integer>.Create;
   FRepoManager      := TGitRepoManager.Create;
-
-  // Enable drag-and-drop support
-  DragAcceptFiles( Handle, True );
 
   // Enable Ctrl+Enter shortcut for Commit & Push
   KeyPreview        := True;
@@ -804,6 +856,7 @@ begin
 
   // Set initial filter menu state
   UpdateFilterMenuChecks;
+  BuildStyleMenu;
 
   // Set initial button state (disabled until conditions met)
   UpdateCommitButtonState;
@@ -843,6 +896,10 @@ begin
 
     if ( not FRepoManager.LoadConfig ) then
       mmoLog.Lines.Add( 'Warning: Failed to load configuration file' );
+
+    // Empty means no choice has been saved yet: keep the start-up default.
+    if ( not FRepoManager.StyleName.IsEmpty ) and ( not ApplyStyle( FRepoManager.StyleName ) ) then
+      mmoLog.Lines.Add( Format( 'Warning: Saved style "%s" is not available', [ FRepoManager.StyleName ] ) );
 
     // FRepoCache is the UI-side snapshot and is not filled until
     // PopulateListView below, so reading its length here saw 0 on a cold
@@ -1024,6 +1081,7 @@ begin
   // nothing at all. A flag each callback checks is the only thing that works.
   FShuttingDown     := True;
   TInterlocked.Exchange( FCancelRefresh, 1 );
+  Application.OnIdle := nil;
 
   // FormCloseQuery already refuses to close while work is in flight, so
   // reaching here with workers running means shutdown was not user-initiated
@@ -1172,6 +1230,118 @@ begin
   mnuFilterPushRequired.Checked := ( FStatusFilter = 5 );
   mnuFilterDiverged.Checked := ( FStatusFilter = 6 );
   mnuFilterConflicted.Checked := ( FStatusFilter = 7 );
+
+end;
+
+/// <summary>
+///   Registers the window for folder drag-and-drop each time its handle is created.
+/// </summary>
+procedure TMainForm.CreateWnd;
+begin
+
+  inherited;
+  DragAcceptFiles( Handle, True );
+
+end;
+
+/// <summary>
+///   Fills View > Style with one radio item per VCL style linked into the executable.
+/// </summary>
+procedure TMainForm.BuildStyleMenu;
+begin
+
+  FStyleNames       := TStyleManager.StyleNames;
+  TArray.Sort<string>( FStyleNames );
+  mnuStyle.Clear;
+
+  for var i := 0 to High( FStyleNames ) do
+  begin
+    var Item        := TMenuItem.Create( mnuStyle );
+    Item.Caption    := FStyleNames[ i ];
+    Item.Tag        := i;
+    Item.RadioItem  := True;
+    Item.GroupIndex := 1;
+    Item.OnClick    := mnuStyleItemClick;
+    mnuStyle.Add( Item );
+  end;
+
+  UpdateStyleMenuChecks;
+
+end;
+
+/// <summary>
+///   Ticks the View > Style item for the style currently active.
+/// </summary>
+procedure TMainForm.UpdateStyleMenuChecks;
+begin
+
+  var sActive       := TStyleManager.ActiveStyle.Name;
+
+  for var i := 0 to mnuStyle.Count - 1 do
+    mnuStyle.Items[ i ].Checked := SameText( FStyleNames[ mnuStyle.Items[ i ].Tag ], sActive );
+
+end;
+
+/// <summary>
+///   Queues the chosen style; it is applied after the menu loop has exited.
+/// </summary>
+procedure TMainForm.mnuStyleItemClick( Sender: TObject );
+begin
+
+  // Changing style here, inside the menu loop, frees TMainMenuBarStyleHook
+  // under TrackMenuFromItem, which then calls Invalidate on it (EAccessViolation).
+  // A posted message is no better: ProcessMenuLoop runs one more
+  // PeekMessage/DispatchMessage pass after the click, and then calls MenuExit on
+  // itself. OnIdle fires only from TApplication.HandleMessage, which that loop
+  // never calls, so by then the menu loop is gone.
+  FPendingStyle     := ( Sender as TMenuItem ).Tag;
+  Application.OnIdle := ApplyPendingStyle;
+
+end;
+
+/// <summary>
+///   Applies and saves the style chosen from View > Style, then unhooks itself.
+/// </summary>
+procedure TMainForm.ApplyPendingStyle( Sender: TObject; var Done: Boolean );
+begin
+
+  Application.OnIdle := nil;
+  var iIndex        := FPendingStyle;
+  FPendingStyle     := -1;
+
+  if ( iIndex < 0 ) or ( iIndex > High( FStyleNames ) ) then
+    Exit;
+
+  var sStyleName    := FStyleNames[ iIndex ];
+
+  if ( not ApplyStyle( sStyleName ) ) then
+  begin
+    Log( Format( 'Could not apply style "%s"', [ sStyleName ] ) );
+    Exit;
+  end;
+
+  FRepoManager.StyleName := sStyleName;
+  FRepoManager.SaveConfig;
+
+end;
+
+/// <summary>
+///   Activates a VCL style by name and redraws what a style change does not restore.
+/// </summary>
+function TMainForm.ApplyStyle( const sStyleName: string ): Boolean;
+begin
+
+  if SameText( TStyleManager.ActiveStyle.Name, sStyleName ) then
+    Result          := True
+  else
+    Result          := TStyleManager.TrySetStyle( sStyleName, False );
+
+  // The header sort arrow is drawn by a header message, not stored by the VCL,
+  // so a recreated list view loses it.
+  if Result then
+    SetColumnSortArrow( FSortColumn, FSortAscending );
+
+  UpdateStyleMenuChecks;
 
 end;
 

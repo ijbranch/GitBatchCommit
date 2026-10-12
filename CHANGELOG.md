@@ -4,6 +4,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **View > Style chooses the application's look** (2026-10-12) - `MainFrm.pas`, `MainFrm.dfm`, `uGitRepoManager.pas`, `GitBatchCommit.dproj`, `README.md`, `Help.md`, `Users Guide.md`. Four styles are now linked in beside the existing Aqua Light Slate: Carbon, Glow, Windows10 Dark and Windows11 Modern Light, plus the plain Windows look. The menu is built from whatever styles the executable contains, so adding a style to the project is enough to list it. The choice is saved as `vcl_style` in `repositories.json` and restored on start-up; an empty value keeps the Aqua Light Slate default, and a saved style that is no longer linked in is reported in the log and ignored.
+  - Drag-and-drop registration moved from `FormCreate` to a `CreateWnd` override. **Why:** a style change can recreate the window handle, which would otherwise silently stop folder dropping. The column sort arrow is redrawn after a change for the same reason.
+  - The switch is deferred to a one-shot `Application.OnIdle`, never made inside the menu click. **Why:** switching style there frees the styled menu bar's `TMainMenuBarStyleHook` while its `ProcessMenuLoop` is still on the stack, and the loop then calls `Invalidate` on the freed hook (`EAccessViolation`, read of `FFFFFFFFFFFFFFFF`, first build). A posted message does not help: the loop runs one more `PeekMessage`/`DispatchMessage` pass after the click and then calls `MenuExit` on itself. `OnIdle` fires only from `TApplication.HandleMessage`, which that loop never calls.
+
 ### Changed
 
 - **3rd-party library header added** (2026-10-06) - `MainFrm.pas`. The "Additional 3rd Party libraries used are..." block lists only the libraries this project's own units name in their uses clauses, at the installed version and date, and is written from `D:\Tools\ThirdPartyHeaders\ThirdPartyLibraries.txt` by `D:\Tools\ThirdPartyHeaders\Sync-ThirdPartyHeaders.py`.
