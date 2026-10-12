@@ -5,6 +5,8 @@ object MainForm: TMainForm
   ClientHeight = 600
   ClientWidth = 1097
   Color = clBtnFace
+  Constraints.MinHeight = 400
+  Constraints.MinWidth = 960
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -12
@@ -12,8 +14,6 @@ object MainForm: TMainForm
   Font.Style = []
   Menu = MainMenu
   Position = poScreenCenter
-  Constraints.MinHeight = 400
-  Constraints.MinWidth = 960
   OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnDestroy = FormDestroy
@@ -122,6 +122,9 @@ object MainForm: TMainForm
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 4
+    DesignSize = (
+      1097
+      45)
     object lblCommitMessage: TLabel
       Left = 8
       Top = 14
@@ -143,8 +146,8 @@ object MainForm: TMainForm
       Top = 10
       Width = 25
       Height = 25
-      Anchors = [akTop, akRight]
       Hint = 'Show/hide commit details'
+      Anchors = [akTop, akRight]
       Caption = '...'
       ParentShowHint = False
       ShowHint = True
@@ -156,8 +159,8 @@ object MainForm: TMainForm
       Top = 10
       Width = 25
       Height = 25
-      Anchors = [akTop, akRight]
       Hint = 'Commit message history'
+      Anchors = [akTop, akRight]
       Caption = #9660
       ParentShowHint = False
       ShowHint = True
@@ -169,8 +172,8 @@ object MainForm: TMainForm
       Top = 10
       Width = 25
       Height = 25
-      Anchors = [akTop, akRight]
       Hint = 'Commit message templates'
+      Anchors = [akTop, akRight]
       Caption = #9661
       ParentShowHint = False
       ShowHint = True
