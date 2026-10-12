@@ -356,5 +356,5 @@ If you deleted the wrong repository's folder, it is in the **Recycle Bin**. Rest
 
 ---
 
-*GitBatchCommit Users Guide - Version 1.7.0*
+*GitBatchCommit Users Guide - Version 1.8.0*
 *Last Updated: 19 September 2026*

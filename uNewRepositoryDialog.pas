@@ -33,13 +33,13 @@
 (*
   uNewRepositoryDialog.pas - New Repository Creation Dialog
 
-  Copyright (c) 2025 GITLAK Software
+  Copyright (c) 2026 GITLAK Software
   All Rights Reserved
 
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.7.0
+  Version: 1.8.0
 
   Part of GitBatchCommit Application
 

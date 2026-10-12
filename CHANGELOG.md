@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-12
+
 ### Added
 
 - **View > Style chooses the application's look** (2026-10-12) - `MainFrm.pas`, `MainFrm.dfm`, `uGitRepoManager.pas`, `GitBatchCommit.dproj`, `README.md`, `Help.md`, `Users Guide.md`. Four styles are now linked in beside the existing Aqua Light Slate: Carbon, Glow, Windows10 Dark and Windows11 Modern Light, plus the plain Windows look. The menu is built from whatever styles the executable contains, so adding a style to the project is enough to list it. The choice is saved as `vcl_style` in `repositories.json` and restored on start-up; an empty value keeps the Aqua Light Slate default, and a saved style that is no longer linked in is reported in the log and ignored.

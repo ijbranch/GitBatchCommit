@@ -566,6 +566,12 @@ This project is provided as-is for personal use only.
 > Full detail lives in `CHANGELOG.md`, which is the authoritative record of changes.
 > This section is a short summary only.
 
+### 1.8.0
+
+- **Added** View > Style - choose between Aqua Light Slate (the default), Carbon, Glow, Windows10 Dark, Windows11 Modern Light and the plain Windows look; the choice is remembered between sessions
+- **Fixed** version detection taking the highest `FileVersion` anywhere in a `.dproj`; it now resolves the version the default configuration actually builds, so the tag pushed on commit matches the binary
+- **Changed** the main unit header to list the 3rd-party libraries the project uses, at their installed versions
+
 ### 1.7.0
 
 - **Added** Delete Selected - deletes any combination of the list entry, the remote repository on GitHub or Codeberg, and the local folder. Irreversible options need the word `DELETE` typed; the local folder goes to the Recycle Bin
@@ -650,3 +656,4 @@ This project is provided as-is for personal use only.
 *Version: 1.5.1 – 28 July 2026*
 *Version: 1.6.0 – 30 August 2026*
 *Version: 1.7.0 – 19 September 2026*
+*Version: 1.8.0 – 12 October 2026*

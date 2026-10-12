@@ -33,13 +33,13 @@
 (*
   MainFrm.pas - Main Form Unit
 
-  Copyright (c) 2025 GITLAK Software
+  Copyright (c) 2026 GITLAK Software
   All Rights Reserved
 
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.7.0
+  Version: 1.8.0
 
   Part of GitBatchCommit Application
 
@@ -3510,7 +3510,7 @@ begin
     '  - Automatic version tagging for Delphi projects' + sLineBreak +
     '  - Drag and drop support' + sLineBreak +
     sLineBreak +
-    'Copyright (c) 2025 GITLAK Software' + sLineBreak +
+    'Copyright (c) 2026 GITLAK Software' + sLineBreak +
     'All Rights Reserved',
     mtInformation, [ mbOK ], 0 );
 

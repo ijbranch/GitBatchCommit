@@ -33,13 +33,13 @@
 (*
   uGitRepoManager.pas - Git Repository Manager Class
 
-  Copyright (c) 2025 GITLAK Software
+  Copyright (c) 2026 GITLAK Software
   All Rights Reserved
 
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.7.0
+  Version: 1.8.0
 
   Part of GitBatchCommit Application
 
@@ -66,7 +66,7 @@ const
   ///   Canonical application version. Update here and only here; surface
   ///   everywhere else ( About dialog, User-Agent header, docs ) by referencing.
   /// </summary>
-  APP_VERSION       = '1.7.0';
+  APP_VERSION       = '1.8.0';
 
   /// <summary>
   ///   Default timeout for Git operations in milliseconds (60 seconds).
