@@ -91,8 +91,8 @@ var
   Dlg               : TCodebergSettingsDialog;
 begin
 
-  Result := False;
-  Dlg := TCodebergSettingsDialog.Create( nil );
+  Result            := False;
+  Dlg               := TCodebergSettingsDialog.Create( nil );
 
   try
     Dlg.edtUsername.Text := sUsername;
@@ -100,9 +100,9 @@ begin
 
     if Dlg.ShowModal = mrOK then
     begin
-      sUsername := Trim( Dlg.edtUsername.Text );
-      sToken := Trim( Dlg.edtToken.Text );
-      Result := True;
+      sUsername     := Trim( Dlg.edtUsername.Text );
+      sToken        := Trim( Dlg.edtToken.Text );
+      Result        := True;
     end;
   finally
     Dlg.Free;

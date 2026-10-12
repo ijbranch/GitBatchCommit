@@ -114,12 +114,12 @@ type
       ///   The word that must be typed before either irreversible option is
       ///   allowed to proceed. Compared case-sensitively.
       /// </summary>
-      CONFIRM_WORD = 'DELETE';
+      CONFIRM_WORD  = 'DELETE';
 
-    /// <summary>
-    ///   Applies the local-delete coupling, the warning text and the enabled
-    ///   state of the Delete button to the current option selection.
-    /// </summary>
+      /// <summary>
+      ///   Applies the local-delete coupling, the warning text and the enabled
+      ///   state of the Delete button to the current option selection.
+      /// </summary>
     procedure UpdateState;
 
     /// <summary>
@@ -156,7 +156,7 @@ type
   end;
 
 var
-  DeleteRepositoryDialog : TDeleteRepositoryDialog;
+  DeleteRepositoryDialog: TDeleteRepositoryDialog;
 
 implementation
 
@@ -285,10 +285,10 @@ begin
 
     if Dlg.ShowModal = mrOk then
     begin
-      AOptions.RemoveEntry  := Dlg.chkRemoveEntry.Checked;
+      AOptions.RemoveEntry := Dlg.chkRemoveEntry.Checked;
       AOptions.DeleteRemote := Dlg.chkDeleteRemote.Checked;
-      AOptions.DeleteLocal  := Dlg.chkDeleteLocal.Checked;
-      Result                := True;
+      AOptions.DeleteLocal := Dlg.chkDeleteLocal.Checked;
+      Result        := True;
     end;
   finally
     Dlg.Free;
@@ -297,3 +297,4 @@ begin
 end;
 
 end.
+

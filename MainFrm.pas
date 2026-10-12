@@ -378,13 +378,13 @@ type
       // so Modified and Push Required were effectively transposed. Each value
       // below is now written as RGB( r, g, b ) so the intent and the paint
       // cannot drift apart again.
-      clStatusClean = TColor( $00E0FFE0 );        // RGB( 224, 255, 224 ) light green
-      clStatusModified = TColor( $00C0FFFF );     // RGB( 255, 255, 192 ) light yellow
+      clStatusClean = TColor( $00E0FFE0 ); // RGB( 224, 255, 224 ) light green
+      clStatusModified = TColor( $00C0FFFF ); // RGB( 255, 255, 192 ) light yellow
       clStatusPullRequired = TColor( $00C0E0FF ); // RGB( 255, 224, 192 ) light orange
-      clStatusError = TColor( $00C0C0FF );        // RGB( 255, 192, 192 ) light red
-      clStatusConflicted = TColor( $008080FF );   // RGB( 255, 128, 128 ) stronger red
+      clStatusError = TColor( $00C0C0FF ); // RGB( 255, 192, 192 ) light red
+      clStatusConflicted = TColor( $008080FF ); // RGB( 255, 128, 128 ) stronger red
       clStatusPushRequired = TColor( $00C0FFC0 ); // RGB( 192, 255, 192 ) pale green
-      clStatusDiverged = TColor( $00FFC0E0 );     // RGB( 224, 192, 255 ) light purple
+      clStatusDiverged = TColor( $00FFC0E0 ); // RGB( 224, 192, 255 ) light purple
 
       /// <summary>
       ///   Upper bound on the number of lines retained in the log memo. Oldest
@@ -1025,7 +1025,7 @@ end;
 procedure TMainForm.FormCloseQuery( Sender: TObject; var CanClose: Boolean );
 begin
 
-  CanClose := True;
+  CanClose          := True;
 
   if ( not IsBusy ) then
     Exit;
@@ -1039,32 +1039,32 @@ begin
   if StyledMessageDlg( 'Git operations are still running.' + sLineBreak + sLineBreak +
     'Cancel them and close once they have stopped?', mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
   begin
-    CanClose := False;
+    CanClose        := False;
     Exit;
   end;
 
   TInterlocked.Exchange( FCancelRefresh, 1 );
   Log( 'Cancelling background work...' );
-  Screen.Cursor := crHourGlass;
+  Screen.Cursor     := crHourGlass;
 
   try
     // Cancellation is checked between repositories, so a drain normally takes
     // only as long as the Git call in flight. Bounded so a wedged network call
     // cannot lock the user out of their own window.
-    var iWaited := 0;
+    var iWaited     := 0;
 
     while ( TInterlocked.CompareExchange( FActiveWorkers, 0, 0 ) > 0 ) and
-          ( iWaited < WORKER_SHUTDOWN_TIMEOUT_MS ) do
+      ( iWaited < WORKER_SHUTDOWN_TIMEOUT_MS ) do
     begin
       CheckSynchronize( 10 );
       Sleep( 10 );
       Inc( iWaited, 20 );
     end;
   finally
-    Screen.Cursor := crDefault;
+    Screen.Cursor   := crDefault;
   end;
 
-  CanClose := TInterlocked.CompareExchange( FActiveWorkers, 0, 0 ) = 0;
+  CanClose          := TInterlocked.CompareExchange( FActiveWorkers, 0, 0 ) = 0;
 
   if ( not CanClose ) then
     StyledMessageDlg( 'A Git operation has not stopped yet - it is probably waiting on a ' +
@@ -1090,7 +1090,7 @@ begin
   var iWaited       := 0;
 
   while ( TInterlocked.CompareExchange( FActiveWorkers, 0, 0 ) > 0 ) and
-        ( iWaited < WORKER_SHUTDOWN_TIMEOUT_MS ) do
+    ( iWaited < WORKER_SHUTDOWN_TIMEOUT_MS ) do
   begin
     // CheckSynchronize lets the workers' Synchronize/Queue calls complete so
     // they can actually finish, and Sleep keeps this off a 100% CPU spin.
@@ -1124,8 +1124,8 @@ begin
     else
     begin
       OutputDebugString( PChar( 'GitBatchCommit: worker still running at shutdown - ' +
-        'the repository manager was leaked deliberately rather than freed under it.' ) );
-      FRepoManager := nil;
+          'the repository manager was leaked deliberately rather than freed under it.' ) );
+      FRepoManager  := nil;
     end;
   end;
 
@@ -1138,7 +1138,7 @@ procedure TMainForm.RefreshRepoCache;
 begin
 
   if Assigned( FRepoManager ) then
-    FRepoCache := FRepoManager.SnapshotAll
+    FRepoCache      := FRepoManager.SnapshotAll
   else
     SetLength( FRepoCache, 0 );
 
@@ -1147,20 +1147,20 @@ end;
 function TMainForm.RepoAt( const iIndex: Integer; out ARepo: TRepoInfo ): Boolean;
 begin
 
-  Result := ( iIndex >= 0 ) and ( iIndex <= High( FRepoCache ) );
+  Result            := ( iIndex >= 0 ) and ( iIndex <= High( FRepoCache ) );
 
   if Result then
-    ARepo := FRepoCache[ iIndex ];
+    ARepo           := FRepoCache[ iIndex ];
 
 end;
 
 function TMainForm.RepoPathAt( const iIndex: Integer ): string;
 begin
 
-  Result := '';
+  Result            := '';
 
   if ( iIndex >= 0 ) and ( iIndex <= High( FRepoCache ) ) then
-    Result := FRepoCache[ iIndex ].Path;
+    Result          := FRepoCache[ iIndex ].Path;
 
 end;
 
@@ -1168,9 +1168,9 @@ function TMainForm.RepositoryCountText( const iCount: Integer ): string;
 begin
 
   if iCount = 1 then
-    Result := '1 repository'
+    Result          := '1 repository'
   else
-    Result := Format( '%d repositories', [ iCount ] );
+    Result          := Format( '%d repositories', [ iCount ] );
 
 end;
 
@@ -1184,7 +1184,7 @@ end;
 function TMainForm.IsBusy: Boolean;
 begin
 
-  Result := FRefreshing or FCommitting or FBatchRunning or
+  Result            := FRefreshing or FCommitting or FBatchRunning or
     ( TInterlocked.CompareExchange( FActiveWorkers, 0, 0 ) > 0 );
 
 end;
@@ -1195,19 +1195,19 @@ begin
   if FShuttingDown then
     Exit;
 
-  btnPullSelected.Enabled     := not bBusy;
+  btnPullSelected.Enabled := not bBusy;
   btnResolveConflicts.Enabled := not bBusy;
-  btnPushOnly.Enabled         := not bBusy;
-  btnForcePush.Enabled        := not bBusy;
-  btnSelectModified.Enabled   := not bBusy;
-  btnSelectAll.Enabled        := not bBusy;
-  btnSelectNone.Enabled       := not bBusy;
-  mnuAddRepository.Enabled    := not bBusy;
-  mnuRemoveSelected.Enabled   := not bBusy;
-  mnuDeleteSelected.Enabled   := not bBusy;
-  mnuRefreshStatus.Enabled    := not bBusy;
-  mnuSettings.Enabled         := not bBusy;
-  pmRepos.AutoPopup           := not bBusy;
+  btnPushOnly.Enabled := not bBusy;
+  btnForcePush.Enabled := not bBusy;
+  btnSelectModified.Enabled := not bBusy;
+  btnSelectAll.Enabled := not bBusy;
+  btnSelectNone.Enabled := not bBusy;
+  mnuAddRepository.Enabled := not bBusy;
+  mnuRemoveSelected.Enabled := not bBusy;
+  mnuDeleteSelected.Enabled := not bBusy;
+  mnuRefreshStatus.Enabled := not bBusy;
+  mnuSettings.Enabled := not bBusy;
+  pmRepos.AutoPopup := not bBusy;
 
   if bBusy then
     btnCommitPush.Enabled := False
@@ -1811,7 +1811,7 @@ begin
 
   for var iI := 0 to lvRepos.Items.Count - 1 do
   begin
-    var iRepoIndex := Integer( lvRepos.Items[ iI ].Data );
+    var iRepoIndex  := Integer( lvRepos.Items[ iI ].Data );
 
     if ( iRepoIndex < 0 ) or ( iRepoIndex > High( FRepoCache ) ) then
       Continue;
@@ -1820,11 +1820,11 @@ begin
       Continue;
 
     FRepoCache[ iRepoIndex ] := Repo;
-    FUpdatingList := True;
+    FUpdatingList   := True;
 
     try
-      var Item    := lvRepos.Items[ iI ];
-      Item.Caption := Repo.Name;
+      var Item      := lvRepos.Items[ iI ];
+      Item.Caption  := Repo.Name;
       Item.SubItems[ 0 ] := Repo.Path;
       Item.SubItems[ 1 ] := Repo.Branch;
       Item.SubItems[ 2 ] := RemoteProviderToString( Repo.Provider );
@@ -1930,7 +1930,7 @@ begin
 
   for var i := 0 to lvRepos.Items.Count - 1 do
   begin
-    iIndex := Integer( lvRepos.Items[ i ].Data );
+    iIndex          := Integer( lvRepos.Items[ i ].Data );
 
     if ( iIndex >= 0 ) and ( iIndex <= High( FRepoCache ) ) then
       FRepoManager.SetRepoSelected( FRepoCache[ iIndex ].Path, lvRepos.Items[ i ].Checked );
@@ -1945,7 +1945,7 @@ begin
   // commit batch runs on a worker thread and never set FBatchRunning, so Force
   // Push stayed clickable throughout it - two threads running Git in the same
   // working tree, which reaches the user as an index.lock failure.
-  Result := ( not FBatchRunning ) and ( not FRefreshing ) and ( not FCommitting );
+  Result            := ( not FBatchRunning ) and ( not FRefreshing ) and ( not FCommitting );
 
   if ( not Result ) then
   begin
@@ -1954,8 +1954,8 @@ begin
     Exit;
   end;
 
-  FBatchRunning := True;
-  FPopulatePending := False;
+  FBatchRunning     := True;
+  FPopulatePending  := False;
 
   // The flag alone is not a guard - it was only consulted by four of the
   // handlers that start Git work. Disabling the controls is.
@@ -1966,7 +1966,7 @@ end;
 procedure TMainForm.EndBatch;
 begin
 
-  FBatchRunning := False;
+  FBatchRunning     := False;
 
   if FShuttingDown then
     Exit;
@@ -1987,21 +1987,21 @@ var
   iIndex            : Integer;
 begin
 
-  List := TList<Integer>.Create;
+  List              := TList<Integer>.Create;
 
   try
     for var i := 0 to lvRepos.Items.Count - 1 do
     begin
       if lvRepos.Items[ i ].Checked then
       begin
-        iIndex := Integer( lvRepos.Items[ i ].Data );
+        iIndex      := Integer( lvRepos.Items[ i ].Data );
 
         if ( iIndex >= 0 ) and ( iIndex < FRepoManager.ReposCount ) then
           List.Add( iIndex );
       end;
     end;
 
-    Result := List.ToArray;
+    Result          := List.ToArray;
   finally
     List.Free;
   end;
@@ -2153,7 +2153,7 @@ begin
       Lines[ i ]    := Format( '%s  -  %s  -  %s', [ Repo.Name, sRemoteTarget, Repo.Path ] );
     end;
   finally
-    Screen.Cursor := crDefault;
+    Screen.Cursor   := crDefault;
   end;
 
   if ( not TDeleteRepositoryDialog.Execute( Lines, lAnyRemote, Options ) ) then
@@ -2214,11 +2214,11 @@ begin
     end;
 
     Log( Format( 'Delete completed: %d of %s fully processed.',
-      [ iSuccess, RepositoryCountText( iCount ) ] ) );
+        [ iSuccess, RepositoryCountText( iCount ) ] ) );
 
     if iSuccess < iCount then
       ErrorDlg( Format( '%s could not be deleted. See the log for the reason in each case.',
-        [ RepositoryCountText( iCount - iSuccess ) ] ), mtWarning );
+          [ RepositoryCountText( iCount - iSuccess ) ] ), mtWarning );
 
     PopulateListView;
   finally
@@ -2265,7 +2265,7 @@ begin
 
   if sSummary.IsEmpty then
   begin
-    StyledMessageDlg(  'Please enter a commit message.', mtWarning, [ mbOK ], 0 );
+    StyledMessageDlg( 'Please enter a commit message.', mtWarning, [ mbOK ], 0 );
     edtCommitMessage.SetFocus;
     Exit;
   end;
@@ -2300,8 +2300,8 @@ begin
     iRepoIndex      := Integer( lvRepos.Items[ iI ].Data );
 
     if lvRepos.Items[ iI ].Checked and RepoAt( iRepoIndex, Repo ) and
-       ( Repo.Status = rsModified ) then
-      RepoPaths := RepoPaths + [ Repo.Path ];
+      ( Repo.Status = rsModified ) then
+      RepoPaths     := RepoPaths + [ Repo.Path ];
   end;
 
   var iCount        := Length( RepoPaths );
@@ -2649,7 +2649,7 @@ begin
     Log( '=== Complete ===' );
     Log( 'Repository URL: https://codeberg.org/' + FRepoManager.CodebergUsername + '/' + sRepoName );
 
-    StyledMessageDlg(  'Repository created and pushed successfully!' + sLineBreak + sLineBreak +
+    StyledMessageDlg( 'Repository created and pushed successfully!' + sLineBreak + sLineBreak +
       'URL: https://codeberg.org/' + FRepoManager.CodebergUsername + '/' + sRepoName,
       mtInformation, [ mbOK ], 0 );
   finally
@@ -2705,7 +2705,7 @@ begin
   // Check credentials first
   if ( not FRepoManager.HasGitHubCredentials ) then
   begin
-    StyledMessageDlg(  'Please configure GitHub credentials first.', mtWarning, [ mbOK ], 0 );
+    StyledMessageDlg( 'Please configure GitHub credentials first.', mtWarning, [ mbOK ], 0 );
     mnuGitHubSettingsClick( nil );
 
     if ( not FRepoManager.HasGitHubCredentials ) then
@@ -2719,7 +2719,7 @@ begin
   // Check if already a Git repository
   if System.SysUtils.DirectoryExists( TPath.Combine( sFolder, '.git' ) ) then
   begin
-    StyledMessageDlg(  'The selected folder is already a Git repository.' + sLineBreak +
+    StyledMessageDlg( 'The selected folder is already a Git repository.' + sLineBreak +
       'Use File > Add Repository instead.', mtWarning, [ mbOK ], 0 );
     Exit;
   end;
@@ -2733,7 +2733,7 @@ begin
     Exit;
 
   // Confirm operation
-  if StyledMessageDlg(  Format( 'This will:%s%s' +
+  if StyledMessageDlg( Format( 'This will:%s%s' +
       '1. Initialize Git repository in: %s%s' +
       '2. Create %s repository "%s" on GitHub%s' +
       '3. Commit all files and push%s%s' +
@@ -2803,7 +2803,7 @@ begin
     Log( '=== Complete ===' );
     Log( 'Repository URL: https://github.com/' + FRepoManager.GitHubUsername + '/' + sRepoName );
 
-    StyledMessageDlg(  'Repository created and pushed successfully!' + sLineBreak + sLineBreak +
+    StyledMessageDlg( 'Repository created and pushed successfully!' + sLineBreak + sLineBreak +
       'URL: https://github.com/' + FRepoManager.GitHubUsername + '/' + sRepoName,
       mtInformation, [ mbOK ], 0 );
   finally
@@ -2832,7 +2832,7 @@ begin
 
   if lvRepos.Selected = nil then
   begin
-    StyledMessageDlg(  'Please select a repository to migrate.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg( 'Please select a repository to migrate.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
@@ -2862,7 +2862,7 @@ begin
   // Prompt for credentials if not yet configured
   if ( not lTargetHasCreds ) then
   begin
-    StyledMessageDlg(  'Please configure ' + sTargetName + ' credentials first.', mtWarning, [ mbOK ], 0 );
+    StyledMessageDlg( 'Please configure ' + sTargetName + ' credentials first.', mtWarning, [ mbOK ], 0 );
 
     if TargetProvider = rpCodeberg then
       mnuCodebergSettingsClick( nil )
@@ -2889,7 +2889,7 @@ begin
 
   if Repo.Provider = TargetProvider then
   begin
-    StyledMessageDlg(  Format( 'Repository "%s" is already hosted on %s.',
+    StyledMessageDlg( Format( 'Repository "%s" is already hosted on %s.',
         [ Repo.Name, sTargetName ] ), mtInformation, [ mbOK ], 0 );
     Exit;
   end;
@@ -2903,7 +2903,7 @@ begin
   if ( not TNewRepositoryDialog.Execute( sRepoName, sDescription, lPrivate, sTargetName ) ) then
     Exit;
 
-  if StyledMessageDlg(  Format(
+  if StyledMessageDlg( Format(
       'Migrate repository "%s" from %s to %s?%s%s' +
       'This will:%s' +
       '1. Create %s repository "%s" on %s%s' +
@@ -2954,7 +2954,7 @@ begin
         // leaving no dialog, no log line, and the hourglass cursor stuck on for
         // the rest of the session.
         try
-          lThreadOK   := FRepoManager.MigrateRepository( sRepoPath, TargetProvider,
+          lThreadOK := FRepoManager.MigrateRepository( sRepoPath, TargetProvider,
             sRepoName, sDescription, lPrivate, sThreadURL, sThreadError, sThreadLog );
         except
           on E: Exception do
@@ -2990,7 +2990,7 @@ begin
 
               PopulateListView;
 
-              StyledMessageDlg(  Format( 'Repository migrated to %s successfully.%s%sNew URL: %s%s%s' +
+              StyledMessageDlg( Format( 'Repository migrated to %s successfully.%s%sNew URL: %s%s%s' +
                   'The old remote still exists on %s — delete it via the web interface once you are satisfied.',
                   [ sTargetName, sLineBreak, sLineBreak, sThreadURL, sLineBreak, sLineBreak, sSourceName ] ),
                 mtInformation, [ mbOK ], 0 );
@@ -3044,7 +3044,7 @@ begin
 
   if lvRepos.Selected = nil then
   begin
-    StyledMessageDlg(  'Please select a repository.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg( 'Please select a repository.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
@@ -3056,18 +3056,18 @@ begin
     rpGitHub: sProviderName := 'GitHub';
     rpOther:
       begin
-        StyledMessageDlg(  'Visibility change only supported for GitHub and Codeberg repositories.',
+        StyledMessageDlg( 'Visibility change only supported for GitHub and Codeberg repositories.',
           mtWarning, [ mbOK ], 0 );
         Exit;
       end;
     rpNone:
       begin
-        StyledMessageDlg(  'This repository has no remote origin configured.', mtWarning, [ mbOK ], 0 );
+        StyledMessageDlg( 'This repository has no remote origin configured.', mtWarning, [ mbOK ], 0 );
         Exit;
       end;
   end;
 
-  if StyledMessageDlg(  Format( 'Make repository "%s" PUBLIC on %s?%s%s' +
+  if StyledMessageDlg( Format( 'Make repository "%s" PUBLIC on %s?%s%s' +
       'This will make the repository visible to everyone.',
       [ FRepoCache[ iIndex ].Name, sProviderName, sLineBreak, sLineBreak ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
@@ -3080,7 +3080,7 @@ begin
     begin
       Log( Format( 'Repository "%s" set to PUBLIC on %s',
           [ FRepoCache[ iIndex ].Name, sProviderName ] ) );
-      StyledMessageDlg(  'Repository visibility changed to PUBLIC.', mtInformation, [ mbOK ], 0 );
+      StyledMessageDlg( 'Repository visibility changed to PUBLIC.', mtInformation, [ mbOK ], 0 );
     end
     else
     begin
@@ -3106,7 +3106,7 @@ begin
 
   if lvRepos.Selected = nil then
   begin
-    StyledMessageDlg(  'Please select a repository.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg( 'Please select a repository.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
@@ -3118,18 +3118,18 @@ begin
     rpGitHub: sProviderName := 'GitHub';
     rpOther:
       begin
-        StyledMessageDlg(  'Visibility change only supported for GitHub and Codeberg repositories.',
+        StyledMessageDlg( 'Visibility change only supported for GitHub and Codeberg repositories.',
           mtWarning, [ mbOK ], 0 );
         Exit;
       end;
     rpNone:
       begin
-        StyledMessageDlg(  'This repository has no remote origin configured.', mtWarning, [ mbOK ], 0 );
+        StyledMessageDlg( 'This repository has no remote origin configured.', mtWarning, [ mbOK ], 0 );
         Exit;
       end;
   end;
 
-  if StyledMessageDlg(  Format( 'Make repository "%s" PRIVATE on %s?%s%s' +
+  if StyledMessageDlg( Format( 'Make repository "%s" PRIVATE on %s?%s%s' +
       'This will make the repository visible only to you.',
       [ FRepoCache[ iIndex ].Name, sProviderName, sLineBreak, sLineBreak ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
@@ -3142,7 +3142,7 @@ begin
     begin
       Log( Format( 'Repository "%s" set to PRIVATE on %s',
           [ FRepoCache[ iIndex ].Name, sProviderName ] ) );
-      StyledMessageDlg(  'Repository visibility changed to PRIVATE.', mtInformation, [ mbOK ], 0 );
+      StyledMessageDlg( 'Repository visibility changed to PRIVATE.', mtInformation, [ mbOK ], 0 );
     end
     else
     begin
@@ -3252,7 +3252,7 @@ begin
 
   if lvRepos.Selected = nil then
   begin
-    StyledMessageDlg(  'Please select a repository.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg( 'Please select a repository.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
@@ -3262,7 +3262,7 @@ begin
   // Check if .gitignore exists, offer to create if not
   if ( not FileExists( sGitignorePath ) ) then
   begin
-    if StyledMessageDlg(  Format( 'No .gitignore file exists in "%s".%s%sCreate one now?',
+    if StyledMessageDlg( Format( 'No .gitignore file exists in "%s".%s%sCreate one now?',
         [ FRepoCache[ iIndex ].Name, sLineBreak, sLineBreak ] ),
       mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
       Exit;
@@ -3342,7 +3342,7 @@ begin
 
   if lvRepos.Selected = nil then
   begin
-    StyledMessageDlg(  'Please select a repository.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg( 'Please select a repository.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
@@ -3398,7 +3398,7 @@ begin
 
     if slToAdd.Count = 0 then
     begin
-      StyledMessageDlg(  'All standard Delphi patterns are already in .gitignore.', mtInformation, [ mbOK ], 0 );
+      StyledMessageDlg( 'All standard Delphi patterns are already in .gitignore.', mtInformation, [ mbOK ], 0 );
       Exit;
     end;
 
@@ -3445,7 +3445,7 @@ begin
       end;
 
       Log( Format( 'Added %d Delphi patterns to .gitignore in %s', [ iAddedCount, FRepoCache[ iIndex ].Name ] ) );
-      StyledMessageDlg(  Format( 'Added %d patterns to .gitignore.', [ iAddedCount ] ), mtInformation, [ mbOK ], 0 );
+      StyledMessageDlg( Format( 'Added %d patterns to .gitignore.', [ iAddedCount ] ), mtInformation, [ mbOK ], 0 );
 
       // Refresh the repository status
       FRepoManager.RefreshStatus( RepoPathAt( iIndex ) );
@@ -3479,7 +3479,7 @@ begin
 
   if ( not FileExists( sReadmePath ) ) then
   begin
-    StyledMessageDlg(  'Users Guide.md not found in application folder.', mtWarning, [ mbOK ], 0 );
+    StyledMessageDlg( 'Users Guide.md not found in application folder.', mtWarning, [ mbOK ], 0 );
     Exit;
   end;
 
@@ -3608,14 +3608,14 @@ begin
 
   if sClientPath.IsEmpty then
   begin
-    StyledMessageDlg(  'No Git client configured. Please set the Git client path in File > Settings.',
+    StyledMessageDlg( 'No Git client configured. Please set the Git client path in File > Settings.',
       mtWarning, [ mbOK ], 0 );
     Exit;
   end;
 
   if ( not FileExists( sClientPath ) ) then
   begin
-    StyledMessageDlg(  'Git client not found: ' + sClientPath, mtError, [ mbOK ], 0 );
+    StyledMessageDlg( 'Git client not found: ' + sClientPath, mtError, [ mbOK ], 0 );
     Exit;
   end;
 
@@ -3822,14 +3822,14 @@ begin
       // invocation also passes '--' before the pattern.
       if ( not TGitRepoManager.IsSafeFilePattern( sFilePattern ) ) then
       begin
-        StyledMessageDlg(  'File pattern contains characters that are not allowed.' + sLineBreak + sLineBreak +
+        StyledMessageDlg( 'File pattern contains characters that are not allowed.' + sLineBreak + sLineBreak +
           'Use only letters, digits, glob characters ( * ? [ ] ), dots, dashes, underscores, slashes, commas, and spaces.',
           mtError, [ mbOK ], 0 );
         Exit;
       end;
 
       // Ask if user wants to configure delphi-indexer path
-      if StyledMessageDlg(  'Configure delphi-indexer.exe path?' + sLineBreak + sLineBreak +
+      if StyledMessageDlg( 'Configure delphi-indexer.exe path?' + sLineBreak + sLineBreak +
         'Current: ' + IfThen( sIndexerPath.IsEmpty, '(Auto-detect)', sIndexerPath ),
         mtConfirmation, [ mbYes, mbNo ], 0 ) = mrYes then
       begin
@@ -3846,7 +3846,7 @@ begin
           if OpenDialog.Execute then
             sIndexerPath := OpenDialog.FileName
           else
-            Exit;                       // User cancelled - don't save any settings
+            Exit; // User cancelled - don't save any settings
         finally
           OpenDialog.Free;
         end;
@@ -4130,7 +4130,7 @@ begin
 
   if iCount = 0 then
   begin
-    StyledMessageDlg(  'No repositories selected.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg( 'No repositories selected.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
@@ -4186,7 +4186,7 @@ begin
 
     // Show preview and confirm
     if bHasChanges then
-      bProceed := StyledMessageDlg(
+      bProceed      := StyledMessageDlg(
         'The following files will be MODIFIED by the pull:' + sLineBreak + sLineBreak +
         slPreview.Text + sLineBreak +
         'Do you want to proceed? (Backup branches will be created)',
@@ -4194,7 +4194,7 @@ begin
     else
     begin
       Log( 'No incoming changes detected (or could not determine changes).' );
-      bProceed := True;
+      bProceed      := True;
     end;
   finally
     slPreview.Free;
@@ -4284,11 +4284,11 @@ begin
 
   if iCount = 0 then
   begin
-    StyledMessageDlg(  'No repositories selected.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg( 'No repositories selected.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
-  if StyledMessageDlg(  Format( 'Resolve conflicts for %s by keeping LOCAL versions?' + sLineBreak +
+  if StyledMessageDlg( Format( 'Resolve conflicts for %s by keeping LOCAL versions?' + sLineBreak +
       sLineBreak + 'This will:' + sLineBreak +
       '- Keep your local version of every conflicted file' + sLineBreak +
       '- DISCARD the incoming remote version of those files' + sLineBreak +
@@ -4322,7 +4322,7 @@ begin
 
           // Track repo path for reindexing after loop completes
           if RepoAt( iRepoIndex, Repo ) and
-             ( slReindexDirs.IndexOf( Repo.Path ) = -1 ) then
+            ( slReindexDirs.IndexOf( Repo.Path ) = -1 ) then
             slReindexDirs.Add( Repo.Path );
         end;
 
@@ -4369,11 +4369,11 @@ begin
 
   if iCount = 0 then
   begin
-    StyledMessageDlg(  'No repositories selected.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg( 'No repositories selected.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
-  if StyledMessageDlg(  Format( 'Push %s without committing?', [ RepositoryCountText( iCount ) ] ),
+  if StyledMessageDlg( Format( 'Push %s without committing?', [ RepositoryCountText( iCount ) ] ),
     mtConfirmation, [ mbYes, mbNo ], 0 ) <> mrYes then
     Exit;
 
@@ -4447,7 +4447,7 @@ begin
 
   if iCount = 0 then
   begin
-    StyledMessageDlg(  'No repositories selected.', mtInformation, [ mbOK ], 0 );
+    StyledMessageDlg( 'No repositories selected.', mtInformation, [ mbOK ], 0 );
     Exit;
   end;
 
@@ -4539,7 +4539,7 @@ begin
   // UTF-8 character split across two reads raised EEncodingError, because
   // TEncoding.UTF8 is built with MB_ERR_INVALID_CHARS — and the process and
   // thread handles were closed only on the straight-line success path.
-  Result := RunProcessCaptureOutput( ACommand, '', AOutput, ATimeout );
+  Result            := RunProcessCaptureOutput( ACommand, '', AOutput, ATimeout );
 
 end;
 
@@ -4662,7 +4662,7 @@ begin
       '.env' + sLineBreak +
       'dist/' + sLineBreak
   else
-    Exit;                               // (None) — no .gitignore
+    Exit; // (None) — no .gitignore
 
   try
     // The single-argument overload writes UTF-8 WITHOUT a BOM. Git does not
@@ -4712,7 +4712,7 @@ begin
   begin
     if not FRepoManager.HasGitHubCredentials then
     begin
-      StyledMessageDlg(  'Please configure GitHub credentials first.', mtWarning, [ mbOK ], 0 );
+      StyledMessageDlg( 'Please configure GitHub credentials first.', mtWarning, [ mbOK ], 0 );
       mnuGitHubSettingsClick( nil );
 
       if not FRepoManager.HasGitHubCredentials then
@@ -4723,7 +4723,7 @@ begin
   begin
     if not FRepoManager.HasCodebergCredentials then
     begin
-      StyledMessageDlg(  'Please configure Codeberg credentials first.', mtWarning, [ mbOK ], 0 );
+      StyledMessageDlg( 'Please configure Codeberg credentials first.', mtWarning, [ mbOK ], 0 );
       mnuCodebergSettingsClick( nil );
 
       if not FRepoManager.HasCodebergCredentials then
@@ -4737,7 +4737,7 @@ begin
   sProjectType      := 'Delphi / Pascal';
 
   if ( not TNewRepositoryDialog.Execute( sRepoName, sDescription, lPrivate, sProjectType,
-    IfThen( iChoice = mrYes, 'GitHub', 'Codeberg' ) ) ) then
+      IfThen( iChoice = mrYes, 'GitHub', 'Codeberg' ) ) ) then
     Exit;
 
   // Write .gitignore based on project type before init
@@ -4845,7 +4845,7 @@ begin
       // a removable drive, and one run while it happened to be offline used to
       // erase the user's configured path permanently and silently.
       LogSafe( Format( 'Reindex: configured indexer not found at "%s" - trying PATH.',
-        [ FRepoManager.DelphiIndexerPath ] ) );
+          [ FRepoManager.DelphiIndexerPath ] ) );
   end;
 
   // 2. Check PATH environment variable
@@ -4857,7 +4857,7 @@ begin
     // SearchPath returns the REQUIRED buffer size when the result does not
     // fit, without writing the buffer at all — so a non-zero return is not on
     // its own proof that SearchBuffer holds anything.
-    iFound := SearchPath( nil, PChar( DELPHI_INDEXER_EXE ), nil, Length( SearchBuffer ), SearchBuffer, FilePart );
+    iFound          := SearchPath( nil, PChar( DELPHI_INDEXER_EXE ), nil, Length( SearchBuffer ), SearchBuffer, FilePart );
 
     if ( iFound > 0 ) and ( iFound < Cardinal( Length( SearchBuffer ) ) ) then
     begin

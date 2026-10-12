@@ -91,8 +91,8 @@ var
   Dlg               : TGitHubSettingsDialog;
 begin
 
-  Result := False;
-  Dlg := TGitHubSettingsDialog.Create( nil );
+  Result            := False;
+  Dlg               := TGitHubSettingsDialog.Create( nil );
 
   try
     Dlg.edtUsername.Text := sUsername;
@@ -100,9 +100,9 @@ begin
 
     if Dlg.ShowModal = mrOK then
     begin
-      sUsername := Trim( Dlg.edtUsername.Text );
-      sToken := Trim( Dlg.edtToken.Text );
-      Result := True;
+      sUsername     := Trim( Dlg.edtUsername.Text );
+      sToken        := Trim( Dlg.edtToken.Text );
+      Result        := True;
     end;
   finally
     Dlg.Free;

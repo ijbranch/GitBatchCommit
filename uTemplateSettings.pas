@@ -121,7 +121,7 @@ type
     /// </summary>
     procedure lstTemplatesClick( Sender: TObject );
   private
-    FTemplates        : TArray<string>;
+    FTemplates: TArray<string>;
 
     /// <summary>
     ///   Enables Edit and Delete only while a template is selected.
@@ -152,18 +152,18 @@ var
   Dlg               : TTemplateSettingsDialog;
 begin
 
-  Result := False;
-  Dlg := TTemplateSettingsDialog.Create( nil );
+  Result            := False;
+  Dlg               := TTemplateSettingsDialog.Create( nil );
 
   try
-    Dlg.FTemplates := Copy( Templates );
+    Dlg.FTemplates  := Copy( Templates );
     Dlg.PopulateList;
     Dlg.UpdateButtonStates;
 
     if Dlg.ShowModal = mrOK then
     begin
-      Templates := Copy( Dlg.FTemplates );
-      Result := True;
+      Templates     := Copy( Dlg.FTemplates );
+      Result        := True;
     end;
   finally
     Dlg.Free;
@@ -191,7 +191,7 @@ end;
 procedure TTemplateSettingsDialog.UpdateButtonStates;
 begin
 
-  btnEdit.Enabled := ( lstTemplates.ItemIndex >= 0 );
+  btnEdit.Enabled   := ( lstTemplates.ItemIndex >= 0 );
   btnDelete.Enabled := ( lstTemplates.ItemIndex >= 0 );
 
 end;
@@ -209,15 +209,15 @@ var
   iLen              : Integer;
 begin
 
-  sTemplate := '';
+  sTemplate         := '';
 
   if InputQuery( 'Add Template', 'Enter commit message template:', sTemplate ) then
   begin
-    sTemplate := Trim( sTemplate );
+    sTemplate       := Trim( sTemplate );
 
     if ( not sTemplate.IsEmpty ) then
     begin
-      iLen := Length( FTemplates );
+      iLen          := Length( FTemplates );
       SetLength( FTemplates, iLen + 1 );
       FTemplates[ iLen ] := sTemplate;
       PopulateList;
@@ -234,16 +234,16 @@ var
   sTemplate         : string;
 begin
 
-  iIndex := lstTemplates.ItemIndex;
+  iIndex            := lstTemplates.ItemIndex;
 
   if iIndex < 0 then
     Exit;
 
-  sTemplate := FTemplates[ iIndex ];
+  sTemplate         := FTemplates[ iIndex ];
 
   if InputQuery( 'Edit Template', 'Enter commit message template:', sTemplate ) then
   begin
-    sTemplate := Trim( sTemplate );
+    sTemplate       := Trim( sTemplate );
 
     if ( not sTemplate.IsEmpty ) then
     begin
@@ -261,7 +261,7 @@ var
   iIndex            : Integer;
 begin
 
-  iIndex := lstTemplates.ItemIndex;
+  iIndex            := lstTemplates.ItemIndex;
 
   if iIndex < 0 then
     Exit;
@@ -289,3 +289,4 @@ begin
 end;
 
 end.
+

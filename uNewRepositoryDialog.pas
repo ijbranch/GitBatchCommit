@@ -124,7 +124,7 @@ type
   end;
 
 var
-  NewRepositoryDialog    : TNewRepositoryDialog;
+  NewRepositoryDialog: TNewRepositoryDialog;
 
 implementation
 
@@ -133,7 +133,7 @@ implementation
 procedure TNewRepositoryDialog.DialogCloseQuery( Sender: TObject; var CanClose: Boolean );
 begin
 
-  CanClose := True;
+  CanClose          := True;
 
   if ModalResult <> mrOK then
     Exit;
@@ -142,7 +142,7 @@ begin
   begin
     StyledMessageDlg( 'Repository name is required.', mtWarning, [ mbOK ], 0 );
     edtRepoName.SetFocus;
-    CanClose := False;
+    CanClose        := False;
   end;
 
 end;
@@ -153,11 +153,11 @@ var
   Dlg               : TNewRepositoryDialog;
 begin
 
-  Result := False;
-  Dlg := TNewRepositoryDialog.Create( nil );
+  Result            := False;
+  Dlg               := TNewRepositoryDialog.Create( nil );
 
   try
-    Dlg.Caption := Format( 'Create %s Repository', [ sHostName ] );
+    Dlg.Caption     := Format( 'Create %s Repository', [ sHostName ] );
     Dlg.OnCloseQuery := Dlg.DialogCloseQuery;
     Dlg.edtRepoName.Text := sRepoName;
     Dlg.edtDescription.Text := sDescription;
@@ -166,7 +166,7 @@ begin
     // Shrink form — project type hidden by default in DFM. Move buttons up to fill the gap.
     // Position relative to the (already DPI-scaled) checkbox and use ScaleValue for the gaps,
     // so the layout stays correct on high-DPI displays instead of overlapping the checkbox.
-    Dlg.btnOK.Top := Dlg.chkPrivate.Top + Dlg.chkPrivate.Height + Dlg.ScaleValue( 16 );
+    Dlg.btnOK.Top   := Dlg.chkPrivate.Top + Dlg.chkPrivate.Height + Dlg.ScaleValue( 16 );
     Dlg.btnCancel.Top := Dlg.btnOK.Top;
     Dlg.ClientHeight := Dlg.btnOK.Top + Dlg.btnOK.Height + Dlg.ScaleValue( 15 );
 
@@ -174,10 +174,10 @@ begin
     begin
       // The name is guaranteed non-blank: OnCloseQuery refuses to let the
       // dialog close otherwise.
-      sRepoName := Trim( Dlg.edtRepoName.Text );
-      sDescription := Trim( Dlg.edtDescription.Text );
-      lPrivate := Dlg.chkPrivate.Checked;
-      Result := True;
+      sRepoName     := Trim( Dlg.edtRepoName.Text );
+      sDescription  := Trim( Dlg.edtDescription.Text );
+      lPrivate      := Dlg.chkPrivate.Checked;
+      Result        := True;
     end;
   finally
     Dlg.Free;
@@ -191,11 +191,11 @@ var
   Dlg               : TNewRepositoryDialog;
 begin
 
-  Result := False;
-  Dlg := TNewRepositoryDialog.Create( nil );
+  Result            := False;
+  Dlg               := TNewRepositoryDialog.Create( nil );
 
   try
-    Dlg.Caption := Format( 'Create %s Repository', [ sHostName ] );
+    Dlg.Caption     := Format( 'Create %s Repository', [ sHostName ] );
     Dlg.OnCloseQuery := Dlg.DialogCloseQuery;
     Dlg.edtRepoName.Text := sRepoName;
     Dlg.edtDescription.Text := sDescription;
@@ -229,11 +229,11 @@ begin
 
     if Dlg.ShowModal = mrOK then
     begin
-      sRepoName := Trim( Dlg.edtRepoName.Text );
-      sDescription := Trim( Dlg.edtDescription.Text );
-      lPrivate := Dlg.chkPrivate.Checked;
-      sProjectType := Dlg.cboProjectType.Text;
-      Result := True;
+      sRepoName     := Trim( Dlg.edtRepoName.Text );
+      sDescription  := Trim( Dlg.edtDescription.Text );
+      lPrivate      := Dlg.chkPrivate.Checked;
+      sProjectType  := Dlg.cboProjectType.Text;
+      Result        := True;
     end;
   finally
     Dlg.Free;
