@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Library list moved from the unit header to the README** (2026-10-15) — `README.md`, `MainFrm.pas`. The "Additional 3rd Party libraries used are..." list in `MainFrm.pas` is now one line pointing to the generated "Third-party libraries" section of `README.md`, written by `D:\Tools\ThirdPartyHeaders\Sync-ThirdPartyHeaders.py` from `ThirdPartyLibraries.txt`, with the list brought up to date on the way (FastMM5 after its upstream merge, among others; see `D:\Tools\CHANGELOG.md`). **Why:** Ian, 2026-10-15: the list belongs in the project's README, not in compiled source.
+
 ## [1.8.0] - 2026-10-12
 
 ### Added
