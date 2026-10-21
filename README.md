@@ -663,7 +663,7 @@ This project is provided as-is for personal use only.
 Requires to be built with Delphi v 13 or higher. Libraries named in this project's own units, at the installed version and the date it was installed (or, for a fork or our own library, last changed):
 
 - FastMM5 v 5.07 - Updated 15/10/2026
-- EurekaLog v 7.16.2.0 - 04/10/2026
+- EurekaLog v 7.16.2.1 - 22/10/2026
 - ETHEA Styled Components v 4.4.1 - 20/10/2026
 
 <!-- /third-party-libraries:GitBatchCommit -->
