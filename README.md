@@ -664,7 +664,7 @@ Requires to be built with Delphi v 13 or higher. Libraries named in this project
 
 - FastMM5 v 5.07 - Updated 24/10/2026
 - EurekaLog v 7.16.2.1 - 22/10/2026
-- ETHEA Styled Components v 4.4.1 - 20/10/2026
+- ETHEA Styled Components v 4.5.0 - 31/10/2026
 
 <!-- /third-party-libraries:GitBatchCommit -->
 
