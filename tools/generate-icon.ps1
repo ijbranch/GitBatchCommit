@@ -22,6 +22,7 @@
 .EXAMPLE
     pwsh -File tools\generate-icon.ps1
 #>
+#Requires -PSEdition Core
 
 Add-Type -AssemblyName System.Drawing
 
