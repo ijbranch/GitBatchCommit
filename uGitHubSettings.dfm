@@ -1,4 +1,4 @@
-object GitHubSettingsDialog: TGitHubSettingsDialog
+object GitHubSettingsForm: TGitHubSettingsForm
   Left = 0
   Top = 0
   BorderStyle = bsDialog
@@ -12,6 +12,7 @@ object GitHubSettingsDialog: TGitHubSettingsDialog
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poMainFormCenter
+  OnCloseQuery = FormCloseQuery
   TextHeight = 15
   object lblUsername: TLabel
     Left = 16
@@ -55,7 +56,7 @@ object GitHubSettingsDialog: TGitHubSettingsDialog
     PasswordChar = '*'
     TabOrder = 1
   end
-  object btnOK: TButton
+  object btnOK: TBitBtn
     Left = 216
     Top = 115
     Width = 75
@@ -65,7 +66,7 @@ object GitHubSettingsDialog: TGitHubSettingsDialog
     ModalResult = 1
     TabOrder = 2
   end
-  object btnCancel: TButton
+  object btnCancel: TBitBtn
     Left = 305
     Top = 115
     Width = 75

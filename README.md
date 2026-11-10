@@ -9,13 +9,13 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 ## Features
 
 - **Repository Management** - Add and remove Git repositories from a persistent list
-- **Delete Repositories** - Dispose of finished repositories rather than merely forgetting them: File > Delete Selected... (or the list's right-click menu) deletes any combination of the list entry, the remote repository on GitHub or Codeberg, and the local folder. Irreversible options require the word `DELETE` to be typed; the local folder goes to the Recycle Bin
-- **Drag and Drop** - Drag repository folders from Windows Explorer directly onto the application. Dropping a non-Git folder offers to initialise it, create a remote repo, and push in one step
-- **New Repository Initialisation** - Automatic project type detection with `.gitignore` generation for Delphi, C/C++, C#, Java, Python, JavaScript, TypeScript, Go, Rust, and HTML
-- **GitHub Integration** - Create new GitHub repositories and push directly from the application. GitHub is the default host
-- **Codeberg Integration** - Create new Codeberg repositories and push directly from the application
-- **Migrate Between Hosts** - Move a repository's remote from Codeberg to GitHub (or back) via the GitHub/Codeberg menus. Creates the new repo on the target host, preserves the previous origin as a secondary remote for safety, swaps `origin`, and pushes all branches and tags
-- **Visibility Management** - Change repository visibility (public/private) via right-click context menu
+- **Delete Repositories** - Dispose of finished repositories rather than merely forgetting them: File > Delete Selected... (or the list's right-click menu) deletes any combination of the list entry, the remote repository on GitHub, and the local folder. Irreversible options require the word `DELETE` to be typed; the local folder goes to the Recycle Bin
+- **Drag and Drop** - Drag repository folders from Windows Explorer directly onto the application. Dropping a non-Git folder offers to initialise it, create a GitHub repository, and push.  Every question is asked first, then the work runs in the background
+- **New Repository Initialisation** - Project type selection (Delphi by default) with `.gitignore` generation for Delphi, C/C++, C#, Java, Python, JavaScript, TypeScript, Go, Rust, and HTML
+- **GitHub Integration** - Create new GitHub repositories and push directly from the application.  GitHub is the only host the application creates, deletes or changes the visibility of
+- **Codeberg** - Removed in 1.9.0.  A repository whose remote is on Codeberg (or any other non-GitHub host) shows the provider **Other**; it can still be committed, pushed and pulled, and can be migrated to GitHub
+- **Migrate to GitHub** - Move a repository's remote from another host (Codeberg, for example) to GitHub via the GitHub menu. Creates the new repo on GitHub, preserves the previous origin as a secondary remote for safety, swaps `origin`, and pushes all branches and tags
+- **Visibility Management** - Change a GitHub repository's visibility (public/private) via right-click context menu; the change runs in the background
 - **Parallel Status Refresh** - Repository status checks run in parallel on background threads, keeping the UI responsive
 - **Status Detection** - Automatically detects repository status:
   - **Clean** - No local changes, and level with the remote
@@ -26,9 +26,11 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
   - **Diverged** - Both of the above, shown as `(+ahead/-behind)`
   - **Error** - Repository not accessible or not a valid Git repo
 
+  A branch that has commits and a remote but no upstream reads `Push Required (not on the remote)`; Push Only and Commit & Push set its upstream.  When the remote could not be reached during a refresh, ` - fetch failed` is appended, and the comparison is against the last fetched state.
+
   The working tree is assessed with `git status --porcelain`, which covers modified, staged, untracked, deleted and renamed files as well as dirty submodules. Unmerged paths are identified from the porcelain `XY` codes (`DD`, `AU`, `UD`, `UA`, `DU`, `AA`, `UU`) and take priority over everything else, because staging them with `add -A` would commit the conflict markers. Changes that are only build output (`.dcu`, `.map`, platform build folders and so on; `.exe` and `.hpp` are deliberately NOT treated as build output, since plenty of repositories track tooling binaries and C/C++ headers on purpose) do not count as modifications. The relationship to the remote is measured with `git rev-list --left-right --count @{upstream}...HEAD`, which is locale-independent and reports both directions at once. It is measured for **every** repository, whatever the state of the working tree: a repository can be modified and behind at once, and the single status slot can only name one of the two, so the pull it owes is carried in the status text instead.
 - **Branch Display** - Shows the current branch for each repository
-- **Remote Provider Display** - Shows the remote provider (GitHub, Codeberg, Other, None) for each repository. This is the provider of the remote the branch actually **tracks** (`branch.<name>.remote`), falling back to `origin` when a branch has no upstream - not always `origin`, because that is the remote a push or pull will contact and the one the ahead/behind counts are measured against
+- **Remote Provider Display** - Shows the remote provider (GitHub, Other, None) for each repository. This is the provider of the remote the branch actually **tracks** (`branch.<name>.remote`), falling back to `origin` when a branch has no upstream - not always `origin`, because that is the remote a push or pull will contact and the one the ahead/behind counts are measured against
 - **Version Display** - Shows the project version extracted from Delphi `.dproj` files (reads the root `.dproj`, falling back to a subdirectory scan) - resolving the version the project's **active configuration** builds, not the highest number in the file
 - **Automatic Version Tagging** - For Delphi projects, automatically creates and pushes Git tags based on the version number in the `.dproj` file when committing
 - **Batch Operations** - Commit and push to multiple repositories with one click
@@ -38,15 +40,16 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Column Sorting** - Click any column header to sort; click again to reverse order
 - **Status Filtering** - Use View > Filter menu to show only repositories with specific status
 - **Visual Styles** - Use View > Style to switch between Aqua Light Slate (default), Carbon, Glow, Windows, Windows10 Dark and Windows11 Modern Light; the choice is remembered
-- **Smart Button State** - Commit & Push button only enabled when repositories are selected and commit message is entered
+- **Smart Button State** - Commit & Push button only enabled when repositories are selected, commit message is entered, and no operation is running
 - **Operation Log** - Detailed log of all Git operations performed
 - **Help System** - Press F1 to view `Users Guide.md`; Help > About for version info
 - **Colour-Coded Status** - Repository rows are colour-coded by status (light green=Clean, light yellow=Modified, light orange=Pull Required, pale green=Push Required, light purple=Diverged, strong red=Conflicted, light red=Error)
 - **Open in Git Client** - Right-click to open repository in configured external Git client (e.g., Fork)
-- **Safe Refusals** - Declines rather than guessing when a repository's state cannot be established: an unfinished merge, rebase, cherry-pick, revert or bisect; unresolved conflicts; a detached or unborn HEAD; a branch that is behind its upstream and owes a pull; or a `git status` that failed or timed out. Force Push additionally refuses when the remote has moved since the last refresh
-- **Worktree and Submodule Support** - The real Git directory is resolved with `git rev-parse`, so linked worktrees and submodules (where `.git` is a file, not a folder) are handled like any other repository
+- **Safe Refusals** - Declines rather than guessing when a repository's state cannot be established: an unfinished merge, rebase, cherry-pick, revert or bisect; unresolved conflicts; a detached or unborn HEAD; a branch that is behind its upstream and owes a pull; or a `git status` that failed or timed out. Force Push additionally refuses when the remote has moved since the last refresh, or when no upstream commit was recorded at the last refresh
+- **Worktree and Submodule Support** - The real Git directory is resolved with `git rev-parse`, so linked worktrees and submodules (where `.git` is a file, not a folder) are handled like any other repository, and can be added with File > Add Repository
+- **Background Work** - Every Git operation runs off the UI thread.  While one runs, every command that starts Git work is disabled and folders dropped on the window are ignored (drop them again afterwards).  Closing the window while work is running asks whether to cancel it; cancellation takes effect between repositories
 - **Open in Explorer** - Right-click to open repository folder in Windows Explorer
-- **Pull Operation** - Right-click to pull changes from remote for a single repository (fast-forward only — refuses to create a merge commit on diverged history)
+- **Pull Operation** - Right-click to pull changes from remote for the right-clicked repository, through the same preview-and-backup flow as Pull Selected (fast-forward only — refuses to create a merge commit on diverged history)
 - **Commit Message History** - Click the dropdown button next to the commit message to select from recent messages (up to 20 stored)
 - **Commit Message Templates** - Define reusable commit message templates via File > Templates; select from the templates dropdown (▽) next to the commit message
 - **Commit Details** - Click the "..." button to add a detailed description below the summary line (standard Git commit format)
@@ -54,25 +57,26 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **File Pattern Filtering** - Optionally stage only files matching a pattern (e.g., `*.pas`) via File > Settings
 - **delphi-lookup Integration** - Automatically triggers incremental reindexing of committed repositories for delphi-lookup symbol search (optional, auto-detected)
 - **Pull Selected** - Pull changes from remote for multiple selected repositories at once (with safeguards)
-- **Resolve Conflicts** - Resolve an in-progress merge by keeping your local version of every conflicted file (the incoming remote version of those files is discarded), then commit and push. Repositories with no merge in progress are skipped
+- **Resolve Conflicts** - Resolve an in-progress merge by keeping your local version of every conflicted file (the incoming remote version of those files is discarded; files that merged cleanly keep the merged result), then commit and push. Repositories with no merge in progress are skipped; one in a rebase or cherry-pick is refused
 - **Push Only** - Push already-committed changes without creating a new commit (useful when local branch is ahead of remote)
 - **Force Push** - Force push to overwrite remote history when local code is the source of truth
 - **Pull Safeguards** - Multiple safety features protect your local code when pulling:
   - Warning dialog clearly explains that local files may be modified
   - Preview of incoming changes before pulling
-  - Automatic backup branch creation before any pull operation
+  - Automatic backup branch creation for every repository that has incoming changes (or whose preview failed); a repository whose backup branch cannot be created is not pulled
 
 ## Requirements
 
-- Delphi 10.3 Rio or higher (uses inline variable declarations)
+- Delphi 13 or higher (uses inline variable declarations and conditional expressions)
 - Git installed and available in system PATH
-- Windows operating system
+- Windows 10 or later
 
 ### Third-Party Dependencies
 
 | Component | Description | Source |
 |-----------|-------------|--------|
 | FastMM5 | High-performance memory manager | https://github.com/pleriche/FastMM5 |
+| OmniThreadLibrary | Background work runs on its thread pool (`OtlParallel`, used by `MainFrm.pas` and `uGitRepoManager.pas`) | `D:\gllOmniThreadLibrary` (GITLAK fork) |
 | VCL styles | Aqua Light Slate, Carbon, Glow, Windows10 Dark, Windows11 Modern Light - linked in via `Custom_Styles`; View > Style lists whatever is linked | Included with RAD Studio (`$(BDSCOMMONDIR)\Styles`) |
 | delphi-lookup | Optional: Delphi symbol indexer for auto-reindex after commits | https://github.com/JavierusTk/delphi-lookup |
 | EurekaLog 7 | Exception reporting; compiled in under the `EurekaLog` conditional define | https://www.eurekalog.com |
@@ -99,17 +103,21 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 1. Open Windows Explorer and navigate to your Git repositories
 2. Select one or more repository folders
 3. Drag and drop them onto the GitBatchCommit window
-4. Valid repositories are added automatically; non-repository folders are skipped
+4. Valid repositories are added automatically.  For each folder that is not a repository yet you are asked whether to initialise it and push it to a new GitHub repository (see [Creating a New GitHub Repository](#creating-a-new-github-repository)); every question is asked first, then the work runs in the background
+
+A folder already in the list is reported in the log as `Already in the list`.  Folders dropped while an operation is running are ignored; drop them again when it has finished.
 
 **Method 2: Menu**
 
 1. Select **File > Add Repository**
-2. Browse to a folder containing a Git repository (must have a `.git` subfolder)
-3. The repository is added to the list and its status is refreshed
+2. Browse to a folder containing a Git repository (a `.git` folder, or a `.git` file for a linked worktree or submodule)
+3. The repository is added to the list and its local status is shown; adding does not contact the remote, so the comparison with the remote arrives with the next refresh
+
+**Trust:** Git hooks in a listed repository run when this application commits or pushes there (versions before 1.9.0 disabled them with `-c core.hooksPath=`), and the repository's own Git configuration is honoured.  Adding a repository to the list means trusting its hooks: do not add a folder you do not trust.
 
 ### Removing Repositories
 
-1. Select a repository in the list
+1. Tick the repositories in the list
 2. Select **File > Remove Selected**
 3. Confirm the removal
 
@@ -117,14 +125,14 @@ Note: This only removes the repository from the list - it does not delete any fi
 
 ### Deleting Repositories
 
-**File > Delete Selected...**, or **Delete Selected...** on the list's right-click menu, deletes the checked repositories. Like Remove Selected it acts on the **checked** rows, not on the highlighted one.
+**File > Delete Selected...**, or **Delete Selected...** on the list's right-click menu, deletes repositories.  The File menu command acts on the **ticked** rows.  The right-click command acts on the right-clicked row when that row is not ticked, and on every ticked row when it is.  Closing the window during a Delete stops it after the repository it is on.
 
 The dialog lists every repository it is about to act on - name, the exact remote it resolved (as `GitHub: owner/name`), then the folder - and offers three independent choices. The remote comes before the path because a path is long and unbounded; the list scrolls horizontally when one runs past the edge:
 
 | Option | Effect |
 |--------|--------|
 | Remove the entry from this list | The list entry only. Nothing on disk or on the host is touched |
-| Delete the remote repository on its host | Deletes the repository on GitHub or Codeberg through the provider's API, with its issues, releases and history. **Permanent** |
+| Delete the remote repository on its host | Deletes the repository on GitHub through its API, with its issues, releases and history. **Permanent**.  A remote on any other host cannot be deleted from here |
 | Delete the local folder | Sends the working-tree folder to the **Recycle Bin**, so it can be restored from there |
 
 Either of the last two requires the word `DELETE` to be typed, exactly and in capitals, before the dialog's Delete button becomes available. Removing list entries alone needs no typed confirmation.
@@ -160,16 +168,18 @@ To refresh again at any time, select **File > Refresh Status** (or press **F5**)
    - **Select None** - Clears all selections
 3. Enter your commit message in the text field
 4. Click **Commit & Push Selected**
-5. Confirm the operation
-6. Monitor progress in the log panel
+5. Confirm the operation.  Only ticked repositories whose status is **Modified** are committed; the confirmation names the ticked ones that will be skipped
+6. Monitor progress in the log panel.  If any repository does not complete, a summary names it, and the log gives the reason
 
 The application performs the following Git commands for each selected repository:
 
 ```
 git add -A
 git commit -F <temp message file>
-git push
+git push                          (git push -u <remote> -- <branch> when the branch has no upstream)
 ```
+
+Git hooks in the repository (`pre-commit`, `commit-msg`, `pre-push` and so on) run as they would from the command line.
 
 **Automatic Version Tagging (Delphi Projects):**
 
@@ -177,14 +187,14 @@ If the repository contains a Delphi project file (`.dproj`) with version informa
 
 1. Extract the `FileVersion` the project's **active configuration** builds, from the `.dproj` file (e.g., `1.0.1.25`)
 2. Create an annotated Git tag with `v` prefix (e.g., `v1.0.1.25`)
-3. Push the tag to the remote repository
+3. Push the tag to the same remote as the commit
 
 Tags are only created if they don't already exist. This means:
 - First commit with version `1.0.1.25` → creates tag `v1.0.1.25`
 - Subsequent commits with same version → no new tag (already exists)
 - Commit after incrementing version to `1.0.1.26` → creates tag `v1.0.1.26`
 
-The tags appear in your repository's **Tags** or **Releases** section on GitHub/Codeberg.
+The tags appear in your repository's **Tags** or **Releases** section on GitHub.
 
 ### Handling Pull Required Status
 
@@ -194,7 +204,7 @@ Repositories flagged as **Pull Required** can be updated in several ways:
 
 1. Right-click on a repository with **Pull Required** status
 2. Select **Pull**
-3. Confirm the operation
+3. Confirm the operation; the same warning, preview and backup steps as Pull Selected follow
 4. The repository status will be refreshed after the pull completes
 
 **Multiple Repositories (Pull Selected Button):**
@@ -202,8 +212,8 @@ Repositories flagged as **Pull Required** can be updated in several ways:
 1. Tick the checkboxes next to the repositories you want to pull
 2. Click **Pull Selected** in the toolbar
 3. Review the warning about local files being modified
-4. Review the preview of files that will change
-5. Confirm to proceed - backup branches are created automatically
+4. Incoming changes are fetched; review the preview of files that will change
+5. Confirm to proceed - a backup branch is created for each repository that has incoming changes
 6. All selected repositories will be pulled and their status refreshed
 
 **Pull Safeguards:**
@@ -211,8 +221,8 @@ Repositories flagged as **Pull Required** can be updated in several ways:
 The Pull operation includes multiple safety features to protect your local code:
 
 - **Warning Dialog** - Clear warning that local files may be modified
-- **Change Preview** - Shows exactly which files will be modified before pulling
-- **Automatic Backup** - Creates a timestamped backup branch (e.g., `backup-2026-01-15-143022-517`) before pulling
+- **Change Preview** - Fetches first and shows exactly which files will be modified before pulling
+- **Automatic Backup** - Creates a timestamped backup branch (e.g., `backup-2026-01-15-143022-517`) before pulling, for each repository that has incoming changes or whose preview failed (not on every pull).  If the backup branch cannot be created, that repository is not pulled
 - **Recovery Option** - If something goes wrong, reset to the backup branch with: `git reset --hard backup-YYYY-MM-DD-HHMMSS-zzz`
 
 To delete backup branches after confirming everything is OK: `git branch -d backup-YYYY-MM-DD-HHMMSS-zzz`
@@ -224,10 +234,10 @@ If a merge performed outside this application has left conflicts (shown in the l
 1. Tick the checkboxes next to repositories with conflicts
 2. Click **Resolve Conflicts** in the toolbar
 3. Confirm the operation
-4. All conflicts are resolved by keeping your local versions
+4. The conflicted files are resolved by keeping your local versions; files that merged cleanly keep the merged result, and uncommitted or untracked files are left as they are
 5. The resolution is committed and pushed automatically
 
-This is a "keep local" strategy - your local file versions take precedence over remote changes. Use this when you want to ensure your local code is preserved.
+This is a "keep local" strategy - your local file versions take precedence over remote changes for the conflicted files. Use this when you want to ensure your local code is preserved.  It acts only on a merge in progress: a repository with no merge in progress is skipped, and one in a rebase or cherry-pick is refused.
 
 ### Push Only
 
@@ -236,7 +246,7 @@ For repositories where you have committed changes locally but haven't pushed the
 1. Tick the checkboxes next to the repositories you want to push
 2. Click **Push Only** in the toolbar
 3. Confirm the operation
-4. Changes are pushed without creating a new commit
+4. Changes are pushed without creating a new commit.  A branch with no upstream (`Push Required (not on the remote)`) is pushed with `-u`, which sets its upstream
 
 This is useful when:
 - You've already committed manually in another Git client
@@ -262,95 +272,81 @@ When your local code is the "source of truth" and you need to overwrite the remo
 
 GitBatchCommit uses `git push --force-with-lease` rather than a bare `--force`, and pins the lease to the upstream commit recorded when the repository's status was last refreshed — that is, what the list was showing you. A push made by someone else since then **aborts the operation** instead of destroying their work. If you see a "stale info" or rejection message, refresh and review the incoming commits before trying again — that message means the force push just prevented data loss.
 
-The pinning matters: a bare `--force-with-lease` compares against the remote-tracking ref, and this application fetches on every status refresh. Without an explicit commit, its own background fetch would quietly move the ref forward and the lease would pass on commits you had never seen.
+The pinning matters: a bare `--force-with-lease` compares against the remote-tracking ref, and this application fetches on every status refresh. Without an explicit commit, its own background fetch would quietly move the ref forward and the lease would pass on commits you had never seen.  For the same reason a repository with no upstream commit recorded at the last refresh is refused rather than force pushed; use Push Only to publish such a branch.
 
 ### Creating a New GitHub Repository
 
-GitBatchCommit can initialize a local folder as a Git repository, create a corresponding repository on GitHub, and push the initial commit - all in one operation.
+GitBatchCommit can initialise a local folder as a Git repository, create a corresponding repository on GitHub, and push the initial commit - all in one operation, run in the background.
 
 **First-time Setup:**
 
 1. Select **GitHub > Settings**
 2. Enter your GitHub username
 3. Enter a personal access token (generate at github.com/settings/tokens with `repo` scope)
-4. Click **OK** - credentials are saved for future use
+4. Click **OK** - credentials are saved for future use.  A username without a token, or a token without a username, is refused; clear both to remove the credentials
 
 **Creating a Repository:**
 
-1. Select **GitHub > Initialize & Push to GitHub**
-2. Select the folder you want to initialize
-3. Enter the repository name (pre-filled from folder name)
+1. Select **GitHub > Initialise & Push to GitHub...**
+2. Select the folder you want to publish
+3. Enter the repository name (pre-filled from folder name).  A name GitHub would reject is refused, with a suggested alternative
 4. Optionally add a description
-5. Choose whether the repository should be private
-6. Confirm the operation
+5. Choose whether the repository should be private (new repositories default to private)
+6. For a folder that is not a repository yet, choose the project type, which writes a matching `.gitignore` (Delphi by default; `(None)` writes none, and an existing `.gitignore` is never overwritten)
+7. Confirm the operation
 
-The application will:
-- Initialize a Git repository in the folder
+The application will, in the background:
+- Initialise a Git repository in the folder
 - Create the repository on GitHub
 - Add the remote origin
 - Commit all files
 - Push to GitHub
 - Add the repository to your managed list
 
-### Creating a New Codeberg Repository
+The command can also be used on a folder that is **already** a Git repository: when it has no `origin` a GitHub repository is created for it, and its commits are then pushed; when it already has an `origin`, nothing is created and it is pushed there.  Each step already done is skipped, so a run that stopped part-way (a failed push, for example) is finished by running the command again on the same folder.
 
-GitBatchCommit can also initialize a local folder and push to Codeberg.
+Dropping folders that are not repositories on the window does the same for each of them: every question is asked first, then the work runs in the background.
 
-**First-time Setup:**
+**Codeberg:** Removed in 1.9.0.  There is no Codeberg menu, settings dialog, *Initialise & Push to Codeberg* or *Migrate to Codeberg* any more.  A Codeberg username and token stored by an older version are ignored, and dropped from the configuration file the next time it is saved.
 
-1. Select **Codeberg > Settings**
-2. Enter your Codeberg username
-3. Enter a personal access token (generate at codeberg.org/user/settings/applications)
-4. Click **OK** - credentials are saved for future use
+### Migrating a Repository to GitHub
 
-**Creating a Repository:**
-
-1. Select **Codeberg > Initialize & Push to Codeberg**
-2. Select the folder you want to initialize
-3. Enter the repository name (pre-filled from folder name)
-4. Optionally add a description
-5. Choose whether the repository should be private
-6. Confirm the operation
-
-The process is identical to GitHub - the application initializes the repository, creates it on Codeberg, and pushes the initial commit.
-
-### Migrating a Repository Between GitHub and Codeberg
-
-GitBatchCommit can move a repository's remote from one host to the other in a single operation. This works in both directions (Codeberg -> GitHub and GitHub -> Codeberg).
+GitBatchCommit can move a repository's remote from another host (Codeberg, for example) to GitHub in a single operation.
 
 **Steps:**
 
 1. Select the repository in the list
-2. Choose **GitHub > Migrate Selected Repository to GitHub...** or **Codeberg > Migrate Selected Repository to Codeberg...** depending on the destination
+2. Choose **GitHub > Migrate Selected Repository to GitHub...**
 3. Confirm/adjust the target repository name, description, and visibility in the dialog
 4. Review the confirmation summary and click **Yes**
 
 **What happens:**
 
-- The target repository is created on the destination host using your configured credentials
-- The existing `origin` remote is renamed to a provider-named alias (`codeberg` or `github`) so the old URL is preserved locally and can be restored if needed
-- `origin` is repointed to the new host
-- `git push -u origin --all` pushes every branch to the new host and sets upstream tracking
+- The target repository is created on GitHub using your configured credentials
+- The existing `origin` remote is renamed to `old-origin` so the old URL is preserved locally and can be restored if needed
+- `origin` is repointed to GitHub
+- `git push -u origin --all` pushes every branch to GitHub and sets upstream tracking
 - `git push origin --tags` pushes every tag
 
 **Important:**
 
-- The old remote repository is **not** deleted by the migration. Once you have confirmed the migration succeeded, delete it with **File > Delete Selected...** (ticking only *Delete the remote repository*), or manually via the web interface on the source host. Note that the deletion resolves the remote from the branch's **upstream**, which migration has already repointed at the new host - so check the target the dialog names before confirming.
-- Target-host credentials must be configured first (**GitHub > Settings...** or **Codeberg > Settings...**). If missing, the settings dialog opens automatically.
-- If a local remote of that alias name already exists, it is **left alone** and a numbered suffix is used instead — a mirror remote you set up yourself is never destroyed, along with its refspecs and push URL.
+- The old remote repository is **not** deleted by the migration. Once you have confirmed the migration succeeded, delete it manually via the web interface on the source host (Delete Selected can delete only a GitHub remote, and it resolves the remote from the branch's **upstream**, which migration has already repointed at GitHub).
+- GitHub credentials must be configured first (**GitHub > Settings...**). If missing, the settings dialog opens automatically.
+- The working tree must be clean and the repository must have at least one commit.
+- If a local remote named `old-origin` already exists, it is **left alone** and a numbered suffix is used instead (`old-origin-N`) — a mirror remote you set up yourself is never destroyed, along with its refspecs and push URL.
 - Branches that exist only on the old remote are recovered locally before the push, so nothing is left behind on the host you are migrating away from.
-- If any step fails, the original remotes are restored, so a failed migration cannot leave the repository with no `origin` or with `origin` pointing at an empty new remote.
+- If any step fails, the original remotes, branch upstreams and branch list are restored, so a failed migration cannot leave the repository with no `origin` or with `origin` pointing at an empty new remote.  The repository created on GitHub is left for you to remove.
 
 ### Changing Repository Visibility
 
-You can change the visibility of GitHub and Codeberg repositories directly from the application:
+You can change the visibility of GitHub repositories directly from the application:
 
 1. Right-click on a repository in the list
 2. Select **Set Public** or **Set Private**
-3. Confirm the operation
+3. Confirm the operation; the change runs in the background
 
 **Requirements:**
-- The repository must be hosted on GitHub or Codeberg
+- The repository must be hosted on GitHub
 - You must have the appropriate credentials configured
 - You must have permission to modify the repository settings
 
@@ -362,6 +358,8 @@ You can view and edit a repository's .gitignore file directly from the applicati
 2. Select **Edit .gitignore...**
 3. If no .gitignore file exists, you'll be prompted to create one
 4. The file opens in your system's default text editor
+
+**Fix .gitignore (Add Delphi Patterns)** on the same menu appends the standard Delphi build-output patterns that are missing.  The file keeps its line endings and encoding.  An ignore rule does not stop Git tracking a file it already tracks, and the application says so: run `git rm --cached <file>` in the repository and commit to stop tracking one.
 
 ### Shift-Click Selection
 
@@ -436,7 +434,7 @@ The application remembers your last 20 commit messages:
 2. Select a previous message from the list
 3. The message is inserted into the commit field
 
-Messages are automatically added to history when you successfully commit and push.
+Messages are automatically added to history as soon as a commit is made, whether or not the push that follows succeeds.
 
 ### Using Commit Details
 
@@ -456,7 +454,7 @@ Detailed description explaining the changes,
 which can span multiple lines.
 ```
 
-After a successful commit, the details panel is automatically cleared and hidden.
+Once every repository in the batch has succeeded, the details panel is automatically cleared and hidden.  While any repository is outstanding the details are kept, so the same message can be used again.
 
 ### Using Commit Message Templates
 
@@ -469,6 +467,8 @@ Create reusable commit message templates for common operations:
 3. Use **Edit...** to modify an existing template
 4. Use **Delete** to remove a template
 5. Click **OK** to save changes
+
+A blank template, or one already in the list, is refused.
 
 **Using Templates:**
 
@@ -484,8 +484,8 @@ Organise your repositories into groups for easier management:
 
 **Assigning a Group:**
 
-1. Tick the checkboxes next to the repositories you want to group
-2. Right-click on the list
+1. Tick the checkboxes next to the repositories you want to group, or skip this to group a single repository
+2. Right-click on a ticked row (or on the single unticked row to group just that one)
 3. Select **Set Group**
 4. If no groups exist yet, you'll be prompted to enter a new group name
 5. If groups exist, choose from the submenu:
@@ -493,7 +493,7 @@ Organise your repositories into groups for easier management:
    - Select **New Group...** to create a new group
    - Select **(Clear Group)** to remove the group assignment
 
-The group is applied to all checked repositories.
+The group is applied to the right-clicked row when that row is not ticked, and to every ticked repository when it is.
 
 **Filtering by Group:**
 
@@ -526,7 +526,11 @@ Repository paths and credentials are stored in a JSON file located at:
 
 The file is created automatically when you first add a repository or configure credentials.
 
-**Note:** Access tokens for GitHub and Codeberg are encrypted with the Windows Data Protection API (DPAPI) under your user account, with application-specific entropy, before being written to this file. They appear as an opaque `dpapi:`-prefixed value and can only be decrypted by the same Windows user on the same machine, so copying the file elsewhere does not carry a usable credential.
+If the file cannot be read (not valid JSON, for example), it is copied to `<config file>.unreadable-<timestamp>` beside it, a warning names the copy, and the session starts with an empty configuration; the original is never written over before it has been copied.  If even the copy cannot be made, nothing is saved in that session.  A failure to save settings, templates or credentials is reported in a warning, not logged as a success.
+
+A Codeberg username and token stored by a version before 1.9.0 are ignored, and dropped from the file the next time it is saved.
+
+**Note:** Access tokens for GitHub are encrypted with the Windows Data Protection API (DPAPI) under your user account, with application-specific entropy, before being written to this file. They appear as an opaque `dpapi:`-prefixed value and can only be decrypted by the same Windows user on the same machine, so copying the file elsewhere does not carry a usable credential.
 
 If encryption is ever unavailable, the token is **omitted from the file rather than written in clear text**, and the settings dialog tells you so. A stored token that cannot be decrypted is never overwritten with an empty value either — the original is written back untouched, so an environment problem cannot silently destroy the credential. Tokens written by an earlier build, whether in plain text or without entropy, are still read and are re-encrypted the next time settings are saved.
 
@@ -537,11 +541,12 @@ If encryption is ever unavailable, the token is **omitted from the file rather t
 | `GitBatchCommit.dpr` | Main project file |
 | `MainFrm.pas` | Main form unit - UI and user interaction |
 | `MainFrm.dfm` | Main form design file |
-| `uGitRepoManager.pas` | Git repository manager class - handles all Git, Codeberg, and GitHub operations |
-| `uNewRepositoryDialog.pas` | Host-neutral dialog for entering new repository details (GitHub or Codeberg) |
-| `uCodebergSettings.pas` | Dialog for configuring Codeberg credentials |
+| `uGitRepoManager.pas` | Git repository manager class - handles all Git and GitHub operations |
+| `uNewRepositoryDialog.pas` | Dialog for entering new repository details (name, description, visibility, project type) |
+| `uDeleteRepositoryDialog.pas` | Confirmation dialog for Delete Selected |
 | `uGitHubSettings.pas` | Dialog for configuring GitHub credentials |
 | `uTemplateSettings.pas` | Dialog for managing commit message templates |
+| `Tests\` | DUnitX test suite for the engine (`uGitRepoManager.pas`), GitBatchCommitTests |
 
 ## Limitations
 
@@ -549,7 +554,7 @@ If encryption is ever unavailable, the token is **omitted from the file rather t
 - Requires Git to be installed and in the system PATH
 - Merge conflict resolution uses "keep local" strategy only - for complex merges, use an external Git client
 - Single commit message for all repositories (by design)
-- Cannot delete remote repositories - must be done manually via GitHub/Codeberg web interface
+- GitHub only: a remote on any other host can be committed, pushed and pulled, but cannot be created, deleted or have its visibility changed from here
 
 ## Future Enhancements
 
@@ -565,6 +570,21 @@ This project is provided as-is for personal use only.
 
 > Full detail lives in `CHANGELOG.md`, which is the authoritative record of changes.
 > This section is a short summary only.
+
+### 1.9.0
+
+- **Removed** Codeberg support: the Codeberg menu and settings dialog, Initialise & Push to Codeberg and Migrate to Codeberg.  A Codeberg (or other non-GitHub) remote shows as **Other** and can still be committed, pushed, pulled and migrated to GitHub; stored Codeberg credentials are dropped at the next save
+- **Changed** Git hooks in a listed repository now run (earlier versions disabled them with `-c core.hooksPath=`); adding a repository means trusting its hooks
+- **Changed** GitHub > Initialise & Push to GitHub runs in the background, works on a folder that is already a repository, and resumes a run that stopped part-way; dropped folders are asked about first, then processed in the background; new repositories default to private
+- **Changed** the right-click Set Group and Delete Selected act on the right-clicked row when it is not ticked; Remove Selected asks for confirmation
+- **Changed** Commit & Push names the ticked repositories it will skip and the ones that did not complete, and keeps the details text until every repository succeeds
+- **Changed** Pull fetches and previews first, and creates a backup branch only where something is incoming; no backup, no pull
+- **Fixed** Resolve Conflicts keeps the local version of the conflicted files only, and only for a merge in progress
+- **Fixed** Force Push is refused when no upstream commit was recorded, or when the last refresh could not fetch from the remote; status text gains `- fetch failed` and `Push Required (not on the remote)`, and Push Only sets the upstream for such a branch
+- **Fixed** an unreadable configuration file is copied aside rather than overwritten, and failed saves are reported
+- **Fixed** Fix .gitignore keeps the file's line endings and encoding
+- **Added** linked worktrees and submodules can be added with File > Add Repository; dialogs refuse invalid repository names, half-entered credentials and blank or duplicate templates
+- **Changed** background work uses the OmniThreadLibrary thread pool, and every command that starts Git work is disabled while one runs
 
 ### 1.8.0
 
@@ -656,6 +676,7 @@ This project is provided as-is for personal use only.
 *Version: 1.5.1 – 28 July 2026*
 *Version: 1.6.0 – 30 August 2026*
 *Version: 1.7.0 – 19 September 2026*
+*Version: 1.8.0 – 12 October 2026*
 
 <!-- third-party-libraries:GitBatchCommit - generated by E:\DBiWorkflow Development\DBiCommonFiles\ThirdPartyHeaders\Sync-ThirdPartyHeaders.py from ThirdPartyLibraries.txt; edit the master list, not this section -->
 ## Third-party libraries
@@ -665,7 +686,8 @@ Requires to be built with Delphi v 13 or higher. Libraries named in this project
 - FastMM5 v 5.07 - Updated 24/10/2026
 - EurekaLog v 7.16.2.1 - 22/10/2026
 - ETHEA Styled Components v 4.6.0 - 04/11/2026
+- OmniThreadLibrary v 3.09 (gllOmniThreadLibrary) - 06/11/2026
 
 <!-- /third-party-libraries:GitBatchCommit -->
 
-*Version: 1.8.0 – 12 October 2026*
+*Version: 1.9.0 – 10 November 2026*

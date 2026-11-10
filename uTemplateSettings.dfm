@@ -1,4 +1,4 @@
-object TemplateSettingsDialog: TTemplateSettingsDialog
+object TemplateSettingsForm: TTemplateSettingsForm
   Left = 0
   Top = 0
   BorderStyle = bsDialog
@@ -12,7 +12,6 @@ object TemplateSettingsDialog: TTemplateSettingsDialog
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poMainFormCenter
-  OnCreate = FormCreate
   TextHeight = 15
   object lblTemplates: TLabel
     Left = 16
@@ -30,7 +29,7 @@ object TemplateSettingsDialog: TTemplateSettingsDialog
     TabOrder = 0
     OnClick = lstTemplatesClick
   end
-  object btnAdd: TButton
+  object btnAdd: TBitBtn
     Left = 359
     Top = 37
     Width = 75
@@ -39,7 +38,7 @@ object TemplateSettingsDialog: TTemplateSettingsDialog
     TabOrder = 1
     OnClick = btnAddClick
   end
-  object btnEdit: TButton
+  object btnEdit: TBitBtn
     Left = 359
     Top = 68
     Width = 75
@@ -49,7 +48,7 @@ object TemplateSettingsDialog: TTemplateSettingsDialog
     TabOrder = 2
     OnClick = btnEditClick
   end
-  object btnDelete: TButton
+  object btnDelete: TBitBtn
     Left = 359
     Top = 99
     Width = 75
@@ -59,7 +58,7 @@ object TemplateSettingsDialog: TTemplateSettingsDialog
     TabOrder = 3
     OnClick = btnDeleteClick
   end
-  object btnOK: TButton
+  object btnOK: TBitBtn
     Left = 278
     Top = 284
     Width = 75
@@ -69,7 +68,7 @@ object TemplateSettingsDialog: TTemplateSettingsDialog
     ModalResult = 1
     TabOrder = 4
   end
-  object btnCancel: TButton
+  object btnCancel: TBitBtn
     Left = 359
     Top = 284
     Width = 75

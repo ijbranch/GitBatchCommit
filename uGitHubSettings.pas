@@ -7,7 +7,7 @@
   intellectual property and confidential information, is the exclusive
   property of Ian Branch (GITLAK Software).
 
-    A licence is granted for the sole purpose of personal use. only.
+    A licence is granted for the sole purpose of personal use only.
 
     THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS
   OR IMPLIED.
@@ -52,23 +52,53 @@ unit uGitHubSettings;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
-  System.SysUtils, System.Variants, System.Classes;
+  Vcl.Controls, Vcl.Forms, Vcl.StdCtrls, Vcl.Buttons,
+  System.Classes;
 
 type
   /// <summary>
   ///   Dialog form for configuring GitHub credentials.
   /// </summary>
-  TGitHubSettingsDialog = class( TForm )
+  TGitHubSettingsForm = class( TForm )
+    /// <summary>
+    ///   The "Username" label.
+    /// </summary>
     lblUsername: TLabel;
+    /// <summary>
+    ///   The "Access Token" label.
+    /// </summary>
     lblToken: TLabel;
+    /// <summary>
+    ///   The "Generate token at: github.com/settings/tokens" label.
+    /// </summary>
     lblHelp: TLabel;
+    /// <summary>
+    ///   GitHub user name.
+    /// </summary>
     edtUsername: TEdit;
+    /// <summary>
+    ///   GitHub personal access token; masked.
+    /// </summary>
     edtToken: TEdit;
-    btnOK: TButton;
-    btnCancel: TButton;
-  private
+    /// <summary>
+    ///   The "OK" button.
+    /// </summary>
+    btnOK: TBitBtn;
+    /// <summary>
+    ///   The "Cancel" button.
+    /// </summary>
+    btnCancel: TBitBtn;
+    /// <summary>
+    ///   Refuses OK when only one of the user name and the token is filled in.
+    /// </summary>
+    /// <remarks>
+    ///   Half a credential was accepted and saved, and then every GitHub
+    ///   command reported "credentials not configured" with nothing to say
+    ///   which half was missing.  Both blank is allowed: it clears them.
+    /// </remarks>
+    /// <param name="Sender">The form being closed.</param>
+    /// <param name="CanClose">Set False to keep the dialog open.</param>
+    procedure FormCloseQuery( Sender: TObject; var CanClose: Boolean );
   public
     /// <summary>
     ///   Shows the dialog and returns the entered credentials.
@@ -80,35 +110,72 @@ type
   end;
 
 var
-  GitHubSettingsDialog: TGitHubSettingsDialog;
+  /// <summary>
+  ///   Unused design-time instance variable; the dialog is created by
+  ///   <see cref="TGitHubSettingsForm.Execute"/>.
+  /// </summary>
+  GitHubSettingsForm: TGitHubSettingsForm;
 
 implementation
 
+uses
+  Vcl.Dialogs, Vcl.StyledTaskDialog,
+  System.SysUtils, System.UITypes;
+
 {$R *.dfm}
 
-class function TGitHubSettingsDialog.Execute( var sUsername, sToken: string ): Boolean;
-var
-  Dlg               : TGitHubSettingsDialog;
+procedure TGitHubSettingsForm.FormCloseQuery( Sender: TObject; var CanClose: Boolean );
+begin
+
+  CanClose          := True;
+
+  if ModalResult <> mrOk then
+    Exit;
+
+  var bHasUser      := not Trim( edtUsername.Text ).IsEmpty;
+  var bHasToken     := not Trim( edtToken.Text ).IsEmpty;
+
+  if bHasUser = bHasToken then
+    Exit;
+
+  CanClose          := False;
+
+  if bHasUser then
+  begin
+    StyledMessageDlg( 'Enter the access token as well, or clear the user name to remove the credentials.',
+      mtWarning, [ mbOK ], 0 );
+    edtToken.SetFocus;
+  end
+  else
+  begin
+    StyledMessageDlg( 'Enter the user name as well, or clear the access token to remove the credentials.',
+      mtWarning, [ mbOK ], 0 );
+    edtUsername.SetFocus;
+  end;
+
+end;
+
+class function TGitHubSettingsForm.Execute( var sUsername, sToken: string ): Boolean;
 begin
 
   Result            := False;
-  Dlg               := TGitHubSettingsDialog.Create( nil );
+
+  var oDialog       := TGitHubSettingsForm.Create( nil );
 
   try
-    Dlg.edtUsername.Text := sUsername;
-    Dlg.edtToken.Text := sToken;
+    oDialog.edtUsername.Text := sUsername;
+    oDialog.edtToken.Text := sToken;
 
-    if Dlg.ShowModal = mrOK then
+    if oDialog.ShowModal = mrOk then
     begin
-      sUsername     := Trim( Dlg.edtUsername.Text );
-      sToken        := Trim( Dlg.edtToken.Text );
+      sUsername     := Trim( oDialog.edtUsername.Text );
+      sToken        := Trim( oDialog.edtToken.Text );
       Result        := True;
     end;
   finally
-    Dlg.Free;
+    oDialog.Free;
   end;
 
 end;
 
 end.
-

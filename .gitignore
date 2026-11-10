@@ -75,3 +75,13 @@ __recovery/
 
 # Boss dependency manager vendor folder https://github.com/HashLoad/boss
 modules/
+
+# Editor and tool leftovers
+*.$$$
+*.bak[0-9]
+*.orig
+*.cbk
+*~
+
+# Test results
+*-results.xml

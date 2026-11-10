@@ -7,7 +7,7 @@
   intellectual property and confidential information, is the exclusive
   property of Ian Branch (GITLAK Software).
 
-    A licence is granted for the sole purpose of personal use. only.
+    A licence is granted for the sole purpose of personal use only.
 
     THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS
   OR IMPLIED.
@@ -39,7 +39,7 @@
   Licence: Provided as-is for personal use only.
 
   Author:  GITLAK Software
-  Version: 1.8.0
+  Version: 1.9.0
 
   Description:
     A Delphi VCL application for committing and pushing changes to multiple
@@ -77,11 +77,10 @@ uses
   Vcl.Styles,
   MainFrm in 'MainFrm.pas' {MainForm},
   uGitRepoManager in 'uGitRepoManager.pas',
-  uNewRepositoryDialog in 'uNewRepositoryDialog.pas' {NewRepositoryDialog},
-  uDeleteRepositoryDialog in 'uDeleteRepositoryDialog.pas' {DeleteRepositoryDialog},
-  uCodebergSettings in 'uCodebergSettings.pas' {CodebergSettingsDialog},
-  uGitHubSettings in 'uGitHubSettings.pas' {GitHubSettingsDialog},
-  uTemplateSettings in 'uTemplateSettings.pas' {TemplateSettingsDialog};
+  uNewRepositoryDialog in 'uNewRepositoryDialog.pas' {NewRepositoryForm},
+  uDeleteRepositoryDialog in 'uDeleteRepositoryDialog.pas' {DeleteRepositoryForm},
+  uGitHubSettings in 'uGitHubSettings.pas' {GitHubSettingsForm},
+  uTemplateSettings in 'uTemplateSettings.pas' {TemplateSettingsForm};
 
 {$R *.res}
 
@@ -90,11 +89,8 @@ begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
   TStyleManager.TrySetStyle( 'Aqua Light Slate' );
-  Application.Title := 'Git Batch Processor';
+  Application.Title := 'Git Batch Commit';
   Application.CreateForm(TMainForm, MainForm);
   Application.Run;
 
 end.
-
-
-

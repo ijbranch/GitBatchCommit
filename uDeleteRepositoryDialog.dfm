@@ -1,4 +1,4 @@
-object DeleteRepositoryDialog: TDeleteRepositoryDialog
+object DeleteRepositoryForm: TDeleteRepositoryForm
   Left = 0
   Top = 0
   BorderStyle = bsDialog
@@ -94,7 +94,7 @@ object DeleteRepositoryDialog: TDeleteRepositoryDialog
     TabOrder = 2
     OnChange = edtConfirmChange
   end
-  object btnDelete: TButton
+  object btnDelete: TBitBtn
     Left = 296
     Top = 414
     Width = 85
@@ -104,7 +104,7 @@ object DeleteRepositoryDialog: TDeleteRepositoryDialog
     ModalResult = 1
     TabOrder = 3
   end
-  object btnCancel: TButton
+  object btnCancel: TBitBtn
     Left = 389
     Top = 414
     Width = 85

@@ -7,7 +7,7 @@
   intellectual property and confidential information, is the exclusive
   property of Ian Branch (GITLAK Software).
 
-    A licence is granted for the sole purpose of personal use. only.
+    A licence is granted for the sole purpose of personal use only.
 
     THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS
   OR IMPLIED.
@@ -45,7 +45,7 @@
 
   Description:
     Dialog form for entering repository details when creating a new
-    Codeberg repository.
+    GitHub repository.
 *)
 
 unit uNewRepositoryDialog;
@@ -53,193 +53,192 @@ unit uNewRepositoryDialog;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
-  Vcl.StyledTaskDialog,
-  System.SysUtils, System.Variants, System.Classes, System.UITypes;
+  Vcl.Controls, Vcl.Forms, Vcl.StdCtrls, Vcl.Buttons,
+  System.Classes;
 
 type
   /// <summary>
-  ///   Dialog form for creating a new remote repository.
+  ///   Dialog form for entering the details of a new GitHub repository.
   /// </summary>
   /// <remarks>
-  ///   Host-neutral: the same dialog serves GitHub and Codeberg creation and
-  ///   both directions of migration, taking the host name as a parameter so
-  ///   its caption names whichever host it is actually creating on.
+  ///   Shared by Initialise &amp; Push, by a folder dropped on the main window
+  ///   and by migration.  The name is validated against GitHub's own rule
+  ///   before the dialog will close, so a rejected name is corrected here and
+  ///   never reaches the point where a repository has been half created.
   /// </remarks>
-  TNewRepositoryDialog = class( TForm )
+  TNewRepositoryForm = class( TForm )
+    /// <summary>
+    ///   The "Repository Name" label.
+    /// </summary>
     lblRepoName: TLabel;
+    /// <summary>
+    ///   The "Description" label.
+    /// </summary>
     lblDescription: TLabel;
+    /// <summary>
+    ///   Name of the repository to create.
+    /// </summary>
     edtRepoName: TEdit;
+    /// <summary>
+    ///   Optional description of the repository.
+    /// </summary>
     edtDescription: TEdit;
+    /// <summary>
+    ///   The "Private Repository" check box.
+    /// </summary>
     chkPrivate: TCheckBox;
+    /// <summary>
+    ///   The "Project Type" label.
+    /// </summary>
     lblProjectType: TLabel;
-    cboProjectType: TComboBox;
-    btnOK: TButton;
-    btnCancel: TButton;
-  private
+    /// <summary>
+    ///   Project type whose .gitignore template is written.
+    /// </summary>
+    cbProjectType: TComboBox;
+    /// <summary>
+    ///   The "OK" button.
+    /// </summary>
+    btnOK: TBitBtn;
+    /// <summary>
+    ///   The "Cancel" button.
+    /// </summary>
+    btnCancel: TBitBtn;
+    /// <summary>
+    ///   Refuses OK while the repository name is blank or not acceptable to
+    ///   GitHub.
+    /// </summary>
+    /// <remarks>
+    ///   Validating after ShowModal returned meant a bad name produced a
+    ///   warning and then a False result, which every caller reads as
+    ///   "cancelled" — so a typo threw away the description and the private
+    ///   flag the user had just filled in.
+    /// </remarks>
+    /// <param name="Sender">The form being closed.</param>
+    /// <param name="CanClose">Set False to keep the dialog open.</param>
+    procedure FormCloseQuery( Sender: TObject; var CanClose: Boolean );
   public
+    const
+      /// <summary>
+      ///   The project type that writes no .gitignore.
+      /// </summary>
+      PROJECT_TYPE_NONE = '(None)';
+
+      /// <summary>
+      ///   The project type offered by default.
+      /// </summary>
+      PROJECT_TYPE_DELPHI = 'Delphi / Pascal';
+
     /// <summary>
     ///   Shows the dialog and returns the entered values.
     /// </summary>
     /// <param name="sRepoName">Pre-filled and returned repository name.</param>
-    /// <param name="sDescription">Returned repository description.</param>
-    /// <param name="lPrivate">Returned private flag.</param>
-    /// <param name="sHostName">
-    ///   Name of the host the repository will be created on, used for the
-    ///   dialog caption. This dialog is shared by the Codeberg and GitHub
-    ///   flows and by migration in both directions, and its DFM caption said
-    ///   "Create Codeberg Repository" in every one of them — so creating a
-    ///   GitHub repository announced itself as a Codeberg one.
+    /// <param name="sDescription">Pre-filled and returned repository description.</param>
+    /// <param name="bPrivate">Pre-set and returned private flag.</param>
+    /// <param name="sProjectType">
+    ///   Pre-selected and returned project type, which decides the .gitignore
+    ///   written for a new repository.  Ignored, and returned unchanged, when
+    ///   <paramref name="bAskProjectType"/> is False.
     /// </param>
-    /// <returns>True if the user confirmed the dialog.</returns>
-    class function Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
-      const sHostName: string ): Boolean; overload;
-
-    /// <summary>
-    ///   Shows the dialog with project type selection and returns the entered values.
-    /// </summary>
-    /// <param name="sRepoName">Pre-filled and returned repository name.</param>
-    /// <param name="sDescription">Returned repository description.</param>
-    /// <param name="lPrivate">Returned private flag.</param>
-    /// <param name="sProjectType">Pre-selected and returned project type.</param>
-    /// <param name="sHostName">Name of the host, used for the dialog caption.</param>
-    /// <returns>True if the user confirmed the dialog.</returns>
-    class function Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
-      var sProjectType: string; const sHostName: string ): Boolean; overload;
-  private
-    /// <summary>
-    ///   Blocks OK while the repository name is blank.
-    /// </summary>
-    /// <remarks>
-    ///   Validating after ShowModal returned meant a blank name produced a
-    ///   warning and then a False result, which every caller reads as
-    ///   "cancelled" — so a typo silently threw away the description and the
-    ///   private flag the user had just filled in, and dropped them out of the
-    ///   whole flow.
-    /// </remarks>
-    /// <param name="Sender">The form being closed.</param>
-    /// <param name="CanClose">Set False to keep the dialog open.</param>
-    procedure DialogCloseQuery( Sender: TObject; var CanClose: Boolean );
+    /// <param name="bAskProjectType">
+    ///   True to offer the project type.  Migration passes False: the
+    ///   repository already exists and has whatever .gitignore it has.
+    /// </param>
+    /// <returns>True if the user confirmed the dialog with a valid name.</returns>
+    class function Execute( var sRepoName, sDescription: string; var bPrivate: Boolean; var sProjectType: string;
+      const bAskProjectType: Boolean ): Boolean;
   end;
 
 var
-  NewRepositoryDialog: TNewRepositoryDialog;
+  /// <summary>
+  ///   Unused design-time instance variable; the dialog is created by
+  ///   <see cref="TNewRepositoryForm.Execute"/>.
+  /// </summary>
+  NewRepositoryForm : TNewRepositoryForm;
 
 implementation
 
+uses
+  Vcl.Dialogs, Vcl.StyledTaskDialog,
+  System.SysUtils, System.UITypes,
+  uGitRepoManager;
+
 {$R *.dfm}
 
-procedure TNewRepositoryDialog.DialogCloseQuery( Sender: TObject; var CanClose: Boolean );
+procedure TNewRepositoryForm.FormCloseQuery( Sender: TObject; var CanClose: Boolean );
 begin
 
   CanClose          := True;
 
-  if ModalResult <> mrOK then
+  if ModalResult <> mrOk then
     Exit;
 
-  if Trim( edtRepoName.Text ).IsEmpty then
-  begin
-    StyledMessageDlg( 'Repository name is required.', mtWarning, [ mbOK ], 0 );
-    edtRepoName.SetFocus;
-    CanClose        := False;
-  end;
+  var sName         := Trim( edtRepoName.Text );
+
+  if IsValidRepoName( sName ) then
+    Exit;
+
+  if sName.IsEmpty then
+    StyledMessageDlg( 'Repository name is required.', mtWarning, [ mbOK ], 0 )
+  else
+    StyledMessageDlg( Format( '"%s" is not a valid repository name.' + sLineBreak + sLineBreak +
+      'Use letters, digits, "-", "_" and "." only, up to 100 characters.' + sLineBreak + sLineBreak +
+      'Suggested: %s', [ sName, SanitiseRepoName( sName ) ] ), mtWarning, [ mbOK ], 0 );
+
+  edtRepoName.SetFocus;
+  CanClose          := False;
 
 end;
 
-class function TNewRepositoryDialog.Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
-  const sHostName: string ): Boolean;
-var
-  Dlg               : TNewRepositoryDialog;
+class function TNewRepositoryForm.Execute( var sRepoName, sDescription: string; var bPrivate: Boolean;
+  var sProjectType: string; const bAskProjectType: Boolean ): Boolean;
 begin
 
   Result            := False;
-  Dlg               := TNewRepositoryDialog.Create( nil );
+
+  var oDialog       := TNewRepositoryForm.Create( nil );
 
   try
-    Dlg.Caption     := Format( 'Create %s Repository', [ sHostName ] );
-    Dlg.OnCloseQuery := Dlg.DialogCloseQuery;
-    Dlg.edtRepoName.Text := sRepoName;
-    Dlg.edtDescription.Text := sDescription;
-    Dlg.chkPrivate.Checked := lPrivate;
+    oDialog.edtRepoName.Text := sRepoName;
+    oDialog.edtDescription.Text := sDescription;
+    oDialog.chkPrivate.Checked := bPrivate;
 
-    // Shrink form — project type hidden by default in DFM. Move buttons up to fill the gap.
-    // Position relative to the (already DPI-scaled) checkbox and use ScaleValue for the gaps,
-    // so the layout stays correct on high-DPI displays instead of overlapping the checkbox.
-    Dlg.btnOK.Top   := Dlg.chkPrivate.Top + Dlg.chkPrivate.Height + Dlg.ScaleValue( 16 );
-    Dlg.btnCancel.Top := Dlg.btnOK.Top;
-    Dlg.ClientHeight := Dlg.btnOK.Top + Dlg.btnOK.Height + Dlg.ScaleValue( 15 );
-
-    if Dlg.ShowModal = mrOK then
+    if bAskProjectType then
     begin
-      // The name is guaranteed non-blank: OnCloseQuery refuses to let the
-      // dialog close otherwise.
-      sRepoName     := Trim( Dlg.edtRepoName.Text );
-      sDescription  := Trim( Dlg.edtDescription.Text );
-      lPrivate      := Dlg.chkPrivate.Checked;
-      Result        := True;
-    end;
-  finally
-    Dlg.Free;
-  end;
+      oDialog.cbProjectType.Items.AddStrings( [ PROJECT_TYPE_NONE, PROJECT_TYPE_DELPHI, 'C / C++', 'C#', 'Java',
+        'Python', 'JavaScript / Node', 'TypeScript', 'Go', 'Rust', 'HTML / Web' ] );
+      oDialog.cbProjectType.ItemIndex := oDialog.cbProjectType.Items.IndexOf( sProjectType );
 
-end;
-
-class function TNewRepositoryDialog.Execute( var sRepoName, sDescription: string; var lPrivate: Boolean;
-  var sProjectType: string; const sHostName: string ): Boolean;
-var
-  Dlg               : TNewRepositoryDialog;
-begin
-
-  Result            := False;
-  Dlg               := TNewRepositoryDialog.Create( nil );
-
-  try
-    Dlg.Caption     := Format( 'Create %s Repository', [ sHostName ] );
-    Dlg.OnCloseQuery := Dlg.DialogCloseQuery;
-    Dlg.edtRepoName.Text := sRepoName;
-    Dlg.edtDescription.Text := sDescription;
-    Dlg.chkPrivate.Checked := lPrivate;
-
-    // Populate project types
-    Dlg.cboProjectType.Items.Add( '(None)' );
-    Dlg.cboProjectType.Items.Add( 'Delphi / Pascal' );
-    Dlg.cboProjectType.Items.Add( 'C / C++' );
-    Dlg.cboProjectType.Items.Add( 'C#' );
-    Dlg.cboProjectType.Items.Add( 'Java' );
-    Dlg.cboProjectType.Items.Add( 'Python' );
-    Dlg.cboProjectType.Items.Add( 'JavaScript / Node' );
-    Dlg.cboProjectType.Items.Add( 'TypeScript' );
-    Dlg.cboProjectType.Items.Add( 'Go' );
-    Dlg.cboProjectType.Items.Add( 'Rust' );
-    Dlg.cboProjectType.Items.Add( 'HTML / Web' );
-
-    // Default to Delphi
-    if sProjectType.IsEmpty then
-      Dlg.cboProjectType.ItemIndex := 1
+      if oDialog.cbProjectType.ItemIndex < 0 then
+        oDialog.cbProjectType.ItemIndex := 0;
+    end
     else
-      Dlg.cboProjectType.ItemIndex := Dlg.cboProjectType.Items.IndexOf( sProjectType );
-
-    if Dlg.cboProjectType.ItemIndex < 0 then
-      Dlg.cboProjectType.ItemIndex := 0;
-
-    // Show/hide project type based on whether caller provided the param
-    Dlg.lblProjectType.Visible := True;
-    Dlg.cboProjectType.Visible := True;
-
-    if Dlg.ShowModal = mrOK then
     begin
-      sRepoName     := Trim( Dlg.edtRepoName.Text );
-      sDescription  := Trim( Dlg.edtDescription.Text );
-      lPrivate      := Dlg.chkPrivate.Checked;
-      sProjectType  := Dlg.cboProjectType.Text;
+      // No project type: hide the row and close the gap it leaves.  Measured
+      // from the controls themselves, so the layout holds at any scaling.
+      oDialog.lblProjectType.Visible := False;
+      oDialog.cbProjectType.Visible := False;
+      oDialog.btnOK.Top := oDialog.chkPrivate.Top + oDialog.chkPrivate.Height + oDialog.ScaleValue( 16 );
+      oDialog.btnCancel.Top := oDialog.btnOK.Top;
+      oDialog.ClientHeight := oDialog.btnOK.Top + oDialog.btnOK.Height + oDialog.ScaleValue( 15 );
+    end;
+
+    if oDialog.ShowModal = mrOk then
+    begin
+      // The name is guaranteed valid: FormCloseQuery refuses to let the dialog
+      // close otherwise.
+      sRepoName     := Trim( oDialog.edtRepoName.Text );
+      sDescription  := Trim( oDialog.edtDescription.Text );
+      bPrivate      := oDialog.chkPrivate.Checked;
+
+      if bAskProjectType then
+        sProjectType := oDialog.cbProjectType.Text;
+
       Result        := True;
     end;
   finally
-    Dlg.Free;
+    oDialog.Free;
   end;
 
 end;
 
 end.
-

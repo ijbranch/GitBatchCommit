@@ -9,7 +9,7 @@ GitBatchCommit lets you commit and push changes to multiple Git repositories at 
 ### Requirements
 
 - **Git** must be installed and available on your system PATH
-- **Windows** 7 SP1 or later
+- **Windows** 10 or later
 - An internet connection for push/pull operations
 
 ### First Launch
@@ -21,39 +21,43 @@ When you first start the application, the repository list will be empty. You nee
 **Drag and drop** is the easiest method:
 
 1. Open Windows Explorer alongside GitBatchCommit
-2. Select one or more folders that contain Git repositories (folders with a `.git` subfolder)
+2. Select one or more folders that contain Git repositories (folders with a `.git` subfolder, or a `.git` file for a linked worktree or submodule)
 3. Drag them onto the GitBatchCommit window
-4. They appear in the list and their status is checked automatically
+4. They appear in the list with their local status.  Adding does not contact the remote, so how they stand against it shows at the next refresh (**F5**)
 
-You can drag multiple folders at once.
+You can drag multiple folders at once.  A folder that is already listed is reported in the log as `Already in the list`.  While an operation is running, dropped folders are ignored: drop them again when it has finished.
 
 You can also use **File > Add Repository** to browse for a single folder.
 
 Repositories are saved automatically — they persist between sessions.
 
+**Only add repositories you trust.**  When GitBatchCommit commits or pushes, the repository's own Git hooks run (versions before 1.9.0 switched them off), so adding a repository to the list means trusting its hooks.
+
 ### Initialising a New Repository
 
-If you drop a folder that is **not** already a Git repository, the app offers to set it up for you:
+If you drop a folder that is **not** already a Git repository, the app offers to set it up for you on GitHub:
 
-1. A dialog asks which remote provider: **Yes** for GitHub (the default), **No** for Codeberg, or **Cancel** to skip
-2. You enter the repository name, description, and choose public or private
+1. A dialog asks whether to initialise it and push it to a new GitHub repository: **Yes** or **No**
+2. You enter the repository name and description, and choose public or private (private is the default).  A name GitHub would reject is refused, with a suggestion
 3. You select the **project type** (Delphi, Python, C#, etc.) — this generates an appropriate `.gitignore`
-4. The app initialises Git, creates the remote repository, commits all files, and pushes
+4. When you drop several folders, all the questions are asked first.  Then the app initialises Git, creates the GitHub repository, commits all files, and pushes, in the background
+
+You can do the same for one folder with **GitHub > Initialise & Push to GitHub...**.  That command also accepts a folder that is **already** a Git repository: if it has no `origin`, a GitHub repository is created for it, and its commits are then pushed.  If a run stops part-way (a failed push, say), run the command again on the same folder and it carries on from where it stopped.
 
 This is the quickest way to get a new project under version control and hosted remotely.
 
 ### Removing Repositories
 
-Select repositories in the list, then use **File > Remove Selected**. This only removes them from the app's list. No files are deleted from disk.
+Tick repositories in the list, then use **File > Remove Selected** and confirm. This only removes them from the app's list. No files are deleted from disk.
 
 ### Deleting Repositories
 
-Check the repositories you want gone, then use **File > Delete Selected...** (or **Delete Selected...** on the right-click menu). Like Remove Selected, it acts on the **checked** rows.
+Tick the repositories you want gone, then use **File > Delete Selected...** (or **Delete Selected...** on the right-click menu).  The File menu command acts on the **ticked** rows.  On the right-click menu it acts on the row you right-clicked when that row is not ticked, and on every ticked row when it is.
 
 The dialog names every repository it is about to act on, and asks which of three things to delete. You can pick any combination:
 
 - **Remove the entry from this list** — the harmless one. Nothing on disk or on the host is touched
-- **Delete the remote repository on its host** — deletes it on GitHub or Codeberg, with its issues, releases and history. This is permanent; the app cannot get it back
+- **Delete the remote repository on its host** — deletes it on GitHub, with its issues, releases and history (a remote on any other host cannot be deleted from here). This is permanent; the app cannot get it back
 - **Delete the local folder** — sends the folder to the Recycle Bin, so you can restore it from there
 
 Either of the last two needs the word `DELETE` typed in capitals before the Delete button will work. Just removing entries does not.
@@ -81,7 +85,7 @@ Each row shows:
 | **Name** | Repository folder name |
 | **Path** | Full path on disk |
 | **Branch** | Current Git branch (usually `main`) |
-| **Remote** | Hosting provider: GitHub, Codeberg, Other, or None |
+| **Remote** | Hosting provider: GitHub, Other, or None (Codeberg shows as Other since 1.9.0) |
 | **Tracked Files** | Number of files Git is tracking |
 | **Modified** | Number of changed/new/deleted files |
 | **Status** | Current state (see below) |
@@ -99,7 +103,7 @@ Rows are colour-coded:
 | Light yellow | Modified | You have uncommitted changes. Reads `Modified - n to pull` when the remote is ahead as well |
 | Strong red | Conflicted | Unmerged paths, or an unfinished merge/rebase |
 | Light orange | Pull Required | The remote has new commits you don't have locally |
-| Pale green | Push Required | Committed work that has not been pushed |
+| Pale green | Push Required | Committed work that has not been pushed.  Reads `Push Required (not on the remote)` for a branch that has never been pushed |
 | Light purple | Diverged | Commits on both sides - ahead AND behind |
 | Light red | Error | Path doesn't exist, or Git command failed |
 
@@ -107,19 +111,23 @@ A repository that is modified **and** behind its remote has **" - n to pull"** a
 
 A repository whose only changes are build output (`.dcu`, `.map`, `Win64\Release\` and so on) has **" - build output only"** appended to its status. Such a repository does not count as Modified, so Commit & Push deliberately skips it - the status text says so rather than leaving it out silently.
 
+If the remote could not be reached during a refresh, **" - fetch failed"** is appended: the comparison with the remote is based on what was last fetched, so it may be out of date.
+
 ### When an operation refuses
 
 GitBatchCommit refuses rather than guessing whenever it cannot be sure of a repository's state - an unfinished merge, rebase, cherry-pick, revert or bisect; unresolved conflicts; a detached or unborn HEAD; or a `git status` that failed or timed out. The reason appears in the log for that repository and the rest of the batch carries on.
 
-Force Push additionally refuses if the remote has moved on since the list was last refreshed. Note that Force Push does **not** create a backup branch - only Pull does - so that refusal is the only thing standing between you and someone else's commits. Refresh, review what came in, then decide.
+Force Push additionally refuses if the remote has moved on since the list was last refreshed, if the last refresh could not fetch from the remote (the status ends `- fetch failed`), or if no upstream commit was recorded at the last refresh (use Push Only for a branch that has never been pushed). Note that Force Push does **not** create a backup branch - only Pull does - so that refusal is the only thing standing between you and someone else's commits. Refresh, review what came in, then decide.
 
 ### Closing during an operation
 
-If you close the window while Git work is running, you are asked whether to cancel it. The window normally closes within a second or two of answering **Yes**, because cancellation is checked between repositories. If a Git call is stuck on a network timeout the window stays open and asks you to try again shortly - it will not free anything out from under a running operation.
+If you close the window while Git work is running, you are asked whether to cancel it. The window normally closes within a second or two of answering **Yes**, because cancellation is checked between repositories. If a Git call is stuck on a network timeout the window stays open and asks you to try again shortly - it will not free anything out from under a running operation.  A Delete Selected in progress stops after the repository it is on; close the window again once it has.
+
+While an operation is running, every command that starts Git work is greyed out, and so is the right-click menu.
 
 ### What the Remote Column Means
 
-It shows the provider of the remote your branch actually **tracks**, which is the one a push or pull will contact - not necessarily `origin`. If a branch tracks a different remote, the column names that one. So if it says Codeberg on a repository you believe is on GitHub, the branch is tracking the wrong remote; check with `git rev-parse --abbrev-ref @{u}`.
+It shows the provider of the remote your branch actually **tracks**, which is the one a push or pull will contact - not necessarily `origin`. If a branch tracks a different remote, the column names that one.  Any host other than GitHub, Codeberg included, shows as **Other**: such a repository can still be committed, pushed and pulled.  So if it says Other on a repository you believe is on GitHub, the branch is tracking the wrong remote; check with `git rev-parse --abbrev-ref @{u}`.
 
 ### Refreshing Status
 
@@ -141,7 +149,7 @@ This is what you'll do most often:
 6. Press **Ctrl+Enter** or click **Commit & Push Selected**
 7. Confirm the dialog
 
-All selected repositories are staged (`git add -A`), committed with your message, and pushed to their remote. The operation runs in the background — you can watch progress in the log panel.
+Only ticked repositories whose status is **Modified** are committed; if some ticked ones are not, the confirmation lists them as skipped.  Those repositories are staged (`git add -A`), committed with your message, and pushed to their remote. The operation runs in the background — you can watch progress in the log panel.  If any repository does not complete, a message names it (the log says why), and your commit details are kept so you can use them again.  The repository's own Git hooks run, just as they would from the command line.
 
 ### Adding Details to Your Commit
 
@@ -151,12 +159,13 @@ For a more detailed commit message (like the standard Git summary + body format)
 2. A details panel expands below the list
 3. Type your extended description there
 4. The commit message will be: your summary line, a blank line, then the details
+5. The details are cleared once every repository in the batch has succeeded
 
 ### Reusing Previous Messages
 
 - Click the **down arrow** button to see your last 20 commit messages
 - Click the **triangle** button to pick from saved templates
-- Manage templates via **File > Templates**
+- Manage templates via **File > Templates** (a blank template, or one already in the list, is refused)
 
 ## Selection Tools
 
@@ -177,7 +186,7 @@ Use **View > Filter** to show only repos with a specific status (All, Clean, Mod
 
 Use the **Group** dropdown in the toolbar. Groups let you organise repos into categories (e.g., "DBiWorkflow", "Libraries", "Tools").
 
-To assign a group: right-click a repository and choose **Set Group**.
+To assign a group: right-click a repository and choose **Set Group**.  If the row you right-click is ticked, the group goes to every ticked repository; if it is not ticked, only to that row.
 
 ## Appearance
 
@@ -192,17 +201,17 @@ When a repository shows "Pull Required" (orange):
 - **Right-click > Pull** for a single repo
 - **Pull Selected** button for multiple repos at once
 
-Before pulling, the app shows:
+Both work the same way.  Before pulling, the app shows:
 1. A warning that local files may be modified
-2. A preview of incoming changes
-3. An automatic backup branch is created (named `backup-YYYY-MM-DD-HHMMSS-zzz`)
+2. A preview of incoming changes, fetched first
+3. An automatic backup branch is created (named `backup-YYYY-MM-DD-HHMMSS-zzz`) for each repository that has incoming changes, or whose preview failed.  A repository with nothing incoming gets no backup branch.  If the backup branch cannot be created, that repository is not pulled
 
 ### Resolving Conflicts
 
 If a merge performed outside this application has left conflicts:
 
-1. Click **Resolve Conflicts** — this keeps your local version of conflicted files and **discards the incoming remote version of those files**. It only acts on a repository with a merge actually in progress; others are skipped
-2. Then click **Push Only** to send the resolution to the remote
+1. Click **Resolve Conflicts** — this keeps your local version of conflicted files and **discards the incoming remote version of those files**.  Files that merged without a conflict keep the merged result, and uncommitted or untracked files are left alone.  It only acts on a repository with a merge actually in progress; others are skipped, and one in the middle of a rebase or cherry-pick is refused
+2. The resolution is committed and pushed for you; if the push fails, click **Push Only** to send it to the remote
 
 For complex merges requiring manual review, use an external Git client instead.
 
@@ -211,8 +220,8 @@ For complex merges requiring manual review, use an external Git client instead.
 | Button | When to Use |
 |--------|-------------|
 | **Commit & Push Selected** | Normal workflow — stages, commits, and pushes |
-| **Push Only** | When you've already committed locally but haven't pushed yet |
-| **Force Push** | When you need to overwrite the remote with your local code (use with care — requires double confirmation). Uses `--force-with-lease`, so it aborts rather than overwriting if someone else has pushed since your last fetch |
+| **Push Only** | When you've already committed locally but haven't pushed yet.  For a branch that has never been pushed, it sets the upstream as well |
+| **Force Push** | When you need to overwrite the remote with your local code (use with care — requires double confirmation). Uses `--force-with-lease`, so it aborts rather than overwriting if someone else has pushed since your last fetch.  Refused when no upstream commit was recorded at the last refresh |
 
 **Reading the Status column**
 
@@ -223,6 +232,7 @@ For complex merges requiring manual review, use an external Git client instead.
 | Conflicted | Unmerged files, or a half-finished merge/rebase | Resolve Conflicts, or finish the operation in your Git client. Commit & Push will refuse until you do |
 | Pull Required (n) | The remote has n commits you do not | Pull Selected |
 | Push Required (n) | You have n commits the remote does not | Push Only |
+| Push Required (not on the remote) | The branch has never been pushed | Push Only (it sets the upstream) |
 | Diverged (+a/-b) | Both — you and the remote have moved on separately | Pull first, then push; or Force Push if your copy is authoritative |
 | Error | Not a valid or reachable repository | Check the path exists and contains `.git` |
 
@@ -230,23 +240,21 @@ For complex merges requiring manual review, use an external Git client instead.
 
 ### GitHub
 
-- **GitHub > Settings** — enter your username and personal access token (generate at github.com/settings/tokens, needs `repo` scope, plus `delete_repo` if you want Delete Selected to remove GitHub repositories)
-- **GitHub > Initialize & Push** — creates a new GitHub repo and pushes your local code to it
+- **GitHub > Settings** — enter your username and personal access token (generate at github.com/settings/tokens, needs `repo` scope, plus `delete_repo` if you want Delete Selected to remove GitHub repositories).  Enter both or neither: a username without a token, or the reverse, is refused
+- **GitHub > Initialise & Push to GitHub** — creates a new GitHub repo and pushes your local code to it, in the background (see [Initialising a New Repository](#initialising-a-new-repository))
 - **GitHub > Migrate Selected Repository to GitHub** — moves the selected repository from Codeberg (or another host) onto GitHub
 
 ### Codeberg
 
-- **Codeberg > Settings** — enter your username and API token (generate at codeberg.org/user/settings/applications)
-- **Codeberg > Initialize & Push** — creates a new Codeberg repo and pushes your local code to it
-- **Codeberg > Migrate Selected Repository to Codeberg** — moves the selected repository from GitHub (or another host) onto Codeberg
+Removed in 1.9.0: there is no longer a Codeberg menu, Codeberg settings, *Initialise & Push to Codeberg* or *Migrate to Codeberg*.  A repository on Codeberg shows as **Other** in the Remote column and can still be committed, pushed and pulled, or migrated to GitHub.  A Codeberg username and token saved by an older version are ignored, and removed from the configuration file the next time it is saved.
 
-### Migrating Between Hosts
+### Migrating to GitHub
 
-Select a repository, then pick **Migrate Selected Repository to GitHub** (under the GitHub menu) or **Migrate Selected Repository to Codeberg** (under the Codeberg menu). The target repo is created, `origin` is repointed to it, and all branches and tags are pushed. The previous origin URL is kept as a secondary remote (named `codeberg`, `github`, or `old-origin` when the previous host was neither) so it can be restored. The old remote repository is not deleted by the migration. Once you are satisfied with it, you can delete the old one with **File > Delete Selected...** (ticking only the remote option) or via the web UI — but note that the deletion targets the remote your branch now **tracks**, which migration has already repointed at the new host, so check the target the dialog names before confirming.
+Select a repository, then pick **Migrate Selected Repository to GitHub** (under the GitHub menu).  The GitHub repo is created, `origin` is repointed to it, and all branches and tags are pushed.  The previous origin URL is kept as a secondary remote named `old-origin` so it can be restored.  The old remote repository is not deleted by the migration.  Once you are satisfied with it, delete the old one via its host's web UI — Delete Selected cannot do it, because it deletes only GitHub remotes, and it targets the remote your branch now **tracks**, which migration has already repointed at GitHub.
 
 ### Changing Visibility
 
-Right-click a repository and choose **Set Public** or **Set Private** to change its visibility on GitHub or Codeberg.
+Right-click a repository and choose **Set Public** or **Set Private** to change its visibility on GitHub.  The change runs in the background.
 
 ## Context Menu (Right-Click)
 
@@ -256,12 +264,12 @@ Right-click any repository in the list for:
 |--------|--------------|
 | **Set Public / Set Private** | Changes remote visibility |
 | **Edit .gitignore** | Opens the repo's `.gitignore` in your default editor |
-| **Fix .gitignore** | Adds standard Delphi ignore patterns to the `.gitignore` |
+| **Fix .gitignore** | Adds standard Delphi ignore patterns to the `.gitignore`, keeping its line endings and encoding.  Files Git already tracks stay tracked: run `git rm --cached <file>` and commit to stop tracking one |
 | **Open in Explorer** | Opens the repo folder in Windows Explorer |
 | **Open in Git Client** | Opens in your configured external Git client |
-| **Pull** | Pulls changes from remote |
-| **Set Group** | Assigns the repo to a group for filtering |
-| **Delete Selected...** | Deletes the **checked** repositories - list entry, remote repository and/or local folder. See [Deleting Repositories](#deleting-repositories) |
+| **Pull** | Pulls changes from remote, with the same preview and backup as Pull Selected |
+| **Set Group** | Assigns a group for filtering - to the right-clicked row when it is not ticked, to every ticked row when it is |
+| **Delete Selected...** | Deletes the right-clicked row when it is not ticked, or every ticked row when it is - list entry, remote repository and/or local folder. See [Deleting Repositories](#deleting-repositories) |
 
 ## Delphi-Specific Features
 
@@ -280,7 +288,7 @@ When you commit a Delphi project, the app automatically:
 2. Creates an annotated Git tag (e.g., `v1.5.0.38`)
 3. Pushes the tag to the remote
 
-Tags appear in your GitHub/Codeberg Releases section.
+Tags appear in your GitHub Releases section.
 
 ### delphi-lookup Integration
 
@@ -304,6 +312,8 @@ Settings, credentials, repositories, commit history, templates, and the chosen v
 
 This file is outside the project directory and is never committed to Git.
 
+If the file cannot be read, it is copied to `repositories.json.unreadable-<date>-<time>` beside it, a warning tells you where, and the app starts with an empty list; your old file is never written over before that copy exists.  If something goes wrong saving your settings, templates or credentials, you are told, rather than the log claiming they were saved.
+
 ## Keyboard Shortcuts
 
 | Key | Action |
@@ -318,7 +328,7 @@ This file is outside the project directory and is never committed to Git.
 
 ### No Repositories After Startup
 
-If your repository list is empty after restarting, the configuration file may have been reset. Re-add your repositories via drag-and-drop.
+If your repository list is empty after restarting, the configuration file may have been reset. Re-add your repositories via drag-and-drop.  If a warning at startup said the file could not be read, your old list is in the `repositories.json.unreadable-...` copy it names.
 
 ### A Repository Says "- 3 to pull"
 
@@ -342,7 +352,7 @@ The `.dproj` file either doesn't exist or doesn't contain a `FileVersion` entry.
 
 ### Credentials Not Working
 
-Generate a new token and update it via the respective Settings dialog (**Codeberg > Settings** or **GitHub > Settings**).
+Generate a new token and update it via **GitHub > Settings**.
 
 ### Delete Selected Could Not Delete the Remote
 
@@ -356,5 +366,5 @@ If you deleted the wrong repository's folder, it is in the **Recycle Bin**. Rest
 
 ---
 
-*GitBatchCommit Users Guide - Version 1.8.0*
-*Last Updated: 19 September 2026*
+*GitBatchCommit Users Guide - Version 1.9.0*
+*Last Updated: 10 November 2026*

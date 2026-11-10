@@ -41,7 +41,7 @@ object MainForm: TMainForm
       Height = 15
       Caption = 'Group:'
     end
-    object btnSelectModified: TButton
+    object btnSelectModified: TBitBtn
       Left = 8
       Top = 8
       Width = 100
@@ -50,7 +50,7 @@ object MainForm: TMainForm
       TabOrder = 0
       OnClick = btnSelectModifiedClick
     end
-    object btnSelectAll: TButton
+    object btnSelectAll: TBitBtn
       Left = 114
       Top = 8
       Width = 75
@@ -59,7 +59,7 @@ object MainForm: TMainForm
       TabOrder = 1
       OnClick = btnSelectAllClick
     end
-    object btnSelectNone: TButton
+    object btnSelectNone: TBitBtn
       Left = 195
       Top = 8
       Width = 75
@@ -68,16 +68,16 @@ object MainForm: TMainForm
       TabOrder = 2
       OnClick = btnSelectNoneClick
     end
-    object cboGroupFilter: TComboBox
+    object cbGroupFilter: TComboBox
       Left = 336
       Top = 8
       Width = 145
       Height = 23
       Style = csDropDownList
       TabOrder = 3
-      OnChange = cboGroupFilterChange
+      OnChange = cbGroupFilterChange
     end
-    object btnPullSelected: TButton
+    object btnPullSelected: TBitBtn
       Left = 496
       Top = 8
       Width = 90
@@ -86,7 +86,7 @@ object MainForm: TMainForm
       TabOrder = 4
       OnClick = btnPullSelectedClick
     end
-    object btnResolveConflicts: TButton
+    object btnResolveConflicts: TBitBtn
       Left = 594
       Top = 8
       Width = 110
@@ -95,7 +95,7 @@ object MainForm: TMainForm
       TabOrder = 5
       OnClick = btnResolveConflictsClick
     end
-    object btnPushOnly: TButton
+    object btnPushOnly: TBitBtn
       Left = 712
       Top = 8
       Width = 80
@@ -104,7 +104,7 @@ object MainForm: TMainForm
       TabOrder = 6
       OnClick = btnPushOnlyClick
     end
-    object btnForcePush: TButton
+    object btnForcePush: TBitBtn
       Left = 800
       Top = 8
       Width = 90
@@ -141,7 +141,7 @@ object MainForm: TMainForm
       TabOrder = 0
       OnChange = edtCommitMessageChange
     end
-    object btnDetails: TButton
+    object btnDetails: TBitBtn
       Left = 659
       Top = 10
       Width = 25
@@ -154,7 +154,7 @@ object MainForm: TMainForm
       TabOrder = 1
       OnClick = btnDetailsClick
     end
-    object btnHistory: TButton
+    object btnHistory: TBitBtn
       Left = 690
       Top = 10
       Width = 25
@@ -167,7 +167,7 @@ object MainForm: TMainForm
       TabOrder = 2
       OnClick = btnHistoryClick
     end
-    object btnTemplates: TButton
+    object btnTemplates: TBitBtn
       Left = 721
       Top = 10
       Width = 25
@@ -180,7 +180,7 @@ object MainForm: TMainForm
       TabOrder = 3
       OnClick = btnTemplatesClick
     end
-    object btnCommitPush: TButton
+    object btnCommitPush: TBitBtn
       Left = 752
       Top = 10
       Width = 170
@@ -349,7 +349,7 @@ object MainForm: TMainForm
     object mnuGitHub: TMenuItem
       Caption = '&GitHub'
       object mnuInitPushGitHub: TMenuItem
-        Caption = '&Initialize && Push to GitHub...'
+        Caption = '&Initialise && Push to GitHub...'
         OnClick = mnuInitPushGitHubClick
       end
       object mnuMigrateToGitHub: TMenuItem
@@ -362,24 +362,6 @@ object MainForm: TMainForm
       object mnuGitHubSettings: TMenuItem
         Caption = '&Settings...'
         OnClick = mnuGitHubSettingsClick
-      end
-    end
-    object mnuCodeberg: TMenuItem
-      Caption = '&Codeberg'
-      object mnuInitPushCodeberg: TMenuItem
-        Caption = '&Initialize && Push to Codeberg...'
-        OnClick = mnuInitPushCodebergClick
-      end
-      object mnuMigrateToCodeberg: TMenuItem
-        Caption = '&Migrate Selected Repository to Codeberg...'
-        OnClick = mnuMigrateToCodebergClick
-      end
-      object mnuCodebergSep1: TMenuItem
-        Caption = '-'
-      end
-      object mnuCodebergSettings: TMenuItem
-        Caption = '&Settings...'
-        OnClick = mnuCodebergSettingsClick
       end
     end
     object mnuView: TMenuItem
@@ -463,7 +445,7 @@ object MainForm: TMainForm
       Caption = '-'
     end
     object pmEditGitignore: TMenuItem
-      Caption = 'Edit .&gitignore...'
+      Caption = 'Edit .g&itignore...'
       OnClick = pmEditGitignoreClick
     end
     object pmFixGitignore: TMenuItem
@@ -478,7 +460,7 @@ object MainForm: TMainForm
       OnClick = pmOpenInExplorerClick
     end
     object pmOpenInGitClient: TMenuItem
-      Caption = 'Open in &Git Client'
+      Caption = 'Open in Git &Client'
       OnClick = pmOpenInGitClientClick
     end
     object pmSep3: TMenuItem
@@ -499,7 +481,7 @@ object MainForm: TMainForm
     end
     object pmDeleteSelected: TMenuItem
       Caption = '&Delete Selected...'
-      OnClick = mnuDeleteSelectedClick
+      OnClick = pmDeleteSelectedClick
     end
   end
   object pmHistory: TPopupMenu

@@ -7,7 +7,7 @@
   intellectual property and confidential information, is the exclusive
   property of Ian Branch (GITLAK Software).
 
-    A licence is granted for the sole purpose of personal use. only.
+    A licence is granted for the sole purpose of personal use only.
 
     THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS
   OR IMPLIED.
@@ -52,9 +52,8 @@ unit uDeleteRepositoryDialog;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
-  System.SysUtils, System.Classes, System.UITypes, System.Math;
+  Vcl.Controls, Vcl.Forms, Vcl.StdCtrls, Vcl.Buttons,
+  System.Classes;
 
 type
   /// <summary>
@@ -85,21 +84,54 @@ type
   ///   will enable its own Delete button. Removing list entries alone is
   ///   harmless and needs no typed confirmation.
   /// </remarks>
-  TDeleteRepositoryDialog = class( TForm )
+  TDeleteRepositoryForm = class( TForm )
+    /// <summary>
+    ///   The "These repositories are about to be deleted" label.
+    /// </summary>
     lblIntro: TLabel;
+    /// <summary>
+    ///   The repositories about to be acted on, one line each.
+    /// </summary>
     lstRepos: TListBox;
+    /// <summary>
+    ///   The " What to delete " group box.
+    /// </summary>
     gbWhatToDelete: TGroupBox;
+    /// <summary>
+    ///   The "Remove the entry from this list (nothing is deleted)" check box.
+    /// </summary>
     chkRemoveEntry: TCheckBox;
+    /// <summary>
+    ///   The "Delete the remote repository on its host (permanent)" check box.
+    /// </summary>
     chkDeleteRemote: TCheckBox;
+    /// <summary>
+    ///   The "Delete the local folder (sent to the Recycle Bin)" check box.
+    /// </summary>
     chkDeleteLocal: TCheckBox;
+    /// <summary>
+    ///   States what the chosen options will destroy.
+    /// </summary>
     lblWarning: TLabel;
+    /// <summary>
+    ///   The "Type DELETE to confirm" label.
+    /// </summary>
     lblConfirm: TLabel;
+    /// <summary>
+    ///   Where the user types DELETE to authorise a destructive option.
+    /// </summary>
     edtConfirm: TEdit;
-    btnDelete: TButton;
-    btnCancel: TButton;
+    /// <summary>
+    ///   The "Delete" button.
+    /// </summary>
+    btnDelete: TBitBtn;
+    /// <summary>
+    ///   The "Cancel" button.
+    /// </summary>
+    btnCancel: TBitBtn;
     /// <summary>
     ///   Re-applies the option coupling and the button state after any option
-    ///   changes.
+    ///   changes, and withdraws a confirmation typed for a different choice.
     /// </summary>
     /// <param name="Sender">The check box that changed.</param>
     procedure OptionClick( Sender: TObject );
@@ -156,15 +188,22 @@ type
   end;
 
 var
-  DeleteRepositoryDialog: TDeleteRepositoryDialog;
+  /// <summary>
+  ///   Unused design-time instance variable; the dialog is created by
+  ///   <see cref="TDeleteRepositoryForm.Execute"/>.
+  /// </summary>
+  DeleteRepositoryForm: TDeleteRepositoryForm;
 
 implementation
 
+uses
+  System.SysUtils, System.UITypes, System.Math;
+
 {$R *.dfm}
 
-procedure TDeleteRepositoryDialog.UpdateState;
+procedure TDeleteRepositoryForm.UpdateState;
 var
-  lDestructive      : Boolean;
+  bDestructive      : Boolean;
 begin
 
   // Deleting the folder makes the entry meaningless - it can only ever paint
@@ -178,12 +217,12 @@ begin
   else
     chkRemoveEntry.Enabled := True;
 
-  lDestructive      := chkDeleteRemote.Checked or chkDeleteLocal.Checked;
+  bDestructive      := chkDeleteRemote.Checked or chkDeleteLocal.Checked;
 
-  lblConfirm.Enabled := lDestructive;
-  edtConfirm.Enabled := lDestructive;
+  lblConfirm.Enabled := bDestructive;
+  edtConfirm.Enabled := bDestructive;
 
-  if ( not lDestructive ) then
+  if ( not bDestructive ) then
     lblWarning.Caption := 'Nothing on disk or on the remote host will be touched - only the ' +
       'entries are removed from this list. The repositories can be added back at any time.'
   else if chkDeleteRemote.Checked and chkDeleteLocal.Checked then
@@ -199,15 +238,15 @@ begin
 
   // The greyed check box says the option is unavailable; this says why.
   if ( not chkDeleteRemote.Enabled ) then
-    lblWarning.Caption := lblWarning.Caption + ' None of these has a remote on GitHub or ' +
-      'Codeberg that this application can delete.';
+    lblWarning.Caption := lblWarning.Caption + ' None of these has a remote on GitHub that this ' +
+      'application can delete.';
 
-  btnDelete.Enabled := ( chkRemoveEntry.Checked or lDestructive ) and
-    ( ( not lDestructive ) or SameStr( Trim( edtConfirm.Text ), CONFIRM_WORD ) );
+  btnDelete.Enabled := ( chkRemoveEntry.Checked or bDestructive ) and
+    ( ( not bDestructive ) or SameStr( Trim( edtConfirm.Text ), CONFIRM_WORD ) );
 
 end;
 
-procedure TDeleteRepositoryDialog.SizeListToContent;
+procedure TDeleteRepositoryForm.SizeListToContent;
 var
   iWidest           : Integer;
 begin
@@ -227,30 +266,37 @@ begin
 
 end;
 
-procedure TDeleteRepositoryDialog.OptionClick( Sender: TObject );
+procedure TDeleteRepositoryForm.OptionClick( Sender: TObject );
+begin
+
+  // The typed word authorises the options as they stood when it was typed.
+  // It used to survive a change: type DELETE for "local folder", then tick
+  // "remote repository" as well, and the Delete button was already live for a
+  // permanent deletion that had never been confirmed.
+  if ( Sender = chkDeleteRemote ) or ( Sender = chkDeleteLocal ) then
+    edtConfirm.Clear;
+
+  UpdateState;
+
+end;
+
+procedure TDeleteRepositoryForm.edtConfirmChange( Sender: TObject );
 begin
 
   UpdateState;
 
 end;
 
-procedure TDeleteRepositoryDialog.edtConfirmChange( Sender: TObject );
-begin
-
-  UpdateState;
-
-end;
-
-class function TDeleteRepositoryDialog.Execute( const aRepoLines: TArray<string>;
+class function TDeleteRepositoryForm.Execute( const aRepoLines: TArray<string>;
   const bAnyRemoteDeletable: Boolean; out AOptions: TDeleteRepositoryOptions ): Boolean;
 var
-  Dlg               : TDeleteRepositoryDialog;
+  Dlg               : TDeleteRepositoryForm;
 begin
 
   Result            := False;
   AOptions          := Default( TDeleteRepositoryOptions );
 
-  Dlg               := TDeleteRepositoryDialog.Create( nil );
+  Dlg               := TDeleteRepositoryForm.Create( nil );
 
   try
     if Length( aRepoLines ) = 1 then

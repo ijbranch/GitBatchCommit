@@ -1,8 +1,8 @@
-object NewRepositoryDialog: TNewRepositoryDialog
+object NewRepositoryForm: TNewRepositoryForm
   Left = 0
   Top = 0
   BorderStyle = bsDialog
-  Caption = 'Create Codeberg Repository'
+  Caption = 'Create GitHub Repository'
   ClientHeight = 212
   ClientWidth = 400
   Color = clBtnFace
@@ -12,6 +12,7 @@ object NewRepositoryDialog: TNewRepositoryDialog
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poMainFormCenter
+  OnCloseQuery = FormCloseQuery
   TextHeight = 15
   object lblRepoName: TLabel
     Left = 16
@@ -55,18 +56,16 @@ object NewRepositoryDialog: TNewRepositoryDialog
     Width = 71
     Height = 15
     Caption = 'Project Type:'
-    Visible = False
   end
-  object cboProjectType: TComboBox
+  object cbProjectType: TComboBox
     Left = 130
     Top = 121
     Width = 250
     Height = 23
     Style = csDropDownList
     TabOrder = 3
-    Visible = False
   end
-  object btnOK: TButton
+  object btnOK: TBitBtn
     Left = 216
     Top = 172
     Width = 75
@@ -76,7 +75,7 @@ object NewRepositoryDialog: TNewRepositoryDialog
     ModalResult = 1
     TabOrder = 4
   end
-  object btnCancel: TButton
+  object btnCancel: TBitBtn
     Left = 305
     Top = 172
     Width = 75
