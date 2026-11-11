@@ -39,7 +39,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 - **Edit .gitignore** - Right-click a repository to edit its .gitignore file
 - **Column Sorting** - Click any column header to sort; click again to reverse order
 - **Status Filtering** - Use View > Filter menu to show only repositories with specific status
-- **Visual Styles** - Use View > Style to switch between Aqua Light Slate (default), Carbon, Glow, Windows, Windows10 Dark and Windows11 Modern Light; the choice is remembered
+- **Visual Styles** - Use View > Style to switch between Windows Modern MountainMist (default), Carbon, Glow, Windows, Windows10 Dark and Windows11 Modern Light; the choice is remembered
 - **Smart Button State** - Commit & Push button only enabled when repositories are selected, commit message is entered, and no operation is running
 - **Operation Log** - Detailed log of all Git operations performed
 - **Help System** - Press F1 to view `Users Guide.md`; Help > About for version info
@@ -77,7 +77,7 @@ GitBatchCommit simplifies the workflow of updating multiple projects when a shar
 |-----------|-------------|--------|
 | FastMM5 | High-performance memory manager | https://github.com/pleriche/FastMM5 |
 | OmniThreadLibrary | Background work runs on its thread pool (`OtlParallel`, used by `MainFrm.pas` and `uGitRepoManager.pas`) | `D:\gllOmniThreadLibrary` (GITLAK fork) |
-| VCL styles | Aqua Light Slate, Carbon, Glow, Windows10 Dark, Windows11 Modern Light - linked in via `Custom_Styles`; View > Style lists whatever is linked | Included with RAD Studio (`$(BDSCOMMONDIR)\Styles`) |
+| VCL styles | Windows Modern MountainMist, Carbon, Glow, Windows10 Dark, Windows11 Modern Light - linked in via `Custom_Styles`; View > Style lists whatever is linked | Included with RAD Studio (`$(BDSCOMMONDIR)\Styles`) |
 | delphi-lookup | Optional: Delphi symbol indexer for auto-reindex after commits | https://github.com/JavierusTk/delphi-lookup |
 | EurekaLog 7 | Exception reporting; compiled in under the `EurekaLog` conditional define | https://www.eurekalog.com |
 | ELExtraPlugIns | GITLAK EurekaLog plug-in aggregator, referenced by bare unit name from `GitBatchCommit.dpr` | `E:\EurekaLog` |
@@ -588,7 +588,7 @@ This project is provided as-is for personal use only.
 
 ### 1.8.0
 
-- **Added** View > Style - choose between Aqua Light Slate (the default), Carbon, Glow, Windows10 Dark, Windows11 Modern Light and the plain Windows look; the choice is remembered between sessions
+- **Added** View > Style - choose between Windows Modern MountainMist (the default), Carbon, Glow, Windows10 Dark, Windows11 Modern Light and the plain Windows look; the choice is remembered between sessions
 - **Fixed** version detection taking the highest `FileVersion` anywhere in a `.dproj`; it now resolves the version the default configuration actually builds, so the tag pushed on commit matches the binary
 - **Changed** the main unit header to list the 3rd-party libraries the project uses, at their installed versions
 

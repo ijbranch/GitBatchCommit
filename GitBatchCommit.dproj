@@ -73,7 +73,7 @@
         <VerInfo_Release>0</VerInfo_Release>
         <VerInfo_Build>0</VerInfo_Build>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=;CFBundleName=</VerInfo_Keys>
-        <Custom_Styles>&quot;Aqua Light Slate|VCLSTYLE|$(BDSCOMMONDIR)\Styles\AquaLightSlate.vsf&quot;;&quot;Carbon|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Carbon.vsf&quot;;&quot;Glow|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Glow.vsf&quot;;&quot;Windows10 Dark|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Windows10Dark.vsf&quot;;&quot;Windows11 Modern Light|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Windows11_Modern_Light.vsf&quot;</Custom_Styles>
+        <Custom_Styles>&quot;Windows Modern MountainMist|VCLSTYLE|$(BDSCOMMONDIR)\Styles\WindowsModernMountainMist.vsf&quot;;&quot;Carbon|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Carbon.vsf&quot;;&quot;Glow|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Glow.vsf&quot;;&quot;Windows10 Dark|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Windows10Dark.vsf&quot;;&quot;Windows11 Modern Light|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Windows11_Modern_Light.vsf&quot;</Custom_Styles>
         <Defines>EUREKALOG_VER7;$(Defines)</Defines>
         <DCC_Define>EUREKALOG_VER7;$(DCC_Define)</DCC_Define>
         <DCC_MapFile>3</DCC_MapFile>
@@ -144,8 +144,8 @@
         <VerInfo_MajorVer>1</VerInfo_MajorVer>
         <VerInfo_MinorVer>9</VerInfo_MinorVer>
         <VerInfo_Release>0</VerInfo_Release>
-        <VerInfo_Build>146</VerInfo_Build>
-        <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.9.0.146;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.9.0.146</VerInfo_Keys>
+        <VerInfo_Build>147</VerInfo_Build>
+        <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.9.0.147;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.9.0.147</VerInfo_Keys>
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
@@ -171,8 +171,8 @@
         <VerInfo_MajorVer>1</VerInfo_MajorVer>
         <VerInfo_MinorVer>9</VerInfo_MinorVer>
         <VerInfo_Release>0</VerInfo_Release>
-        <VerInfo_Build>88</VerInfo_Build>
-        <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.9.0.88;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.9.0.88</VerInfo_Keys>
+        <VerInfo_Build>89</VerInfo_Build>
+        <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.9.0.89;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.9.0.89</VerInfo_Keys>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
         <VerInfo_Locale>1033</VerInfo_Locale>

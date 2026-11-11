@@ -88,7 +88,7 @@ begin
 
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  TStyleManager.TrySetStyle( 'Aqua Light Slate' );
+  TStyleManager.TrySetStyle( 'Windows Modern MountainMist' );
   Application.Title := 'Git Batch Commit';
   Application.CreateForm(TMainForm, MainForm);
   Application.Run;

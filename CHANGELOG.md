@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- (2026-11-11) **Appearance: the Windows Modern MountainMist style** — `GitBatchCommit.dproj`, `GitBatchCommit.dpr`, `Help.md`, `README.md`, `Users Guide.md`.  `GitBatchCommit` runs in the `Windows Modern MountainMist` VCL style in place of `Aqua Light Slate` ( Ian, 2026-11-11: every `.exe` project uses it ).  The `.dproj` embeds the style and the `.dpr` selects it.
 - (2026-11-10) **Force Push is refused after a failed fetch** — `uGitRepoManager.pas`, `README.md`, `Help.md`, `Users Guide.md`.  (Ian, 2026-11-10.)  `ForcePushRepository` refuses while `TRepoInfo.FetchFailed` is set, because the row then shows the remote as it was at an earlier fetch.  A local-only refresh no longer clears `FetchFailed`; only a refresh that fetches does.
 - (2026-11-10) **Version 1.9.0** — `uGitRepoManager.pas`, `GitBatchCommit.dproj`, `GitBatchCommit.dpr`, `MainFrm.pas`.
 - (2026-11-10) **Git hooks in a listed repository now run** — `uGitRepoManager.pas`.  The `-c core.hooksPath=` override is gone (Ian, 2026-11-10: "Run hooks").  **Why:** our own repositories rely on their pre-commit hooks (`.dproj` normalisation, ProductVersion sync), and this tool was committing around them.  Listing a repository means trusting its hooks.

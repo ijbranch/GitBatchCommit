@@ -531,8 +531,8 @@ If a Git call is stuck on a network timeout, the drain gives up after 90 seconds
 | **Where** | View > Style menu |
 | **When** | Any time; the change applies immediately |
 | **Why** | Personal preference, or a dark style for low-light work |
-| **How** | View > Style > Select a style (Aqua Light Slate, Carbon, Glow, Windows, Windows10 Dark, Windows11 Modern Light) |
-| **Caveats** | Saved as `vcl_style` in `repositories.json`; empty means the Aqua Light Slate default. A saved style that is no longer linked into the program is ignored, with a warning in the log |
+| **How** | View > Style > Select a style (Windows Modern MountainMist, Carbon, Glow, Windows, Windows10 Dark, Windows11 Modern Light) |
+| **Caveats** | Saved as `vcl_style` in `repositories.json`; empty means the Windows Modern MountainMist default. A saved style that is no longer linked into the program is ignored, with a warning in the log |
 | **Linkages** | The list comes from the styles linked into the executable (`Custom_Styles` in `GitBatchCommit.dproj`) |
 
 ### Column Sorting

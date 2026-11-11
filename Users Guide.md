@@ -190,7 +190,7 @@ To assign a group: right-click a repository and choose **Set Group**.  If the ro
 
 ## Appearance
 
-Use **View > Style** to change the look of the application: Aqua Light Slate (the default), Carbon, Glow, Windows, Windows10 Dark or Windows11 Modern Light. The change applies at once and is remembered the next time you start the program.
+Use **View > Style** to change the look of the application: Windows Modern MountainMist (the default), Carbon, Glow, Windows, Windows10 Dark or Windows11 Modern Light. The change applies at once and is remembered the next time you start the program.
 
 ## Pull Operations
 
