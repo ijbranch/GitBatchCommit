@@ -683,7 +683,7 @@ This project is provided as-is for personal use only.
 
 Requires to be built with Delphi v 13 or higher. Libraries named in this project's own units, at the installed version and the date it was installed (or, for a fork or our own library, last changed):
 
-- FastMM5 v 5.07 - Updated 24/10/2026
+- FastMM5 v 5.07 (gllFastMM5 fork, Win64 per-thread small block arenas) - Updated 13/11/2026
 - EurekaLog v 7.16.2.1 - 22/10/2026
 - ETHEA Styled Components v 4.6.0 - 04/11/2026
 - OmniThreadLibrary v 3.09 (gllOmniThreadLibrary) - 06/11/2026
