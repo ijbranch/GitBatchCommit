@@ -356,12 +356,29 @@ type
     /// </summary>
     [Test]
     procedure ChildReadsEndOfFileFromStandardInput;
+
+    /// <summary>
+    ///   Proves a pipe whose writer has closed gives back every byte written,
+    ///   then the END of the output ( no bytes, no error ) from the
+    ///   <c>ERROR_BROKEN_PIPE</c> that follows, and not a failure.
+    /// </summary>
+    [Test]
+    procedure ClosedPipeGivesAllDataThenTheEnd;
+
+    /// <summary>
+    ///   Proves a read that FAILS for another reason ( a write-only handle,
+    ///   <c>ERROR_ACCESS_DENIED</c> ) is reported as a failure with its error
+    ///   code, not taken for the end of the output, which passed a cut-short
+    ///   Git result off as complete.
+    /// </summary>
+    [Test]
+    procedure FailedReadIsReportedNotTakenForTheEnd;
   end;
 
 implementation
 
 uses
-  System.SysUtils, System.IOUtils, System.Diagnostics;
+  Winapi.Windows, System.SysUtils, System.IOUtils, System.Diagnostics;
 
 const
   /// <summary>
@@ -818,6 +835,72 @@ begin
   // the timeout; with the empty one it sees end-of-file at once.
   Assert.IsTrue( RunProcessCaptureOutput( 'cmd /c "set /p x=& echo done"', '', sOutput, QUICK_COMMAND_TIMEOUT, True ), sOutput );
   Assert.AreEqual( 'done', sOutput.Trim, False );
+
+end;
+
+procedure TTestRunProcess.ClosedPipeGivesAllDataThenTheEnd;
+var
+  hRead       : THandle;
+  hWrite      : THandle;
+  dwWritten   : DWORD;
+  dwBytesRead : DWORD;
+  dwError     : DWORD;
+begin
+
+  // More than one chunk, so the loop has to come round.
+  var naSent    := TEncoding.UTF8.GetBytes( StringOfChar( 'x', 10000 ) );
+  var naBuffer  : TBytes;
+  var naGot     : TBytes := nil;
+  SetLength( naBuffer, 4096 );
+
+  Assert.IsTrue( CreatePipe( hRead, hWrite, nil, 65536 ), 'CreatePipe' );
+  try
+    Assert.IsTrue( WriteFile( hWrite, naSent[ 0 ], Length( naSent ), dwWritten, nil ), 'WriteFile' );
+    CloseHandle( hWrite );
+    hWrite      := 0;
+
+    repeat
+      Assert.IsTrue( ReadPipeChunk( hRead, naBuffer, dwBytesRead, dwError ),
+        Format( 'the read failed with %d', [ dwError ] ) );
+      Assert.AreEqual( DWORD( 0 ), dwError, 'no error alongside a chunk or the end' );
+
+      var iUsed := Length( naGot );
+      SetLength( naGot, iUsed + Integer( dwBytesRead ) );
+
+      if dwBytesRead > 0 then
+        Move( naBuffer[ 0 ], naGot[ iUsed ], dwBytesRead );
+    until dwBytesRead = 0;
+
+    Assert.IsTrue( SameBytes( naSent, naGot ), 'every byte written comes back' );
+  finally
+    CloseHandle( hRead );
+
+    if hWrite <> 0 then
+      CloseHandle( hWrite );
+  end;
+
+end;
+
+procedure TTestRunProcess.FailedReadIsReportedNotTakenForTheEnd;
+var
+  dwBytesRead : DWORD;
+  dwError     : DWORD;
+begin
+
+  var naBuffer  : TBytes;
+  SetLength( naBuffer, 4096 );
+  FSandbox.WriteText( FSandbox.Root, 'data.txt', 'some text' );
+
+  var hFile     := CreateFile( PChar( TPath.Combine( FSandbox.Root, 'data.txt' ) ), GENERIC_WRITE, 0, nil, OPEN_EXISTING,
+    FILE_ATTRIBUTE_NORMAL, 0 );
+  Assert.IsTrue( hFile <> INVALID_HANDLE_VALUE, 'CreateFile' );
+  try
+    Assert.IsFalse( ReadPipeChunk( hFile, naBuffer, dwBytesRead, dwError ), 'a failed read is not the end' );
+    Assert.AreEqual( DWORD( ERROR_ACCESS_DENIED ), dwError, 'the Windows error is handed back' );
+    Assert.AreEqual( DWORD( 0 ), dwBytesRead, 'no bytes from a failed read' );
+  finally
+    CloseHandle( hFile );
+  end;
 
 end;
 

@@ -1361,11 +1361,13 @@ function IsValidRepoName( const AName: string ): Boolean;
 ///   Receives standard output followed by standard error; standard output
 ///   alone when <paramref name="bStdOutOnly"/> is True and the process
 ///   succeeded.  When the process could not be started it holds the reason.
-///   Output past 8 MB per stream is discarded and marked as truncated.
+///   Output past 8 MB per stream is discarded and marked as truncated.  When
+///   a read of either stream failed it ends with the reason, and the result
+///   is False.
 /// </param>
 /// <param name="iTimeout">Timeout in milliseconds.</param>
 /// <param name="bStdOutOnly">True to leave standard error out of a successful result.</param>
-/// <returns>True if the process ran to completion and exited with code 0.</returns>
+/// <returns>True if the process ran to completion, exited with code 0 and its output was read in full.</returns>
 function RunProcessCaptureOutput( const sCommandLine, sWorkingDir: string; out sOutput: string;
   const iTimeout: Cardinal; const bStdOutOnly: Boolean = False ): Boolean;
 
@@ -1377,6 +1379,24 @@ function RunProcessCaptureOutput( const sCommandLine, sWorkingDir: string; out s
 /// <param name="iCount">Number of bytes in the buffer to decode.</param>
 /// <returns>The decoded text; invalid sequences become U+FFFD.</returns>
 function DecodeUtf8Lenient( const ABytes: TBytes; const iCount: Integer ): string;
+
+/// <summary>
+///   Reads one chunk from the read end of a child's output pipe, telling the
+///   normal end of output apart from a failed read.
+/// </summary>
+/// <remarks>
+///   <c>ReadFile</c> returning True with no bytes, or failing with
+///   <c>ERROR_BROKEN_PIPE</c> ( the child closed its end ) or
+///   <c>ERROR_HANDLE_EOF</c>, is the END of the output.  Any other failure
+///   means the output was cut short, and treating it as the end passed a
+///   partial Git result off as complete.
+/// </remarks>
+/// <param name="hRead">The read end of the pipe.</param>
+/// <param name="naBuffer">Receives the bytes; must not be empty.</param>
+/// <param name="dwBytesRead">Bytes read; 0 at the end of the output.</param>
+/// <param name="dwError">The Windows error code when the read failed; otherwise 0.</param>
+/// <returns>True for a chunk or the end of the output; False when the read failed.</returns>
+function ReadPipeChunk( const hRead: THandle; var naBuffer: TBytes; out dwBytesRead, dwError: DWORD ): Boolean;
 
 /// <summary>
 ///   Returns True for an exception that indicates a defect in this application
@@ -1846,6 +1866,27 @@ begin
 
 end;
 
+function ReadPipeChunk( const hRead: THandle; var naBuffer: TBytes; out dwBytesRead, dwError: DWORD ): Boolean;
+begin
+
+  dwError           := 0;
+  Result            := True;
+
+  if ReadFile( hRead, naBuffer[ 0 ], Length( naBuffer ), dwBytesRead, nil ) then
+    Exit;
+
+  // Read at once: any later API call may replace it.
+  var dwLastError   := Winapi.Windows.GetLastError;
+  dwBytesRead       := 0;
+
+  if ( dwLastError <> ERROR_BROKEN_PIPE ) and ( dwLastError <> ERROR_HANDLE_EOF ) then
+  begin
+    dwError         := dwLastError;
+    Result          := False;
+  end;
+
+end;
+
 function RunProcessCaptureOutput( const sCommandLine, sWorkingDir: string; out sOutput: string;
   const iTimeout: Cardinal; const bStdOutOnly: Boolean ): Boolean;
 type
@@ -1858,6 +1899,7 @@ type
     naBytes         : TBytes;
     iCount          : Integer;
     bTruncated      : Boolean;
+    dwReadError     : DWORD;
   end;
 var
   StartupInfo       : TStartupInfo;
@@ -1892,12 +1934,14 @@ var
     // matter how chatty the child is.
     var iReads      := 0;
 
-    while ( iReads < MAX_READS_PER_DRAIN ) and
+    // A stream whose read failed is not read again: its output is already
+    // known to be incomplete, and the failure is reported once.
+    while ( ACapture.dwReadError = 0 ) and ( iReads < MAX_READS_PER_DRAIN ) and
       PeekNamedPipe( ACapture.hRead, nil, 0, nil, @dwBytesAvail, nil ) and ( dwBytesAvail > 0 ) do
     begin
       Inc( iReads );
 
-      if ( not ReadFile( ACapture.hRead, naBuffer[ 0 ], Length( naBuffer ), dwBytesRead, nil ) ) or
+      if ( not ReadPipeChunk( ACapture.hRead, naBuffer, dwBytesRead, ACapture.dwReadError ) ) or
         ( dwBytesRead = 0 ) then
         Break;
 
@@ -2121,16 +2165,23 @@ begin
       DrainPipe( rStdOut );
       DrainPipe( rStdErr );
 
+      // A stream whose read failed counts as empty: it is never read again,
+      // so waiting for it to drain would never end.
       if ( ( rStdOut.iCount + rStdErr.iCount ) = iBefore ) and
-        ( ( not PeekNamedPipe( rStdOut.hRead, nil, 0, nil, @dwBytesAvail, nil ) ) or ( dwBytesAvail = 0 ) ) and
-        ( ( not PeekNamedPipe( rStdErr.hRead, nil, 0, nil, @dwBytesAvail, nil ) ) or ( dwBytesAvail = 0 ) ) then
+        ( ( rStdOut.dwReadError <> 0 ) or ( not PeekNamedPipe( rStdOut.hRead, nil, 0, nil, @dwBytesAvail, nil ) ) or
+        ( dwBytesAvail = 0 ) ) and
+        ( ( rStdErr.dwReadError <> 0 ) or ( not PeekNamedPipe( rStdErr.hRead, nil, 0, nil, @dwBytesAvail, nil ) ) or
+        ( dwBytesAvail = 0 ) ) then
         Break;
 
       if bWasCut and bTimedOut then
         Break;
     until False;
 
-    if ( not bTimedOut ) and GetExitCodeProcess( ProcessInfo.hProcess, dwExitCode ) then
+    // A failed read means the output is cut short, so even exit code 0 is not
+    // a complete result.
+    if ( not bTimedOut ) and ( rStdOut.dwReadError = 0 ) and ( rStdErr.dwReadError = 0 ) and
+      GetExitCodeProcess( ProcessInfo.hProcess, dwExitCode ) then
       Result        := ( dwExitCode = 0 );
   finally
     // A caller that PARSES the result asks for stdout alone.  It still gets
@@ -2151,6 +2202,13 @@ begin
 
     if bTimedOut then
       sOutput       := sOutput.TrimRight + sLineBreak + 'Operation timed out';
+
+    for var dwReadError in [ rStdOut.dwReadError, rStdErr.dwReadError ] do
+    begin
+      if dwReadError <> 0 then
+        sOutput     := sOutput.TrimRight + sLineBreak +
+          Format( 'Could not read the command''s output: %s', [ SysErrorMessage( dwReadError ) ] );
+    end;
 
     if bProcessStarted then
     begin

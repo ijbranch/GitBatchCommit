@@ -144,8 +144,8 @@
         <VerInfo_MajorVer>1</VerInfo_MajorVer>
         <VerInfo_MinorVer>9</VerInfo_MinorVer>
         <VerInfo_Release>0</VerInfo_Release>
-        <VerInfo_Build>147</VerInfo_Build>
-        <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.9.0.147;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.9.0.147</VerInfo_Keys>
+        <VerInfo_Build>149</VerInfo_Build>
+        <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.9.0.149;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.9.0.149</VerInfo_Keys>
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
@@ -171,8 +171,8 @@
         <VerInfo_MajorVer>1</VerInfo_MajorVer>
         <VerInfo_MinorVer>9</VerInfo_MinorVer>
         <VerInfo_Release>0</VerInfo_Release>
-        <VerInfo_Build>89</VerInfo_Build>
-        <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.9.0.89;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.9.0.89</VerInfo_Keys>
+        <VerInfo_Build>91</VerInfo_Build>
+        <VerInfo_Keys>FileDescription=GitBatchCommit;FileVersion=1.9.0.91;ProgramID=com.embarcadero.GitBatchCommit;ProductName=GitBatchCommit;ProductVersion=1.9.0.91</VerInfo_Keys>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
         <VerInfo_Locale>1033</VerInfo_Locale>
