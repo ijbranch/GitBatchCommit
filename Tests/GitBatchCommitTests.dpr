@@ -29,7 +29,8 @@ uses
   Test.GitRepoManager.Pure in 'Test.GitRepoManager.Pure.pas',
   Test.GitRepoManager.Config in 'Test.GitRepoManager.Config.pas',
   Test.GitRepoManager.Git in 'Test.GitRepoManager.Git.pas',
-  Test.GitRepoManager.Parallel in 'Test.GitRepoManager.Parallel.pas';
+  Test.GitRepoManager.Parallel in 'Test.GitRepoManager.Parallel.pas',
+  Test.GitRepoManager.Http in 'Test.GitRepoManager.Http.pas';
 
 {$R *.res}
 

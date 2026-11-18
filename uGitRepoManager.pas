@@ -66,7 +66,7 @@ const
   ///   Canonical application version. Update here and only here; surface
   ///   everywhere else ( About dialog, User-Agent header, docs ) by referencing.
   /// </summary>
-  APP_VERSION = '1.9.0';
+  APP_VERSION = '1.9.1';
 
   /// <summary>
   ///   Timeout, in milliseconds, for a Git command that works on the local
@@ -616,8 +616,12 @@ type
     /// <param name="sTempFile">The file to delete; may be empty.</param>
     procedure DeleteCommitMessageFile( const sTempFile: string );
 
+  protected
     /// <summary>
-    ///   Makes an HTTP request to a remote API.
+    ///   Makes an HTTP request to a remote API.  One redirect within the API's own origin (scheme, host, port) is
+    ///   followed with the same verb, body and token (GitHub's 307 for a renamed repository); a redirect anywhere else
+    ///   is refused, returning False with a response naming the Location, so the token is never sent there.
+    ///   Protected so a test descendant can drive it against a local server.
     /// </summary>
     /// <param name="sVerb">HTTP verb: 'POST', 'PATCH' or 'DELETE'.</param>
     /// <param name="sBaseURL">API base URL ( GITHUB_API_URL ).</param>
@@ -630,6 +634,8 @@ type
     function ExecuteApiRequest( const sVerb, sBaseURL, sEndpoint, sBody: string;
       const aHeaders: TArray<TNameValuePair>; out sResponse: string;
       out iStatusCode: Integer ): Boolean;
+
+  private
 
     /// <summary>
     ///   Makes an authenticated request to the GitHub API.
@@ -779,7 +785,8 @@ type
     function IsWorkingTreeClean( const sRepoPath: string ): Boolean;
 
     /// <summary>
-    ///   Configures a TNetHTTPClient with User-Agent and timeouts.
+    ///   Configures a TNetHTTPClient with User-Agent and timeouts, and turns automatic redirects off: the RTL would
+    ///   replay the token to any redirect target, so ExecuteApiRequest follows a same-origin redirect itself.
     /// </summary>
     /// <param name="AClient">The client to configure.</param>
     procedure ConfigureHttpClient( const AClient: TNetHTTPClient );
@@ -2887,6 +2894,9 @@ begin
 
   AClient.ContentType := 'application/json';
   AClient.UserAgent := Format( 'GitBatchCommit/%s', [ APP_VERSION ] );
+  // Never follow a redirect: the RTL would replay the Authorization token to whatever host it points at (GITLAKRTL
+  // finding D2; this public project cannot link GITLAKRTL's fix).  A 3xx is reported to the caller instead.
+  AClient.HandleRedirects := False;
   AClient.ConnectionTimeout := 15000;
   AClient.ResponseTimeout := 30000;
 
@@ -4131,23 +4141,51 @@ begin
     ConfigureHttpClient( HttpClient );
 
     try
-      if SameText( sVerb, 'POST' ) then
-        Response    := HttpClient.Post( sBaseURL + sEndpoint, RequestStream, nil, aHeaders )
-      else if SameText( sVerb, 'PATCH' ) then
-        Response    := HttpClient.Patch( sBaseURL + sEndpoint, RequestStream, nil, aHeaders )
-      else if SameText( sVerb, 'DELETE' ) then
-        // No request body: GitHub takes the repository from the path and
-        // rejects a DELETE that carries one.
-        Response    := HttpClient.Delete( sBaseURL + sEndpoint, nil, aHeaders )
-      else
+      if not ( SameText( sVerb, 'POST' ) or SameText( sVerb, 'PATCH' ) or SameText( sVerb, 'DELETE' ) ) then
       begin
         sResponse   := Format( 'Unsupported HTTP verb: %s', [ sVerb ] );
         Exit;
       end;
 
-      iStatusCode   := Response.StatusCode;
-      sResponse     := Response.ContentAsString;
-      Result        := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
+      // At most one redirect is followed, by hand, and only within the API's own origin (scheme, host, port): a
+      // renamed or transferred repository answers 307 with a Location on the same host.  A redirect anywhere else is
+      // refused, because the token would go with it.
+      var sURL      := sBaseURL + sEndpoint;
+      for var iHop := 0 to 1 do
+      begin
+        RequestStream.Position := 0;
+        if SameText( sVerb, 'POST' ) then
+          Response  := HttpClient.Post( sURL, RequestStream, nil, aHeaders )
+        else if SameText( sVerb, 'PATCH' ) then
+          Response  := HttpClient.Patch( sURL, RequestStream, nil, aHeaders )
+        else
+          // No request body: GitHub takes the repository from the path and
+          // rejects a DELETE that carries one.
+          Response  := HttpClient.Delete( sURL, nil, aHeaders );
+
+        iStatusCode := Response.StatusCode;
+        sResponse   := Response.ContentAsString;
+        Result      := ( iStatusCode >= 200 ) and ( iStatusCode < 300 );
+        if ( iStatusCode < 300 ) or ( iStatusCode >= 400 ) then
+          Break;
+
+        var sLocation := Response.HeaderValue[ 'Location' ];
+        if sLocation = '' then
+        begin
+          sResponse := Format( 'The API answered %d without a Location to follow.', [ iStatusCode ] );
+          Break;
+        end;
+        var uFrom   := TURI.Create( sBaseURL );
+        var uTo     := TURI.Create( sLocation );
+        if ( iHop = 1 ) or not SameText( uFrom.Scheme, uTo.Scheme ) or not SameText( uFrom.Host, uTo.Host ) or
+          ( uFrom.Port <> uTo.Port ) then
+        begin
+          sResponse := Format( 'The API answered %d, redirecting to %s; not followed, so the access token is not ' +
+            'sent there.', [ iStatusCode, sLocation ] );
+          Break;
+        end;
+        sURL        := sLocation;
+      end;
     except
       // No network, a refused connection, a TLS failure or a timeout: all
       // reported to the caller as text.  A defect of ours goes to EurekaLog.

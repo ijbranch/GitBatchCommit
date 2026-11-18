@@ -121,8 +121,8 @@
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
         <VerInfo_Locale>3081</VerInfo_Locale>
-        <VerInfo_Build>11</VerInfo_Build>
-        <VerInfo_Keys>CompanyName=GITLAK Software;FileDescription=GitBatchCommit DUnitX test suite;FileVersion=1.0.0.11;InternalName=GitBatchCommitTests;LegalCopyright=(c) 2026 GITLAK Software;LegalTrademarks=;OriginalFilename=;ProductName=GitBatchCommitTests;ProductVersion=1.0.0.11;Comments=</VerInfo_Keys>
+        <VerInfo_Build>34</VerInfo_Build>
+        <VerInfo_Keys>CompanyName=GITLAK Software;FileDescription=GitBatchCommit DUnitX test suite;FileVersion=1.0.0.34;InternalName=GitBatchCommitTests;LegalCopyright=(c) 2026 GITLAK Software;LegalTrademarks=;OriginalFilename=;ProductName=GitBatchCommitTests;ProductVersion=1.0.0.34;Comments=</VerInfo_Keys>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -134,6 +134,7 @@
         <DCCReference Include="Test.GitRepoManager.Config.pas"/>
         <DCCReference Include="Test.GitRepoManager.Git.pas"/>
         <DCCReference Include="Test.GitRepoManager.Parallel.pas"/>
+        <DCCReference Include="Test.GitRepoManager.Http.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

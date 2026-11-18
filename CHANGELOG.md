@@ -62,6 +62,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 
+- (2026-11-19) **The GitHub token could follow a redirect to another host** (1.9.1) — `uGitRepoManager.pas`, `GitBatchCommit.dproj`.  The API client followed redirects, and Embarcadero's HTTP client replays every request header, `Authorization: Bearer <token>` included, to whatever host a redirect points at (GITLAKRTL finding D2; this public project cannot link GITLAKRTL's fix).  `ConfigureHttpClient` now sets `HandleRedirects := False` and `ExecuteApiRequest` follows at most one redirect itself, only within the API's own origin (scheme, host, port: GitHub's 307 for a renamed or transferred repository keeps working, with the same verb, body and token); a redirect anywhere else, a second redirect, or one without a `Location` fails the request with a response saying why, so the token stays with the API host.  `APP_VERSION` is 1.9.1 too (About box, User-Agent).  `ExecuteApiRequest` is protected (was private) so the tests can drive it against a local server.
 - (2026-11-10) **A remote URL carrying a credential was shown in the Delete dialog** — `MainFrm.pas`.  The resolved remote is passed through `RedactSecrets` like every log line and error dialog.
 
 ## [1.8.0] - 2026-10-12
