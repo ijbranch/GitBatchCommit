@@ -151,6 +151,8 @@ begin
 
   FreeAndNil( FManager );
   FreeAndNil( FSandbox );
+  // the fixture outlives the test: an array kept here counts as memory the test leaked
+  FRepos := nil;
 
 end;
 

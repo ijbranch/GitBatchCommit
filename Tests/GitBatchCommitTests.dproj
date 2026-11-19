@@ -59,6 +59,7 @@
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
+        <DCC_UnitSearchPath>D:\gllDUnitX\Source\Gll;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <SanitizedProjectName>GitBatchCommitTests</SanitizedProjectName>
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
@@ -121,8 +122,8 @@
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
         <VerInfo_Locale>3081</VerInfo_Locale>
-        <VerInfo_Build>34</VerInfo_Build>
-        <VerInfo_Keys>CompanyName=GITLAK Software;FileDescription=GitBatchCommit DUnitX test suite;FileVersion=1.0.0.34;InternalName=GitBatchCommitTests;LegalCopyright=(c) 2026 GITLAK Software;LegalTrademarks=;OriginalFilename=;ProductName=GitBatchCommitTests;ProductVersion=1.0.0.34;Comments=</VerInfo_Keys>
+        <VerInfo_Build>38</VerInfo_Build>
+        <VerInfo_Keys>CompanyName=GITLAK Software;FileDescription=GitBatchCommit DUnitX test suite;FileVersion=1.0.0.38;InternalName=GitBatchCommitTests;LegalCopyright=(c) 2026 GITLAK Software;LegalTrademarks=;OriginalFilename=;ProductName=GitBatchCommitTests;ProductVersion=1.0.0.38;Comments=</VerInfo_Keys>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
